@@ -1,0 +1,6 @@
+pandas
+spacy
+bertopic
+matplotlib
+requests
+git+https://github.com/andehr/sfpd.git

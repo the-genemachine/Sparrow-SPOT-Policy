@@ -1,0 +1,251 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sparrow SPOT Scale™ - </title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Garamond', 'Georgia', serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 20px;
+        }
+        .certificate {
+            background: white; max-width: 920px; width: 100%; padding: 55px;
+            box-shadow: 0 25px 70px rgba(0,0,0,0.32); position: relative;
+            border-top: 6px solid #2980b9; border-bottom: 6px solid #2980b9;
+        }
+        .certificate::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(200,200,200,0.04) 35px, rgba(200,200,200,0.04) 70px);
+            pointer-events: none;
+        }
+        .watermark {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 110px; color: rgba(200,200,200,0.14); font-weight: bold; pointer-events: none; z-index: 0;
+        }
+        .content { position: relative; z-index: 1; }
+
+        /* Header */
+        .header { text-align: center; margin-bottom: 45px; padding-bottom: 30px; border-bottom: 2px solid #2980b9; }
+        .header h1 { font-size: 2.6em; color: #1a6699; letter-spacing: 1.8px; margin-bottom: 8px; }
+        .header .subtitle { font-size: 1.15em; color: #444; font-style: italic; }
+        .seal { font-size: 3.2em; color: #2980b9; margin: 18px 0; }
+
+        /* Document Type Badge */
+        .doc-type-badge {
+            display: inline-block; background: #e3f2fd; color: #1565c0; padding: 6px 14px;
+            border-radius: 20px; font-size: 0.85em; font-weight: 600; letter-spacing: 0.5px; margin-top: 8px;
+        }
+
+        /* Article Info */
+        .article-info {
+            background: #f8f9fa; padding: 22px; border-left: 5px solid #2980b9; border-radius: 0 6px 6px 0;
+            margin: 35px 0; font-size: 0.98em;
+        }
+        .article-info h3 { color: #1a6699; font-size: 1.18em; margin-bottom: 12px; }
+        .article-info p { margin: 7px 0; line-height: 1.65; color: #333; }
+        .article-info strong { color: #1a6699; }
+
+        /* Composite Grade */
+        .composite-grade {
+            text-align: center; padding: 42px; margin: 45px 0;
+            background: linear-gradient(135deg, #e3f2fd20 0%, #bbdefb30 100%);
+            border: 2.5px solid #2980b9; border-radius: 10px;
+        }
+        .composite-grade h2 { color: #1a6699; font-size: 2.1em; margin-bottom: 16px; }
+        .composite-score { font-size: 3.8em; font-weight: 900; color: #1a6699; margin: 18px 0; }
+        .composite-classification { font-size: 1.25em; color: #333; line-height: 1.6; }
+
+        /* Individual Grades Grid */
+        .grades {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 18px; margin: 45px 0;
+        }
+        .grade-item {
+            background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;
+            border-top: 4px solid #2980b9; transition: transform 0.2s;
+        }
+        .grade-item h4 { color: #1a6699; font-size: 0.95em; margin-bottom: 10px; letter-spacing: 0.8px; }
+        .grade-value { font-size: 2.1em; font-weight: bold; color: #1a6699; margin: 8px 0; }
+        .grade-letter { font-size: 1.3em; color: #555; margin: 4px 0; }
+        .grade-description { font-size: 0.88em; color: #666; line-height: 1.5; }
+
+        /* Methodology */
+        .methodology {
+            background: #e8f4fc; padding: 22px; border-left: 5px solid #2980b9; border-radius: 0 6px 6px 0;
+            margin: 40px 0; font-size: 0.94em;
+        }
+        .methodology h3 { color: #1a6699; margin-bottom: 14px; }
+        .methodology ul { list-style: none; }
+        .methodology li { margin: 9px 0; position: relative; padding-left: 22px; color: #333; }
+        .methodology li::before { content: '✓'; color: #2980b9; position: absolute; left: 0; font-weight: bold; }
+
+        /* Footer */
+        .footer {
+            margin-top: 55px; padding-top: 28px; border-top: 2px solid #ddd;
+            text-align: center; font-size: 0.88em; color: #666;
+        }
+        .certificate-id { margin: 14px 0; font-weight: bold; color: #1a6699; }
+
+        /* Grade Color Classes */
+        .grade-a { color: #27ae60; }
+        .grade-b { color: #3498db; }
+        .grade-c { color: #f39c12; }
+        .grade-d { color: #e74c3c; }
+        .grade-f { color: #c0392b; }
+
+        /* Print & Mobile */
+        @media print {
+            body { background: white; }
+            .certificate { box-shadow: none; max-width: 100%; padding: 40px; }
+        }
+        @media (max-width: 600px) {
+            .certificate { padding: 30px; }
+            .header h1 { font-size: 1.9em; }
+            .composite-score { font-size: 2.8em; }
+            .grades { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate">
+        <div class="watermark">SPARROW SPOT</div>
+        <div class="content">
+
+            <!-- Header -->
+            <div class="header">
+                <h1>Sparrow SPOT Scale™ Certification</h1>
+                <p class="subtitle">Policy & Legislative Document Quality Assessment</p>
+                <div class="doc-type-badge">POLICY DOCUMENT</div>
+                <div class="seal">★</div>
+            </div>
+
+            <!-- Article Info -->
+            <div class="article-info">
+                <h3>Document Information</h3>
+                <p><strong>Title:</strong> Policy Document</p>
+                <p><strong>Analysis Date:</strong> November 26, 2025</p>
+            </div>
+
+            <!-- Composite Grade -->
+            <div class="composite-grade">
+                <h2>Overall Assessment</h2>
+                <div class="composite-score">82.9/100</div>
+                <div class="composite-classification">
+                    Grade: <strong class="grade-b">B+</strong><br>
+                    Performance: <strong>Strong</strong><br>
+                    Classification: <strong>Good Policy</strong>
+                </div>
+            </div>
+
+            <!-- Individual Grades -->
+            <div class="grades">
+                <div class="grade-item">
+                    <h4>Fiscal Transparency</h4>
+                    <div class="grade-value">89.2</div>
+                    <div class="grade-letter">(FT)</div>
+                    <div class="grade-code" style="font-size: 0.95em; font-weight: 600; color: #2980b9; margin: 6px 0;">CD</div>
+                    <div class="grade-description">Clear Disclosure</div>
+                </div>
+                <div class="grade-item">
+                    <h4>Stakeholder Balance</h4>
+                    <div class="grade-value">82.3</div>
+                    <div class="grade-letter">(SB)</div>
+                    <div class="grade-code" style="font-size: 0.95em; font-weight: 600; color: #2980b9; margin: 6px 0;">BV</div>
+                    <div class="grade-description">Balanced Views</div>
+                </div>
+                <div class="grade-item">
+                    <h4>Economic Rigor</h4>
+                    <div class="grade-value">60.2</div>
+                    <div class="grade-letter">(ER)</div>
+                    <div class="grade-code" style="font-size: 0.95em; font-weight: 600; color: #2980b9; margin: 6px 0;">AA</div>
+                    <div class="grade-description">Acceptable Assumptions</div>
+                </div>
+                <div class="grade-item">
+                    <h4>Public Accessibility</h4>
+                    <div class="grade-value">85.0</div>
+                    <div class="grade-letter">(PA)</div>
+                    <div class="grade-code" style="font-size: 0.95em; font-weight: 600; color: #2980b9; margin: 6px 0;">GC</div>
+                    <div class="grade-description">Generally Clear</div>
+                </div>
+                <div class="grade-item">
+                    <h4>Policy Consequentiality</h4>
+                    <div class="grade-value">97.1</div>
+                    <div class="grade-letter">(PC)</div>
+                    <div class="grade-code" style="font-size: 0.95em; font-weight: 600; color: #2980b9; margin: 6px 0;">T</div>
+                    <div class="grade-description">Transformative</div>
+                </div>
+            </div>
+
+            <!-- Ethical Framework Assessment Section (v8) -->
+            <div class="ethical-framework" style="background: #f0f4f8; padding: 25px; margin: 25px 0; border-left: 5px solid #27ae60; border-radius: 4px;">
+                <h3 style="color: #27ae60; margin-bottom: 15px;">🔒 Ethical Framework Assessment (v8.0)</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <!-- Trust Score Badge -->
+                    <div class="badge" style="padding: 12px; border: 2px solid #3498db; border-radius: 4px; background: white;">
+                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">Trust Score</div>
+                        <div style="font-size: 1.8em; font-weight: 700; color: #3498db; margin: 5px 0;">61</div>
+                        <div style="font-size: 0.85em; color: #666;">Explainability, Fairness, Robustness, Compliance</div>
+                    </div>
+                    <!-- AI Detection Badge -->
+                    <div class="badge" style="padding: 12px; border: 2px solid #e74c3c; border-radius: 4px; background: white;">
+                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">AI Detection</div>
+                        <div style="font-size: 1.2em; font-weight: 700; color: #e74c3c; margin: 5px 0;">53%</div>
+                        <div style="font-size: 0.85em; color: #666;">Human/Mixed/AI Classification</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <!-- Risk Tier Badge -->
+                    <div class="badge" style="padding: 12px; border: 2px solid #f39c12; border-radius: 4px; background: white;">
+                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">Risk Classification</div>
+                        <div style="font-size: 1.2em; font-weight: 700; color: #f39c12; margin: 5px 0;">MEDIUM</div>
+                        <div style="font-size: 0.85em; color: #666;">NIST AI RMF v1.0 Based</div>
+                    </div>
+                    <!-- Fairness Assessment -->
+                    <div class="badge" style="padding: 12px; border: 2px solid #27ae60; border-radius: 4px; background: white;">
+                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">Fairness Metrics</div>
+                        <div style="font-size: 1.2em; font-weight: 700; color: #27ae60; margin: 5px 0;">50%</div>
+                        <div style="font-size: 0.85em; color: #666;">Demographic Parity & Equalized Odds</div>
+                    </div>
+                </div>
+                
+                <div style="background: #ffe6e6; border: 2px solid #e74c3c; padding: 12px; border-radius: 4px; margin-top: 15px;">
+                    <div style="font-weight: 700; color: #e74c3c; margin-bottom: 5px;">⚠️ Escalation Required</div>
+                    <div style="font-size: 0.9em; color: #555;">⚠️ HUMAN EXPERT REVIEW REQUIRED (AI-generated input detected; Trust Score below 70 threshold (score: 61.7/100))</div>
+                </div>
+            
+            </div>
+
+            <!-- Post-Audit Adjustments Section (Fix #5) -->
+            
+
+            <!-- Deep Analysis Section (v8.2) -->
+            
+
+            <!-- Methodology -->
+            <div class="methodology">
+                <h3>Assessment Methodology</h3>
+                <ul>
+                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v8.0 with Narrative Engine</li>
+                    <li>Advanced NLP with machine learning</li>
+                    <li>Policy-adapted evaluation framework with AI detection</li>
+                    <li>Expert-level assessment protocols with fairness auditing</li>
+                </ul>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <p>This certificate verifies comprehensive quality assessment under the Sparrow SPOT Scale™ framework for policy documents.</p>
+                <div class="certificate-id">
+                    <p>Issued: November 26, 2025 | Grading Authority: Sparrow SPOT Scale™ v8.0 (Narrative Engine + Ethical Framework v1.0)</p>
+                    <p>Valid for policy analysis and credibility certification</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

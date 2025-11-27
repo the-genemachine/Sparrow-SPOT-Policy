@@ -1,0 +1,16 @@
+======================================================================
+CITATION QUALITY ANALYSIS REPORT
+======================================================================
+
+Overall Score: 0.0/100
+
+Details:
+  total_urls: 0
+  total_citation_markers: 73
+  total_citations: 73
+  citations_per_1000_words: 0.46
+  url_analysis: {'total': 0, 'unique': 0, 'accessible': 0, 'broken': 0, 'source_types': {}}
+  citation_markers: ['(September 2008)', '(December 2019)', '(February 2025)', '(FES\n2024)', '(FES 2024)', '(FES 2024)', '(Budget 2025)', '(for 2025)', 'According to the', 'according to forecasters', 'according to their', 'according to current', 'according to market', 'According to ESDC', 'According to the', 'According to the', 'According to Statistics', 'according to the', 'according to the', 'Economic State']
+  quality_score: 0.9
+  quality_level: Very Poor
+  summary: No citations found. Document lacks source attribution.

@@ -1,0 +1,4 @@
+# Gradio GUI Requirements
+# Install with: pip install -r gui/requirements.txt
+
+gradio>=4.0.0

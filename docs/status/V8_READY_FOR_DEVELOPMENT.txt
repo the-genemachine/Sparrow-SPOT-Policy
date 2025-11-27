@@ -1,0 +1,252 @@
+================================================================================
+                  ✅ v8 READY FOR DEVELOPMENT MANIFEST
+================================================================================
+
+WORKSPACE LOCATION: /home/gene/Wave-2-2025-Methodology/SPOT_News/
+WORKSPACE SIZE: 12 MB
+FILES: 32 total (16 Python + 12 documentation + 4 configuration)
+CONSOLIDATION STATUS: ✅ COMPLETE
+
+================================================================================
+                             PHASE 1: VERIFY
+================================================================================
+
+Before starting v8 development, run these verification commands:
+
+1. Check Python imports:
+   $ python3 -c "
+   import sys
+   modules = ['sparrow_grader_v8', 'ai_detection_engine', 'nist_risk_mapper', 
+              'bias_auditor', 'trust_score_calculator', 'certificate_generator']
+   for m in modules:
+       try:
+           __import__(m)
+           print(f'✓ {m}')
+       except Exception as e:
+           print(f'✗ {m}: {e}')
+   "
+
+2. Verify file integrity:
+   $ ls -la *.py | wc -l  # Should show 10 (7 core + v7 + v8 + integrate)
+
+3. Check test data:
+   $ find test_articles -name "*.json" | wc -l  # Should show 16+
+
+================================================================================
+                      PHASE 2: BUILD NARRATIVE ENGINE
+================================================================================
+
+Create these 5 new modules in this order:
+
+1. narrative_engine.py
+   - Purpose: Translate v7 JSON analysis → story components
+   - Input: v7 analysis report (JSON)
+   - Output: Narrative dict with lede, criteria, tensions, implications
+   - Size estimate: ~400-500 lines
+   
+2. tone_adaptor.py
+   - Purpose: Adjust narrative voice for different audiences
+   - Input: Narrative + tone (journalistic, academic, civic, critical, explanatory)
+   - Output: Voice-adapted narrative text
+   - Size estimate: ~300-400 lines
+
+3. insight_extractor.py
+   - Purpose: Find surprising findings, gaps, mismatches in analysis
+   - Input: v7 analysis JSON
+   - Output: List of notable insights with implications
+   - Size estimate: ~250-350 lines
+
+4. format_renderer.py
+   - Purpose: Output same narrative in multiple formats
+   - Input: Narrative + format (x_thread, linkedin, social_badge, html_certificate)
+   - Output: Platform-specific formatted text/HTML
+   - Size estimate: ~400-500 lines
+
+5. narrative_qa.py
+   - Purpose: Validate narratives against source data
+   - Input: Generated narrative + original v7 JSON
+   - Output: QA report with accuracy score and approval status
+   - Size estimate: ~300-400 lines
+
+TOTAL NEW CODE: ~1,600-2,000 lines
+
+================================================================================
+                        PHASE 3: INTEGRATION
+================================================================================
+
+Update sparrow_grader_v8.py:
+
+1. Add imports at top:
+   from narrative_engine import NarrativeEngine
+   from tone_adaptor import ToneAdaptor
+   from insight_extractor import InsightExtractor
+   from format_renderer import FormatRenderer
+   from narrative_qa import NarrativeQA
+
+2. Add to __init__:
+   self.narrative_engine = NarrativeEngine()
+   self.tone_adaptor = ToneAdaptor()
+   self.insight_extractor = InsightExtractor()
+   self.format_renderer = FormatRenderer()
+   self.narrative_qa = NarrativeQA()
+
+3. Add to grade() method after scoring:
+   # Generate narrative
+   narrative_components = self.narrative_engine.generate(analysis_json)
+   narrative_text = self.tone_adaptor.adapt(narrative_components, "journalistic")
+   insights = self.insight_extractor.extract(analysis_json)
+   
+   # Multi-format output
+   outputs = {
+     "x_thread": self.format_renderer.render(narrative_text, "x_thread"),
+     "linkedin": self.format_renderer.render(narrative_text, "linkedin"),
+     "badge": self.format_renderer.render(narrative_text, "social_badge"),
+     "certificate": self.format_renderer.render(narrative_text, "html_certificate")
+   }
+   
+   # Validate
+   qa_report = self.narrative_qa.validate(narrative_text, analysis_json)
+   
+   return {
+     "analysis": analysis_json,
+     "narrative": narrative_text,
+     "insights": insights,
+     "outputs": outputs,
+     "qa_report": qa_report
+   }
+
+================================================================================
+                          PHASE 4: TESTING
+================================================================================
+
+Test with these 5 budget analyses (all in test_articles/2025_budget/):
+
+1. 2025-Budget-00.json → v8 narrative output
+2. 2025-Budget-01.json → v8 narrative output
+3. 2025-Budget-02.json → v8 narrative output
+4. 2025-Budget-03.json → v8 narrative output
+5. 2025-Budget-04.json → v8 narrative output
+
+Expected outputs:
+- ✓ Narrative text (journalistic tone)
+- ✓ X thread (280-char format)
+- ✓ LinkedIn article (professional format)
+- ✓ Social badge (image + caption)
+- ✓ HTML certificate (full design)
+- ✓ QA report (accuracy validated)
+
+Run test:
+$ python3 << 'EOFTEST'
+from sparrow_grader_v8 import SparrowGrader
+import json
+
+grader = SparrowGrader()
+
+with open('test_articles/2025_budget/2025-Budget-00.json') as f:
+    analysis = json.load(f)
+
+result = grader.generate_narratives(analysis)
+print("✓ Narrative generated:", result['narrative'][:100])
+print("✓ X thread:", result['outputs']['x_thread'][:100])
+print("✓ QA Score:", result['qa_report']['accuracy_score'])
+EOFTEST
+
+================================================================================
+                      PHASE 5: SPOT-NEWS™ VARIANT
+================================================================================
+
+Create SPOT-News™ media accountability mode:
+
+1. Implement mode detection:
+   if document_type == "policy" → SPOT-Policy™ mode
+   if document_type == "news_article" → SPOT-News™ mode
+
+2. Create SPOT-News™ criteria (map from policy):
+   FT (Fiscal) → ST (Source & Data integrity)
+   SB (Stakeholder) → PR (Perspective Range/balance)
+   ER (Economic) → EV (Evidence Quality)
+   PA (Accessibility) → AC (Accessibility/clarity)
+   PC (Consequentiality) → AG (Agency/accountability)
+
+3. Test with media examples:
+   - test_articles/Canada-US-Tariffs.md
+   - test_articles/Canada-US-Relations.md
+   - test_articles/Billion-Dollar-Raket.md
+
+================================================================================
+                        AVAILABLE RESOURCES
+================================================================================
+
+Documentation:
+✓ QUICKSTART.md - How to use SPOT_News
+✓ CONSOLIDATION_MANIFEST.md - Directory structure & files
+✓ docs/Suitability of SPOT-Policy™ v7.0 for Social Media Articles.md
+✓ docs/SPOT-Policy™ for News Articles.md (SPOT-News™ spec)
+✓ v7_reference/V7_PHASE2_COMPLETION_SUMMARY.md
+
+Reference Code:
+✓ sparrow_grader_v7.py - Reference v7 implementation
+✓ certificate_generator.py - Learn output generation
+✓ ai_detection_engine.py - Learn ethical framework
+✓ All v7 modules in v7_reference/
+
+Test Data:
+✓ 5 budget analyses (2025-Budget-00 through 04)
+✓ 3 media analysis examples (Canada-US, Billion-Dollar)
+✓ All in JSON, TXT, HTML formats
+
+================================================================================
+                        TIME ESTIMATES
+================================================================================
+
+v8.1: Narrative Engine Development
+  - Module 1 (narrative_engine.py): 1-1.5 hours
+  - Module 2 (tone_adaptor.py): 45-60 min
+  - Module 3 (insight_extractor.py): 45-60 min
+  - Module 4 (format_renderer.py): 1-1.5 hours
+  - Module 5 (narrative_qa.py): 45-60 min
+  - Integration into sparrow_grader_v8.py: 30-45 min
+  - TOTAL: 4-6 hours
+
+v8.2: Testing & Validation
+  - Test on 5 budget examples: 30-45 min
+  - Validate all 4 output formats: 30-45 min
+  - Fix bugs & refinements: 30-45 min
+  - TOTAL: 1.5-2 hours
+
+v8.3: SPOT-News™ Variant
+  - Implement mode detection: 30-45 min
+  - Create SPOT-News™ criteria: 30-45 min
+  - Test with media examples: 30-45 min
+  - TOTAL: 1.5-2 hours
+
+TOTAL v8 DEVELOPMENT: 7-10 hours
+
+================================================================================
+                      SUCCESS CRITERIA
+================================================================================
+
+✓ All 5 narrative modules created and tested
+✓ Multi-format output working (X, LinkedIn, badge, certificate)
+✓ Narratives validated against source JSON
+✓ Dual-mode detection functioning (policy vs. news)
+✓ SPOT-News™ variant implemented
+✓ All 5 budget test cases pass
+✓ All media examples generate narratives
+✓ Documentation complete
+✓ API documented and examples provided
+✓ Ready for v8.0 release
+
+================================================================================
+                        QUICK START COMMAND
+================================================================================
+
+$ cd /home/gene/Wave-2-2025-Methodology/SPOT_News
+$ cat QUICKSTART.md              # Read this first
+$ python3 sparrow_grader_v8.py   # Verify v7 still works
+$ # Create narrative_engine.py   # Start here for v8.1
+
+================================================================================
+                           SESSION COMPLETE
+          Ready for v8 narrative engine development. Let's go! 🚀
+================================================================================

@@ -1,0 +1,65 @@
+================================================================================
+COHERE AI PATTERN DETECTION - 2025 CANADIAN BUDGET
+================================================================================
+
+OVERALL DETECTION:
+  AI Score: 53.2%
+  Model: Cohere (100% confidence vs other models)
+  Investment Context: $250M Canadian government investment in Cohere
+
+SECTION BREAKDOWN:
+  Section 2 (Main Budget): 40.9% AI | 90% Cohere confidence
+  Section 3 (Economy Chapter): 27.7% AI | 58% Cohere confidence
+
+TOP COHERE PATTERNS FOUND:
+================================================================================
+
+1. STRUCTURED LISTS: ████████████████████████████████████████ 225 instances
+   Pattern: Bullet points, numbered items, organized policy descriptions
+   Example locations: Budget breakdown, policy initiatives, program lists
+
+2. STAKEHOLDER FOCUS: ████████████████ 79 instances
+   Pattern: "stakeholder," "citizen," "business," "community" language
+   Example: Emphasis on constituent impacts and engagement
+
+3. EXECUTIVE SUMMARIES: █████ 25 instances
+   Pattern: "Overview," "Key Points," summary sections
+   Example: Chapter introductions, policy highlights
+
+4. ACTION-ORIENTED: ████ 28 instances
+   Pattern: "implement," "deploy," "establish," "create," "develop"
+   Example: Policy implementation language
+
+5. IMPACT STATEMENTS: ██ 12 instances
+   Pattern: Descriptions of policy consequences and effects
+   Example: Economic and social impact assessments
+
+SUPPORTING AI INDICATORS:
+================================================================================
+
+• Uniform Structure: 176 instances (consistent formatting)
+• Transition Phrases: 13 instances (Furthermore, Moreover, etc.)
+• Hedging Language: 19 instances (may, might, could, potentially)
+• Comprehensive Language: 6 instances (holistic, integrated, multi-faceted)
+
+INTERPRETATION:
+================================================================================
+
+The budget shows STRONG COHERE AI SIGNATURES in:
+  ✓ Content organization and structuring
+  ✓ Stakeholder-focused policy language
+  ✓ Executive summary generation
+  ✓ Action-oriented implementation descriptions
+  
+This aligns with Cohere's business/policy AI focus and Canada's $250M
+investment in the company.
+
+TRANSPARENCY RECOMMENDATION:
+================================================================================
+
+The government should add AI usage disclosure statements to future policy
+documents to maintain public trust and transparency.
+
+================================================================================
+Analysis: Sparrow SPOT Scale™ v8.1 | Date: November 23, 2025
+================================================================================

@@ -1,0 +1,236 @@
+{
+  "timestamp": "2025-11-26T22:43:23.742218",
+  "summary": {
+    "total_quantitative_claims": 281,
+    "traced_to_sources": 0,
+    "trace_rate_pct": 0.0,
+    "plausible_claims": 0,
+    "optimistic_questionable_claims": 0,
+    "untraced_claims": 281
+  },
+  "traced_claims": [],
+  "untraced_claims": [
+    {
+      "type": "percentage",
+      "value": 42.0,
+      "context_before": "Strong\nMore than 75% of our actions this year are to respond to\nsignificant global economic shifts",
+      "context_after": "of Budget 2025 is to strengthen Canadian sovereignty and 36% is to bring\ndown costs for Canadians.",
+      "full_sentence": "Strong\nMore than 75% of our actions this year are to respond to\nsignificant global economic shifts42.0%of Budget 2025 is to strengthen Canadian sovereignty and 36% is to bring\ndown costs for Canadians."
+    },
+    {
+      "type": "percentage",
+      "value": 5.0,
+      "context_before": "trading partner\nWith 8",
+      "context_after": "of our trade tariff-free, Canadian exporters have the lowest average\nU.",
+      "full_sentence": "trading partner\nWith 85.0%of our trade tariff-free, Canadian exporters have the lowest average\nU."
+    },
+    {
+      "type": "percentage",
+      "value": 5.4,
+      "context_before": "Global 17%\n85%\nCanada",
+      "context_after": "of Canada-U.",
+      "full_sentence": "Global 17%\n85%\nCanada5.4%of Canada-U."
+    },
+    {
+      "type": "percentage",
+      "value": 8.4,
+      "context_before": "10%\n8%",
+      "context_after": "6% Nominal GDP\ngrowth 3.",
+      "full_sentence": "10%\n8%8.4%6% Nominal GDP\ngrowth 3."
+    },
+    {
+      "type": "percentage",
+      "value": 4.4,
+      "context_before": "8%\n4%",
+      "context_after": "3.",
+      "full_sentence": "8%\n4%4.4%3."
+    },
+    {
+      "type": "percentage",
+      "value": 0.0,
+      "context_before": "4%\n2%",
+      "context_after": "-1.",
+      "full_sentence": "4%\n2%0.0%-1."
+    },
+    {
+      "type": "percentage",
+      "value": 9.0,
+      "context_before": "",
+      "context_after": "2014-15 to 2024-25\n8.",
+      "full_sentence": "9.0%2014-15 to 2024-25\n8."
+    },
+    {
+      "type": "percentage",
+      "value": 8.1,
+      "context_before": "0%",
+      "context_after": "2025-26 to 2029-30\n7.",
+      "full_sentence": "0%8.1%2025-26 to 2029-30\n7."
+    },
+    {
+      "type": "percentage",
+      "value": 6.0,
+      "context_before": "0%",
+      "context_after": "5.",
+      "full_sentence": "0%6.0%5."
+    },
+    {
+      "type": "percentage",
+      "value": 4.0,
+      "context_before": "0%",
+      "context_after": "3.",
+      "full_sentence": "0%4.0%3."
+    },
+    {
+      "type": "percentage",
+      "value": 2.0,
+      "context_before": "0%",
+      "context_after": "1.",
+      "full_sentence": "0%2.0%1."
+    },
+    {
+      "type": "percentage",
+      "value": 0.5,
+      "context_before": "0%",
+      "context_after": "0.",
+      "full_sentence": "0%0.5%0."
+    },
+    {
+      "type": "percentage",
+      "value": 5.0,
+      "context_before": "Average Tariff Rate on Trade Counterparts\nGlobal 17%\n8",
+      "context_after": "of Canada-U.",
+      "full_sentence": "Average Tariff Rate on Trade Counterparts\nGlobal 17%\n85.0%of Canada-U."
+    },
+    {
+      "type": "percentage",
+      "value": 5.4,
+      "context_before": "trade\nCanada",
+      "context_after": "is tariff-free\nSources: U.",
+      "full_sentence": "trade\nCanada5.4%is tariff-free\nSources: U."
+    },
+    {
+      "type": "percentage",
+      "value": 7.0,
+      "context_before": "imports\npercent\n1934: Reciprocal Trade Agreements Act 2025\n35\n30\n25\n20\nOctober 2025: 1",
+      "context_after": "15\n10\n5\n0\n1900 1920 1940 1960 1980 2000 2020\nSources: U.",
+      "full_sentence": "imports\npercent\n1934: Reciprocal Trade Agreements Act 2025\n35\n30\n25\n20\nOctober 2025: 17.0%15\n10\n5\n0\n1900 1920 1940 1960 1980 2000 2020\nSources: U."
+    },
+    {
+      "type": "percentage",
+      "value": 1.8,
+      "context_before": "OUND]\n\n--- Page 50 ---\nChart 11 \u2013 Real GDP Level\nbillions of chained 2017 dollars\n2,650 Apersistent",
+      "context_after": "decline in GDP is mainly driven by\nU.",
+      "full_sentence": "OUND]\n\n--- Page 50 ---\nChart 11 \u2013 Real GDP Level\nbillions of chained 2017 dollars\n2,650 Apersistent1.8%decline in GDP is mainly driven by\nU."
+    },
+    {
+      "type": "percentage",
+      "value": 9.0,
+      "context_before": "h Low High Low High\n48,000 64,000 46,000 62,000 46,000 62,000\nFrench-speaking\nadmissions outside of",
+      "context_after": "(30,267) 9.",
+      "full_sentence": "h Low High Low High\n48,000 64,000 46,000 62,000 46,000 62,000\nFrench-speaking\nadmissions outside of9.0%(30,267) 9."
+    },
+    {
+      "type": "percentage",
+      "value": 5.0,
+      "context_before": "",
+      "context_after": "(31,825) 10.",
+      "full_sentence": "5.0%(31,825) 10."
+    },
+    {
+      "type": "percentage",
+      "value": 14.9,
+      "context_before": "duction as a Share of Projected Direct Program Expenses* at\nMaturity \u2013 Previous Reviews\nper cent\n16",
+      "context_after": "14\n12\n10\n8\n6 4.",
+      "full_sentence": "duction as a Share of Projected Direct Program Expenses* at\nMaturity \u2013 Previous Reviews\nper cent\n1614.9%14\n12\n10\n8\n6 4."
+    },
+    {
+      "type": "percentage",
+      "value": 4.9,
+      "context_before": "5%",
+      "context_after": "4\n1.",
+      "full_sentence": "5%4.9%4\n1."
+    }
+  ],
+  "authoritative_sources": {
+    "statistics_canada": {
+      "name": "Statistics Canada",
+      "domains": [
+        "statcan.gc.ca",
+        "www150.statcan.gc.ca"
+      ],
+      "reliability": "HIGH",
+      "coverage": [
+        "Canadian economic data",
+        "demographics",
+        "employment",
+        "GDP"
+      ]
+    },
+    "imf": {
+      "name": "International Monetary Fund",
+      "domains": [
+        "imf.org",
+        "data.imf.org"
+      ],
+      "reliability": "HIGH",
+      "coverage": [
+        "Global GDP",
+        "fiscal data",
+        "economic forecasts"
+      ]
+    },
+    "oecd": {
+      "name": "OECD",
+      "domains": [
+        "oecd.org",
+        "data.oecd.org"
+      ],
+      "reliability": "HIGH",
+      "coverage": [
+        "International comparisons",
+        "policy metrics"
+      ]
+    },
+    "world_bank": {
+      "name": "World Bank",
+      "domains": [
+        "worldbank.org",
+        "data.worldbank.org"
+      ],
+      "reliability": "HIGH",
+      "coverage": [
+        "Development indicators",
+        "global statistics"
+      ]
+    },
+    "bank_of_canada": {
+      "name": "Bank of Canada",
+      "domains": [
+        "bankofcanada.ca",
+        "www.bankofcanada.ca"
+      ],
+      "reliability": "HIGH",
+      "coverage": [
+        "Monetary policy",
+        "inflation",
+        "interest rates"
+      ]
+    },
+    "parliamentary_budget_office": {
+      "name": "Parliamentary Budget Office",
+      "domains": [
+        "pbo-dpb.gc.ca"
+      ],
+      "reliability": "HIGH",
+      "coverage": [
+        "Budget analysis",
+        "fiscal projections"
+      ]
+    }
+  },
+  "methodology": {
+    "indicators_tracked": 6,
+    "source_databases": 6,
+    "validation_method": "Historical deviation analysis (20-year average)"
+  }
+}

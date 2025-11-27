@@ -1,0 +1,14 @@
+ARTIFICIAL INTELLIGENCE TRANSPARENCY DISCLOSURE
+Generated: November 26, 2025
+Analysis Version: Sparrow SPOT Scale™ 8.0
+
+AI USAGE SUMMARY
+• Overall AI Content: 53.2%
+• Classification: Substantial AI Assistance
+• Primary AI Model: Cohere
+• Detection Confidence: 100.0%
+
+This policy was prepared with artificial intelligence assistance.
+All AI-generated content has been reviewed by qualified human experts.
+
+For complete disclosure and methodology, see full transparency certificate.

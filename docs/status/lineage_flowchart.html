@@ -1,0 +1,199 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Lineage - Sparrow SPOT Scale™</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #764ba2;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .stage {
+            background: #f8f9fa;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            position: relative;
+        }
+        .stage.completed {
+            border-left-color: #27ae60;
+            background: #e8f5e9;
+        }
+        .stage.failed {
+            border-left-color: #e74c3c;
+            background: #ffebee;
+        }
+        .stage.in-progress {
+            border-left-color: #f39c12;
+            background: #fff3e0;
+        }
+        .stage-header {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .stage-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .status-completed { background: #27ae60; color: white; }
+        .status-failed { background: #e74c3c; color: white; }
+        .status-in-progress { background: #f39c12; color: white; }
+        .status-pending { background: #95a5a6; color: white; }
+        .stage-description {
+            color: #666;
+            margin: 10px 0;
+        }
+        .stage-details {
+            margin-top: 15px;
+            padding-left: 20px;
+        }
+        .stage-details li {
+            color: #555;
+            margin: 5px 0;
+        }
+        .arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        .metadata {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 30px;
+        }
+        .metadata h3 {
+            color: #1976d2;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Data Lineage Flowchart</h1>
+        <p style="text-align: center; color: #666;">Sparrow SPOT Scale™ v8.2 Analysis Pipeline</p>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 1: Document Ingestion
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Load and parse input document (PDF, TXT, DOCX)</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 2: Text Extraction
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Extract text content and structure from document</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 3: Provenance Analysis
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Extract metadata, file hash, creation tools, author info</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 4: SPOT Grading
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Multi-dimensional quality assessment (FT, SB, ER, PA, PC)</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 5: AI Detection
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Basic AI content detection and model identification</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 6: Deep Analysis (Optional)
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">6-level AI transparency analysis if --deep-analysis flag enabled</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 7: Ethical Framework
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Trust score, bias audit, risk classification, fairness metrics</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 8: Narrative Generation (Optional)
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">AI-powered narrative summaries if --narrative-style flag enabled</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 9: Certificate Generation
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Create HTML certificate with all findings and transparency data</div>
+        </div>
+        <div class='arrow'>▼</div>
+
+        <div class="stage completed">
+            <div class="stage-header">
+                Stage 10: Output Compilation
+                <span class="stage-status status-completed">Completed</span>
+            </div>
+            <div class="stage-description">Save JSON report, text summary, and optional narrative outputs</div>
+        </div>
+
+        <div class="metadata">
+            <h3>Pipeline Metadata</h3>
+            <p><strong>Total Stages:</strong> 10</p>
+            <p><strong>Completed:</strong> 10</p>
+            <p><strong>Failed:</strong> 0</p>
+            <p><strong>Generated:</strong> November 24, 2025 at 01:19:44</p>
+        </div>
+    </div>
+</body>
+</html>
