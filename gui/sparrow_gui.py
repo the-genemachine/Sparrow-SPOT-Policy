@@ -39,6 +39,7 @@ try:
     from ai_disclosure_generator import AIDisclosureGenerator
     from data_lineage_source_mapper import DataLineageSourceMapper
     from citation_quality_scorer import CitationQualityScorer
+    from deep_analyzer import DeepAnalyzer
     
     # Now import sparrow_grader_v8 (it will add parent for article_analyzer)
     from sparrow_grader_v8 import SPARROWGrader, SPOTPolicy
@@ -245,7 +246,7 @@ def analyze_document(
                 result_msg += f"• {file_path} ({size:.1f} KB)\n"
         
         # Build equivalent CLI command
-        cmd_parts = ["python", "sparrow_grader_v8.py"]
+        cmd_parts = [sys.executable, "sparrow_grader_v8.py"]
         if input_path:
             cmd_parts.append(input_path)
         else:
@@ -308,7 +309,8 @@ def run_via_subprocess(url, variant, output_name, narrative_style, narrative_len
     """Run analysis via subprocess for URL inputs."""
     import subprocess
     
-    cmd = ["python", "sparrow_grader_v8.py", "--url", url, "--variant", variant, "--output", output_name]
+    # Use sys.executable to get the current Python interpreter
+    cmd = [sys.executable, "sparrow_grader_v8.py", "--url", url, "--variant", variant, "--output", output_name]
     
     if narrative_style != "None":
         cmd.extend(["--narrative-style", narrative_style])
@@ -439,8 +441,6 @@ def generate_certificate(results, output_name, variant):
 
 def add_deep_analysis(results, text, input_path):
     """Add 6-level deep AI analysis."""
-    from deep_analyzer import DeepAnalyzer
-    
     analyzer = DeepAnalyzer()
     deep_results = analyzer.analyze(input_path, format='markdown')
     
@@ -560,9 +560,103 @@ def generate_lineage_chart(results, output_name, format):
     return chart_path
 
 
+def update_settings_summary(pdf_file, url_input, variant, output_name, narrative_style, 
+                           narrative_length, ollama_model, deep_analysis, citation_check, 
+                           check_urls, enhanced_provenance, generate_ai_disclosure, 
+                           trace_data_sources, nist_compliance, lineage_chart_format):
+    """Generate a summary of current settings."""
+    
+    # Input source
+    if pdf_file:
+        input_src = f"📄 **File:** {Path(pdf_file.name).name}"
+    elif url_input:
+        input_src = f"🌐 **URL:** {url_input}"
+    else:
+        input_src = "⚠️ **No input selected**"
+    
+    # Build summary
+    summary = f"""### Current Configuration
+
+{input_src}
+
+**Analysis Variant:** {variant.upper()}  
+**Output Prefix:** {output_name if output_name else '(auto-generated)'}
+
+---
+
+**Narrative Generation:**
+- Style: {narrative_style.title() if narrative_style != 'None' else 'Disabled'}
+- Length: {narrative_length.title()}
+- Model: {ollama_model}
+
+---
+
+**Analysis Options:**
+- Deep AI Analysis (6 levels): {'✅ Enabled' if deep_analysis else '❌ Disabled'}
+- Citation Quality Check: {'✅ Enabled' if citation_check else '❌ Disabled'}
+- URL Verification: {'✅ Enabled' if check_urls else '❌ Disabled'}
+
+---
+
+**Transparency Features:**
+- Enhanced Provenance: {'✅ Enabled' if enhanced_provenance else '❌ Disabled'}
+- AI Disclosure Statements: {'✅ Enabled' if generate_ai_disclosure else '❌ Disabled'}
+- Data Source Tracing: {'✅ Enabled' if trace_data_sources else '❌ Disabled'}
+- NIST Compliance Check: {'✅ Enabled' if nist_compliance else '❌ Disabled'}
+- Lineage Flowchart: {lineage_chart_format if lineage_chart_format != 'None' else 'Disabled'}
+
+---
+
+**Ready to analyze!** Click the button below to start.
+"""
+    
+    return summary
+
+
+def get_available_ollama_models():
+    """Get list of available Ollama models on the system."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['ollama', 'list'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode == 0:
+            # Parse the output
+            lines = result.stdout.strip().split('\n')
+            if len(lines) > 1:  # Skip header
+                models = []
+                for line in lines[1:]:
+                    # Extract model name (first column)
+                    parts = line.split()
+                    if parts:
+                        model_name = parts[0]
+                        # Only remove :latest suffix, keep other tags like :14b
+                        if model_name.endswith(':latest'):
+                            model_name = model_name.replace(':latest', '')
+                        models.append(model_name)
+                
+                if models:
+                    return models
+        
+        # Fallback to common models if ollama list fails
+        return ["llama3.2", "phi4:14b", "mistral", "qwen2.5", "gemma2"]
+        
+    except Exception as e:
+        print(f"Could not check Ollama models: {e}")
+        # Return default list
+        return ["llama3.2", "phi4:14b", "mistral", "qwen2.5", "gemma2"]
+
+
 # Build the Gradio interface
 def create_interface():
     """Create the Gradio web interface."""
+    
+    # Get available Ollama models
+    available_models = get_available_ollama_models()
     
     with gr.Blocks(title="Sparrow SPOT Scale™") as interface:
         
@@ -635,10 +729,11 @@ def create_interface():
                 )
                 
                 ollama_model = gr.Dropdown(
-                    choices=["llama3.2", "phi4:14b", "mistral", "qwen2.5", "gemma2"],
-                    value="llama3.2",
+                    choices=available_models,
+                    value=available_models[0] if available_models else "llama3.2",
                     label="Ollama Model",
-                    info="Local LLM for narrative generation (must be pulled first: ollama pull <model>)"
+                    info=f"Available local models ({len(available_models)} found). Run 'ollama pull <model>' to add more.",
+                    allow_custom_value=True
                 )
             
             # ========== TAB 3: ANALYSIS OPTIONS ==========
@@ -703,7 +798,13 @@ def create_interface():
             # ========== TAB 5: OUTPUT & EXECUTION ==========
             with gr.Tab("▶️ Run Analysis"):
                 gr.Markdown("### Ready to Analyze")
-                gr.Markdown("Review your settings and click the button below to start the analysis.")
+                
+                # Settings summary
+                with gr.Accordion("📋 Current Settings Summary", open=True):
+                    settings_summary = gr.Markdown(
+                        "**Tip:** Review your settings in the tabs above before clicking Analyze Document.",
+                        elem_id="settings-summary"
+                    )
                 
                 analyze_btn = gr.Button(
                     "🎯 Analyze Document",
@@ -748,6 +849,22 @@ def create_interface():
         
         [GitHub Repository](#) | [Documentation](#) | [Case Studies](#)
         """)
+        
+        # Wire up settings summary to update when any input changes
+        all_inputs = [
+            pdf_file, url_input, variant, output_name,
+            narrative_style, narrative_length, ollama_model,
+            deep_analysis, citation_check, check_urls,
+            enhanced_provenance, generate_ai_disclosure,
+            trace_data_sources, nist_compliance, lineage_chart_format
+        ]
+        
+        for input_component in all_inputs:
+            input_component.change(
+                fn=update_settings_summary,
+                inputs=all_inputs,
+                outputs=settings_summary
+            )
         
         # Connect the analyze button to the function
         analyze_btn.click(

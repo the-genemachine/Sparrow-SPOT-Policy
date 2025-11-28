@@ -80,7 +80,15 @@ class StatisticalAnalyzer:
         if len(sentences) < 3:
             return 0.0
         
-        lengths = [len(s.split()) for s in sentences]
+        lengths = [len(s.split()) for s in sentences if len(s.strip()) > 0]
+        
+        # Filter out abnormally long sentences (likely tokenization errors)
+        # Normal sentences rarely exceed 100 words
+        lengths = [l for l in lengths if l > 0 and l < 200]
+        
+        if len(lengths) < 3:
+            return 0.0
+        
         mean = np.mean(lengths)
         std = np.std(lengths)
         
@@ -185,7 +193,20 @@ class StatisticalAnalyzer:
                 'median_length': 0,
             }
         
-        lengths = [len(s.split()) for s in sentences]
+        lengths = [len(s.split()) for s in sentences if len(s.strip()) > 0]
+        
+        # Filter out abnormally long sentences (likely tokenization errors)
+        # Normal sentences rarely exceed 100 words
+        lengths = [l for l in lengths if l > 0 and l < 200]
+        
+        if len(lengths) == 0:
+            return {
+                'avg_length': 0,
+                'std_length': 0,
+                'min_length': 0,
+                'max_length': 0,
+                'median_length': 0,
+            }
         
         return {
             'avg_length': round(np.mean(lengths), 2),

@@ -2317,7 +2317,9 @@ def main():
                         f.write("---\n")
                         f.write(f"# Sparrow SPOT Scale™ v8.0 Narrative Analysis\n")
                         f.write(f"**Style:** {args.narrative_style.title()}\n")
-                        f.write(f"**Document:** {Path(args.input_file).stem}\n")
+                        # Fix: Handle None input_file (for URLs)
+                        doc_name = Path(args.input_file).stem if args.input_file else (args.url.split('/')[-1].split('?')[0] if args.url else 'remote_document')
+                        f.write(f"**Document:** {doc_name}\n")
                         f.write(f"**Generated:** {narrative_outputs.get('metadata', {}).get('generated_at', 'N/A')}\n")
                         
                         # Include trust score and risk tier
