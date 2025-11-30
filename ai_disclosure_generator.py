@@ -15,6 +15,7 @@ This module creates transparent disclosure language for:
 v8.3 Enhancement: Added comprehensive multi-format generation for full transparency compliance
 """
 
+import os
 from typing import Dict, Optional, List
 from datetime import datetime
 import json
@@ -271,8 +272,36 @@ def _add_comprehensive_methods():
         """Extract AI model identification and confidence."""
         if not self.ai_detection:
             return {'model': 'Unknown', 'confidence': 0}
+        
         likely_model = self.ai_detection.get('likely_ai_model', {})
         if isinstance(likely_model, dict):
+            # Check if we have model_scores to get the actual highest scoring model
+            model_scores = likely_model.get('model_scores', {})
+            if model_scores:
+                # Find the highest scoring model
+                highest_model = max(model_scores.items(), key=lambda x: x[1])
+                model_name, confidence = highest_model
+                
+                # Clean up model names for better display
+                if model_name.lower() == 'cohere':
+                    display_name = 'Cohere'
+                elif 'claude' in model_name.lower():
+                    display_name = 'Claude (Anthropic)'
+                elif 'gemini' in model_name.lower():
+                    display_name = 'Google Gemini'
+                elif 'mistral' in model_name.lower():
+                    display_name = 'Mistral AI'
+                elif 'llama' in model_name.lower() or 'ollama' in model_name.lower():
+                    display_name = 'Ollama/Llama'
+                else:
+                    display_name = model_name
+                
+                return {
+                    'model': display_name,
+                    'confidence': confidence * 100
+                }
+            
+            # Fallback to the likely_ai_model.model if no model_scores
             return {
                 'model': likely_model.get('model', 'Unknown'),
                 'confidence': likely_model.get('confidence', 0) * 100
@@ -397,6 +426,8 @@ We believe in transparency about AI use in government.
         # Formal government statement
         try:
             formal_file = f"{output_prefix}_ai_disclosure_formal.txt"
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(formal_file), exist_ok=True) if os.path.dirname(formal_file) else None
             with open(formal_file, 'w') as f:
                 f.write(self.generate_government_formal(document_name))
             files_created.append(formal_file)
@@ -406,6 +437,8 @@ We believe in transparency about AI use in government.
         # Plain language
         try:
             plain_file = f"{output_prefix}_ai_disclosure_plain.txt"
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(plain_file), exist_ok=True) if os.path.dirname(plain_file) else None
             with open(plain_file, 'w') as f:
                 f.write(self.generate_plain_language(document_name))
             files_created.append(plain_file)
@@ -415,6 +448,8 @@ We believe in transparency about AI use in government.
         # Social media
         try:
             social_file = f"{output_prefix}_ai_disclosure_social.txt"
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(social_file), exist_ok=True) if os.path.dirname(social_file) else None
             social = self.generate_social_media(document_name)
             with open(social_file, 'w') as f:
                 f.write("TWITTER/X:\n" + "="*60 + "\n")
@@ -428,6 +463,8 @@ We believe in transparency about AI use in government.
         # Combined HTML
         try:
             html_file = f"{output_prefix}_ai_disclosure_all.html"
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(html_file), exist_ok=True) if os.path.dirname(html_file) else None
             with open(html_file, 'w') as f:
                 f.write(f"""<!DOCTYPE html>
 <html>

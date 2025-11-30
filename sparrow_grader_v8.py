@@ -2238,6 +2238,8 @@ def main():
     try:
         # JSON output
         output_json = f"{args.output}.json"
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_json), exist_ok=True) if os.path.dirname(output_json) else None
         with open(output_json, 'w') as f:
             # Note: We'll update generation_log after all files are saved
             json.dump(report, f, indent=2)
@@ -2246,6 +2248,8 @@ def main():
         
         # Text summary
         output_txt = f"{args.output}.txt"
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_txt), exist_ok=True) if os.path.dirname(output_txt) else None
         with open(output_txt, 'w') as f:
             f.write(f"Sparrow SPOT Scale™ v8.0 Report (with Narrative Engine)\n")
             f.write(f"Variant: {args.variant.upper()}\n")
@@ -2439,6 +2443,8 @@ def main():
             else:
                 doc_title = Path(args.input_file).stem
             output_html = f"{args.output}_certificate.html"
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_html), exist_ok=True) if os.path.dirname(output_html) else None
             
             if args.variant == 'policy':
                 cert_gen.generate_policy_certificate(report, doc_title, output_html)
@@ -2450,6 +2456,8 @@ def main():
             # Plain-Language Summary (Ollama)
             try:
                 output_summary = f"{args.output}_summary.txt"
+                # Create directory if it doesn't exist
+                os.makedirs(os.path.dirname(output_summary), exist_ok=True) if os.path.dirname(output_summary) else None
                 # Use ollama_model from narrative outputs if available, otherwise from args
                 model_to_use = narrative_outputs.get('metadata', {}).get('ollama_model', args.ollama_model)
                 # Pass narrative_length to enforce length constraints

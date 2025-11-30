@@ -151,12 +151,16 @@ def analyze_document(
             
             # JSON report
             json_path = f"{output_name}.json"
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(json_path), exist_ok=True) if os.path.dirname(json_path) else None
             with open(json_path, 'w') as f:
                 json.dump(results, f, indent=2)
             output_files.append(json_path)
             
             # Text summary
             txt_path = f"{output_name}.txt"
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(txt_path), exist_ok=True) if os.path.dirname(txt_path) else None
             with open(txt_path, 'w') as f:
                 f.write(format_journalism_summary(results))
             output_files.append(txt_path)
@@ -205,12 +209,16 @@ def analyze_document(
                 
                 # JSON report
                 json_path = f"{output_name}.json"
+                # Create directory if it doesn't exist
+                os.makedirs(os.path.dirname(json_path), exist_ok=True) if os.path.dirname(json_path) else None
                 with open(json_path, 'w') as f:
                     json.dump(results, f, indent=2)
                 output_files.append(json_path)
                 
                 # Text summary
                 txt_path = f"{output_name}.txt"
+                # Create directory if it doesn't exist
+                os.makedirs(os.path.dirname(txt_path), exist_ok=True) if os.path.dirname(txt_path) else None
                 with open(txt_path, 'w') as f:
                     f.write(format_policy_summary(results))
                 output_files.append(txt_path)
@@ -438,6 +446,8 @@ def generate_certificate(results, output_name, variant):
     """Generate HTML certificate."""
     cert_gen = CertificateGenerator()
     cert_path = f"{output_name}_certificate.html"
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(cert_path), exist_ok=True) if os.path.dirname(cert_path) else None
     
     if variant == 'journalism':
         cert_gen.generate_journalism_certificate(
@@ -469,6 +479,8 @@ def add_citation_analysis(results, text, check_urls, output_name):
     
     # Save citation report
     citation_file = f"{output_name}_citation_report.txt"
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(citation_file), exist_ok=True) if os.path.dirname(citation_file) else None
     with open(citation_file, 'w') as f:
         f.write("=" * 70 + "\n")
         f.write("CITATION QUALITY ANALYSIS REPORT\n")
@@ -501,11 +513,15 @@ def add_data_lineage(results, text, output_name):
     
     # Save text report
     output_lineage_txt = f"{output_name}_data_lineage.txt"
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_lineage_txt), exist_ok=True) if os.path.dirname(output_lineage_txt) else None
     with open(output_lineage_txt, 'w', encoding='utf-8') as f:
         f.write(mapper.generate_report(lineage_data, 'text'))
     
     # Save JSON report
     output_lineage_json = f"{output_name}_data_lineage.json"
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_lineage_json), exist_ok=True) if os.path.dirname(output_lineage_json) else None
     with open(output_lineage_json, 'w', encoding='utf-8') as f:
         json.dump(lineage_data, f, indent=2)
     
@@ -797,8 +813,9 @@ def create_interface():
                     
                     output_name = gr.Textbox(
                         label="Output Filename Prefix",
-                        placeholder="my_analysis (leave empty to auto-generate)",
-                        lines=1
+                        placeholder="my_analysis or folder/my_analysis (leave empty to auto-generate)",
+                        lines=1,
+                        info="Can include directory paths - folders will be created automatically"
                     )
             
             # ========== TAB 2: NARRATIVE SETTINGS ==========

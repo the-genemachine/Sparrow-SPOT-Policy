@@ -550,28 +550,6 @@ class CertificateGenerator:
             consensus = deep_analysis.get('consensus', {})
             ai_confidence = int(consensus.get('ai_percentage', 0))
             ai_model = consensus.get('primary_model', 'Unknown')
-            
-            # v8.3: Override Mixed/Uncertain with highest scoring individual model
-            if ai_model == 'Mixed/Uncertain':
-                ai_detection = report.get('ai_detection', {})
-                likely_ai_model = ai_detection.get('likely_ai_model', {})
-                model_scores = likely_ai_model.get('model_scores', {})
-                if model_scores:
-                    # Find the model with the highest score
-                    highest_model = max(model_scores, key=model_scores.get)
-                    highest_score = model_scores[highest_model]
-                    # Only override if we have a clear winner (>0.5 threshold)
-                    if highest_score > 0.5:
-                        # Clean up model name for display
-                        model_name_map = {
-                            'cohere': 'Cohere',
-                            'claude': 'Claude (Anthropic)',
-                            'mistral': 'Mistral AI',
-                            'ollama': 'Ollama',
-                            'gemini': 'Google Gemini'
-                        }
-                        ai_model = model_name_map.get(highest_model.lower(), highest_model.title())
-            
             ai_model_confidence = int(consensus.get('confidence', 0))
             transparency_score = consensus.get('transparency_score', 0)
             has_deep_analysis = True
@@ -609,7 +587,6 @@ class CertificateGenerator:
                             ai_model = model_name
                         
                         ai_model_confidence = int(confidence * 100)
-                        print(f'DEBUG: Found highest model: {ai_model} with {ai_model_confidence}% confidence')
                     else:
                         # Fallback to the likely_ai_model.model if no model_scores
                         ai_model = likely_model.get('model', 'Unknown')
@@ -832,28 +809,6 @@ class CertificateGenerator:
             consensus = deep_analysis.get('consensus', {})
             ai_confidence = int(consensus.get('ai_percentage', 0))
             ai_model = consensus.get('primary_model', 'Unknown')
-            
-            # v8.3: Override Mixed/Uncertain with highest scoring individual model
-            if ai_model == 'Mixed/Uncertain':
-                ai_detection = report.get('ai_detection', {})
-                likely_ai_model = ai_detection.get('likely_ai_model', {})
-                model_scores = likely_ai_model.get('model_scores', {})
-                if model_scores:
-                    # Find the model with the highest score
-                    highest_model = max(model_scores, key=model_scores.get)
-                    highest_score = model_scores[highest_model]
-                    # Only override if we have a clear winner (>0.5 threshold)
-                    if highest_score > 0.5:
-                        # Clean up model name for display
-                        model_name_map = {
-                            'cohere': 'Cohere',
-                            'claude': 'Claude (Anthropic)',
-                            'mistral': 'Mistral AI',
-                            'ollama': 'Ollama',
-                            'gemini': 'Google Gemini'
-                        }
-                        ai_model = model_name_map.get(highest_model.lower(), highest_model.title())
-            
             ai_model_confidence = int(consensus.get('confidence', 0))
             transparency_score = consensus.get('transparency_score', 0)
             has_deep_analysis = True
