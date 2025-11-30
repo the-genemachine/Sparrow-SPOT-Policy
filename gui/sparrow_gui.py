@@ -273,7 +273,11 @@ def analyze_document(
                 progress(0.85, desc="Generating outputs...")
                 
                 # JSON report
-                json_path = f"{output_name}.json"
+                # Ensure test_articles paths go to root directory, not gui/test_articles
+                if output_name.startswith('test_articles/'):
+                    json_path = f"../{output_name}.json"
+                else:
+                    json_path = f"{output_name}.json"
                 # Create directory if it doesn't exist
                 os.makedirs(os.path.dirname(json_path), exist_ok=True) if os.path.dirname(json_path) else None
                 with open(json_path, 'w') as f:
@@ -281,7 +285,10 @@ def analyze_document(
                 output_files.append(json_path)
                 
                 # Text summary
-                txt_path = f"{output_name}.txt"
+                if output_name.startswith('test_articles/'):
+                    txt_path = f"../{output_name}.txt"
+                else:
+                    txt_path = f"{output_name}.txt"
                 # Create directory if it doesn't exist
                 os.makedirs(os.path.dirname(txt_path), exist_ok=True) if os.path.dirname(txt_path) else None
                 with open(txt_path, 'w') as f:
@@ -297,7 +304,10 @@ def analyze_document(
                     progress(0.88, desc=f"Generating AI summary with {ollama_model}...")
                     try:
                         cert_gen = CertificateGenerator()
-                        summary_path = f"{output_name}_ollama_summary.txt"
+                        if output_name.startswith('test_articles/'):
+                            summary_path = f"../{output_name}_ollama_summary.txt"
+                        else:
+                            summary_path = f"{output_name}_ollama_summary.txt"
                         
                         # Create directory if needed
                         os.makedirs(os.path.dirname(summary_path), exist_ok=True) if os.path.dirname(summary_path) else None
@@ -533,7 +543,13 @@ def format_policy_summary(results):
 def generate_certificate(results, output_name, variant):
     """Generate HTML certificate."""
     cert_gen = CertificateGenerator()
-    cert_path = f"{output_name}_certificate.html"
+    
+    # Handle test_articles path to go to root directory
+    if output_name.startswith('test_articles/'):
+        cert_path = f"../{output_name}_certificate.html"
+    else:
+        cert_path = f"{output_name}_certificate.html"
+        
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(cert_path), exist_ok=True) if os.path.dirname(cert_path) else None
     
@@ -565,8 +581,12 @@ def add_citation_analysis(results, text, check_urls, output_name):
     scorer = CitationQualityScorer()
     citation_results = scorer.analyze_citations(text, check_urls=check_urls)
     
-    # Save citation report
-    citation_file = f"{output_name}_citation_report.txt"
+    # Save citation report - Handle test_articles path to go to root directory
+    if output_name.startswith('test_articles/'):
+        citation_file = f"../{output_name}_citation_report.txt"
+    else:
+        citation_file = f"{output_name}_citation_report.txt"
+        
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(citation_file), exist_ok=True) if os.path.dirname(citation_file) else None
     with open(citation_file, 'w') as f:
@@ -588,8 +608,14 @@ def add_ai_disclosure(results, output_name):
     # Initialize generator with full results (positional argument, not keyword)
     generator = AIDisclosureGenerator(results)
     
+    # Handle test_articles path to go to root directory
+    if output_name.startswith('test_articles/'):
+        disclosure_prefix = f"../{output_name}"
+    else:
+        disclosure_prefix = output_name
+    
     # Generate all formats
-    files = generator.generate_all_formats(output_prefix=output_name)
+    files = generator.generate_all_formats(output_prefix=disclosure_prefix)
     
     return files
 
@@ -599,15 +625,21 @@ def add_data_lineage(results, text, output_name):
     mapper = DataLineageSourceMapper()
     lineage_data = mapper.trace_sources(text)
     
-    # Save text report
-    output_lineage_txt = f"{output_name}_data_lineage.txt"
+    # Save text report - Handle test_articles path to go to root directory
+    if output_name.startswith('test_articles/'):
+        output_lineage_txt = f"../{output_name}_data_lineage.txt"
+    else:
+        output_lineage_txt = f"{output_name}_data_lineage.txt"
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(output_lineage_txt), exist_ok=True) if os.path.dirname(output_lineage_txt) else None
     with open(output_lineage_txt, 'w', encoding='utf-8') as f:
         f.write(mapper.generate_report(lineage_data, 'text'))
     
-    # Save JSON report
-    output_lineage_json = f"{output_name}_data_lineage.json"
+    # Save JSON report - Handle test_articles path to go to root directory
+    if output_name.startswith('test_articles/'):
+        output_lineage_json = f"../{output_name}_data_lineage.json"
+    else:
+        output_lineage_json = f"{output_name}_data_lineage.json"
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(output_lineage_json), exist_ok=True) if os.path.dirname(output_lineage_json) else None
     with open(output_lineage_json, 'w', encoding='utf-8') as f:
@@ -647,8 +679,15 @@ def generate_narrative(results, text, output_name, style, length, model):
         formats=['x_thread', 'linkedin', 'social_badge', 'html_certificate']
     )
     
-    # Save narrative text
-    narrative_path = f"{output_name}_narrative.txt"
+    # Save narrative text - Handle test_articles path to go to root directory
+    if output_name.startswith('test_articles/'):
+        narrative_path = f"../{output_name}_narrative.txt"
+    else:
+        narrative_path = f"{output_name}_narrative.txt"
+        
+    # Create directory if needed
+    os.makedirs(os.path.dirname(narrative_path), exist_ok=True) if os.path.dirname(narrative_path) else None
+    
     with open(narrative_path, 'w') as f:
         f.write(narrative_result.get('narrative_text', ''))
     output_files.append(narrative_path)
@@ -662,12 +701,22 @@ def generate_lineage_chart(results, output_name, format):
     
     viz = DataLineageVisualizer()
     
+    # Handle test_articles path to go to root directory
     if format == "html":
         content = viz.generate_html_flowchart()
-        chart_path = f"{output_name}_lineage_flowchart.html"
+        if output_name.startswith('test_articles/'):
+            chart_path = f"../{output_name}_lineage_flowchart.html"
+        else:
+            chart_path = f"{output_name}_lineage_flowchart.html"
     else:  # ascii
         content = viz.generate_ascii_flowchart()
-        chart_path = f"{output_name}_lineage_flowchart.txt"
+        if output_name.startswith('test_articles/'):
+            chart_path = f"../{output_name}_lineage_flowchart.txt"
+        else:
+            chart_path = f"{output_name}_lineage_flowchart.txt"
+    
+    # Create directory if needed
+    os.makedirs(os.path.dirname(chart_path), exist_ok=True) if os.path.dirname(chart_path) else None
     
     with open(chart_path, 'w') as f:
         f.write(content)
