@@ -556,11 +556,13 @@ def generate_certificate(results, output_name, variant):
     if variant == 'journalism':
         cert_gen.generate_journalism_certificate(
             report=results,
+            document_title=results.get('document_title', ''),
             output_file=cert_path
         )
     else:  # policy
         cert_gen.generate_policy_certificate(
             report=results,
+            document_title=results.get('document_title', ''),
             output_file=cert_path
         )
     
