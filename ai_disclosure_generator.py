@@ -298,7 +298,7 @@ def _add_comprehensive_methods():
         else:
             return "Heavy AI Assistance"
     
-    def generate_government_formal(self) -> str:
+    def generate_government_formal(self, document_name: str = None) -> str:
         """Generate formal government disclosure statement (NEW in v8.3)"""
         if not self.data:
             return "Error: No analysis data provided. Initialize with full analysis JSON."
@@ -307,8 +307,10 @@ def _add_comprehensive_methods():
         model_info = self._get_model_info()
         ai_level = self._get_ai_level(ai_pct)
         
+        doc_line = f"Document: {document_name}\n" if document_name else ""
+        
         return f"""ARTIFICIAL INTELLIGENCE TRANSPARENCY DISCLOSURE
-Generated: {datetime.now().strftime('%B %d, %Y')}
+{doc_line}Generated: {datetime.now().strftime('%B %d, %Y')}
 Analysis Version: Sparrow SPOT Scale™ {self.metadata['version']}
 
 AI USAGE SUMMARY
@@ -322,7 +324,7 @@ All AI-generated content has been reviewed by qualified human experts.
 
 For complete disclosure and methodology, see full transparency certificate."""
     
-    def generate_plain_language(self) -> str:
+    def generate_plain_language(self, document_name: str = None) -> str:
         """Generate plain-language disclosure for public (NEW in v8.3)"""
         if not self.data:
             return "Error: No analysis data provided."
@@ -338,7 +340,9 @@ For complete disclosure and methodology, see full transparency certificate."""
         else:
             meaning = "AI played a major role - creating substantial content, though people reviewed everything."
         
-        return f"""About This Document: AI Transparency Notice
+        doc_line = f"\nDocument: {document_name}" if document_name else ""
+        
+        return f"""About This Document: AI Transparency Notice{doc_line}
 
 We detected that about {ai_pct:.0f}% of this document appears to be AI-generated.
 The AI system used was likely: {model_info['model']}
@@ -347,7 +351,7 @@ The AI system used was likely: {model_info['model']}
 
 All content was reviewed by human experts, and the government takes full responsibility for accuracy."""
     
-    def generate_social_media(self) -> Dict[str, str]:
+    def generate_social_media(self, document_name: str = None) -> Dict[str, str]:
         """Generate short-form disclosures for social media (NEW in v8.3)"""
         if not self.data:
             return {'error': 'No analysis data'}
@@ -355,10 +359,13 @@ All content was reviewed by human experts, and the government takes full respons
         ai_pct = self._get_ai_percentage()
         model_info = self._get_model_info()
         
-        twitter = f"🔍 AI Transparency: This document is ~{ai_pct:.0f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
+        if document_name:
+            twitter = f"🔍 AI Transparency ({document_name}): ~{ai_pct:.0f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
+        else:
+            twitter = f"🔍 AI Transparency: This document is ~{ai_pct:.0f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
         
-        linkedin = f"""AI Transparency Disclosure
-
+        doc_line = f"\nDocument: {document_name}\n" if document_name else ""
+        linkedin = f"""AI Transparency Disclosure{doc_line}
 This {self.metadata['document_type']} was prepared with AI assistance:
 
 📊 AI Content: ~{ai_pct:.0f}%
@@ -374,7 +381,7 @@ We believe in transparency about AI use in government.
             'linkedin': linkedin
         }
     
-    def generate_all_formats(self, output_prefix: str = 'ai_disclosure') -> List[str]:
+    def generate_all_formats(self, output_prefix: str = 'ai_disclosure', document_name: str = None) -> List[str]:
         """Generate all disclosure formats and save to files (NEW in v8.3)"""
         if not self.data:
             print("Error: No analysis data. Initialize AIDisclosureGenerator with full analysis JSON.")
@@ -382,11 +389,16 @@ We believe in transparency about AI use in government.
         
         files_created = []
         
+        # Extract document name from output_prefix if not provided
+        if not document_name and output_prefix:
+            # Remove common suffixes like _analysis
+            document_name = output_prefix.replace('_analysis', '').replace('_', ' ').title()
+        
         # Formal government statement
         try:
             formal_file = f"{output_prefix}_ai_disclosure_formal.txt"
             with open(formal_file, 'w') as f:
-                f.write(self.generate_government_formal())
+                f.write(self.generate_government_formal(document_name))
             files_created.append(formal_file)
         except Exception as e:
             print(f"Error generating formal disclosure: {e}")
@@ -395,7 +407,7 @@ We believe in transparency about AI use in government.
         try:
             plain_file = f"{output_prefix}_ai_disclosure_plain.txt"
             with open(plain_file, 'w') as f:
-                f.write(self.generate_plain_language())
+                f.write(self.generate_plain_language(document_name))
             files_created.append(plain_file)
         except Exception as e:
             print(f"Error generating plain disclosure: {e}")
@@ -403,7 +415,7 @@ We believe in transparency about AI use in government.
         # Social media
         try:
             social_file = f"{output_prefix}_ai_disclosure_social.txt"
-            social = self.generate_social_media()
+            social = self.generate_social_media(document_name)
             with open(social_file, 'w') as f:
                 f.write("TWITTER/X:\n" + "="*60 + "\n")
                 f.write(social.get('twitter', 'N/A'))
@@ -427,15 +439,15 @@ We believe in transparency about AI use in government.
 <p><strong>Generated:</strong> {datetime.now().strftime('%B %d, %Y')}</p>
 
 <h2>Government Formal</h2>
-<pre>{self.generate_government_formal()}</pre>
+<pre>{self.generate_government_formal(document_name)}</pre>
 
 <h2>Plain Language</h2>
-<pre>{self.generate_plain_language()}</pre>
+<pre>{self.generate_plain_language(document_name)}</pre>
 
 <h2>Social Media</h2>
-<pre>TWITTER: {self.generate_social_media().get('twitter', 'N/A')}
+<pre>TWITTER: {self.generate_social_media(document_name).get('twitter', 'N/A')}
 
-LINKEDIN: {self.generate_social_media().get('linkedin', 'N/A')}</pre>
+LINKEDIN: {self.generate_social_media(document_name).get('linkedin', 'N/A')}</pre>
 </body>
 </html>""")
             files_created.append(html_file)

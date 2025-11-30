@@ -18,6 +18,8 @@ from pathlib import Path
 import json
 import tempfile
 import shutil
+import io
+from contextlib import redirect_stdout
 from datetime import datetime
 
 # Add SPOT_News directory to path (gui/ is subdirectory of SPOT_News/)
@@ -85,6 +87,9 @@ def analyze_document(
     
     Returns: Status message and path to results
     """
+    
+    # Capture stdout to show detailed progress
+    output_buffer = io.StringIO()
     
     # Validate inputs
     if not pdf_file and not url_input:
@@ -161,74 +166,79 @@ def analyze_document(
             output_files.append(cert_path)
             
         else:  # policy variant
-            policy = SPOTPolicy()
-            results = policy.grade(text, pdf_path=input_path if is_pdf else None)
-            
-            progress(0.5, desc="Running policy evaluation...")
-            
-            # Initialize output files list
-            output_files = []
-            
-            # Apply optional enhancements
-            if deep_analysis:
-                progress(0.6, desc="Running deep AI analysis (6 levels)...")
-                results = add_deep_analysis(results, text, input_path)
-            
-            if citation_check:
-                progress(0.65, desc="Checking citation quality...")
-                results, citation_file = add_citation_analysis(results, text, check_urls, output_name)
-                output_files.append(citation_file)
-            
-            if generate_ai_disclosure:
-                progress(0.7, desc="Generating AI disclosure statements...")
-                disclosure_files = add_ai_disclosure(results, output_name)
-                if disclosure_files:
-                    output_files.extend(disclosure_files)
-            
-            if trace_data_sources:
-                progress(0.75, desc="Tracing data sources...")
-                results, lineage_files = add_data_lineage(results, text, output_name)
-                output_files.extend(lineage_files)
-            
-            if nist_compliance:
-                progress(0.8, desc="Checking NIST compliance...")
-                results = add_nist_compliance(results, text)
-            
-            progress(0.85, desc="Generating outputs...")
-            
-            # JSON report
-            json_path = f"{output_name}.json"
-            with open(json_path, 'w') as f:
-                json.dump(results, f, indent=2)
-            output_files.append(json_path)
-            
-            # Text summary
-            txt_path = f"{output_name}.txt"
-            with open(txt_path, 'w') as f:
-                f.write(format_policy_summary(results))
-            output_files.append(txt_path)
-            
-            # Certificate
-            cert_path = generate_certificate(results, output_name, variant)
-            output_files.append(cert_path)
-            
-            # Narrative (if requested)
-            if narrative_style != "None":
-                progress(0.9, desc=f"Generating {narrative_style} narrative...")
-                narrative_files = generate_narrative(
-                    results, text, output_name, narrative_style, 
-                    narrative_length, ollama_model
-                )
-                output_files.extend(narrative_files)
-            
-            # Lineage chart (if requested)
-            if lineage_chart_format != "None":
-                progress(0.92, desc="Creating lineage flowchart...")
-                chart_path = generate_lineage_chart(results, output_name, lineage_chart_format)
-                if chart_path:
-                    output_files.append(chart_path)
+            # Capture stdout from all analysis modules
+            with redirect_stdout(output_buffer):
+                policy = SPOTPolicy()
+                results = policy.grade(text, pdf_path=input_path if is_pdf else None)
+                
+                progress(0.5, desc="Running policy evaluation...")
+                
+                # Initialize output files list
+                output_files = []
+                
+                # Apply optional enhancements
+                if deep_analysis:
+                    progress(0.6, desc="Running deep AI analysis (6 levels)...")
+                    results = add_deep_analysis(results, text, input_path)
+                
+                if citation_check:
+                    progress(0.65, desc="Checking citation quality...")
+                    results, citation_file = add_citation_analysis(results, text, check_urls, output_name)
+                    output_files.append(citation_file)
+                
+                if generate_ai_disclosure:
+                    progress(0.7, desc="Generating AI disclosure statements...")
+                    disclosure_files = add_ai_disclosure(results, output_name)
+                    if disclosure_files:
+                        output_files.extend(disclosure_files)
+                
+                if trace_data_sources:
+                    progress(0.75, desc="Tracing data sources...")
+                    results, lineage_files = add_data_lineage(results, text, output_name)
+                    output_files.extend(lineage_files)
+                
+                if nist_compliance:
+                    progress(0.8, desc="Checking NIST compliance...")
+                    results = add_nist_compliance(results, text)
+                
+                progress(0.85, desc="Generating outputs...")
+                
+                # JSON report
+                json_path = f"{output_name}.json"
+                with open(json_path, 'w') as f:
+                    json.dump(results, f, indent=2)
+                output_files.append(json_path)
+                
+                # Text summary
+                txt_path = f"{output_name}.txt"
+                with open(txt_path, 'w') as f:
+                    f.write(format_policy_summary(results))
+                output_files.append(txt_path)
+                
+                # Certificate
+                cert_path = generate_certificate(results, output_name, variant)
+                output_files.append(cert_path)
+                
+                # Narrative (if requested)
+                if narrative_style != "None":
+                    progress(0.9, desc=f"Generating {narrative_style} narrative...")
+                    narrative_files = generate_narrative(
+                        results, text, output_name, narrative_style, 
+                        narrative_length, ollama_model
+                    )
+                    output_files.extend(narrative_files)
+                
+                # Lineage chart (if requested)
+                if lineage_chart_format != "None":
+                    progress(0.92, desc="Creating lineage flowchart...")
+                    chart_path = generate_lineage_chart(results, output_name, lineage_chart_format)
+                    if chart_path:
+                        output_files.append(chart_path)
         
         progress(1.0, desc="Analysis complete!")
+        
+        # Get captured output
+        detailed_output = output_buffer.getvalue()
         
         # Format success message
         score = results.get('composite_score', 0)
@@ -244,6 +254,10 @@ def analyze_document(
             if os.path.exists(file_path):
                 size = os.path.getsize(file_path) / 1024
                 result_msg += f"• {file_path} ({size:.1f} KB)\n"
+        
+        # Add detailed analysis output
+        if detailed_output.strip():
+            result_msg += f"\n\n{'='*60}\nDETAILED ANALYSIS OUTPUT:\n{'='*60}\n{detailed_output}"
         
         # Build equivalent CLI command
         cmd_parts = [sys.executable, "sparrow_grader_v8.py"]
@@ -442,7 +456,7 @@ def generate_certificate(results, output_name, variant):
 def add_deep_analysis(results, text, input_path):
     """Add 6-level deep AI analysis."""
     analyzer = DeepAnalyzer()
-    deep_results = analyzer.analyze(input_path, format='markdown')
+    deep_results = analyzer.analyze_document(input_path)
     
     results['deep_analysis'] = deep_results
     return results
@@ -506,7 +520,7 @@ def add_nist_compliance(results, text):
     from nist_compliance_checker import NISTComplianceChecker
     
     checker = NISTComplianceChecker()
-    nist_results = checker.check_compliance(text, results)
+    nist_results = checker.check_compliance(results)
     
     results['nist_compliance'] = nist_results
     return results
@@ -520,25 +534,20 @@ def generate_narrative(results, text, output_name, style, length, model):
     
     output_files = []
     
-    # Generate narrative
-    narrative_path = f"{output_name}_narrative.txt"
-    pipeline.generate_narrative(
-        results=results,
-        style=style,
+    # Generate complete narrative
+    narrative_result = pipeline.generate_complete_narrative(
+        analysis=results,
+        tone=style,
         length=length,
-        model=model,
-        output_path=narrative_path
+        ollama_model=model,
+        formats=['x_thread', 'linkedin', 'social_badge', 'html_certificate']
     )
-    output_files.append(narrative_path)
     
-    # Generate publish-ready version
-    publish_path = f"{output_name}_publish.md"
-    pipeline.generate_publish_ready(
-        results=results,
-        narrative_path=narrative_path,
-        output_path=publish_path
-    )
-    output_files.append(publish_path)
+    # Save narrative text
+    narrative_path = f"{output_name}_narrative.txt"
+    with open(narrative_path, 'w') as f:
+        f.write(narrative_result.get('narrative_text', ''))
+    output_files.append(narrative_path)
     
     return output_files
 
@@ -549,13 +558,15 @@ def generate_lineage_chart(results, output_name, format):
     
     viz = DataLineageVisualizer()
     
-    chart_path = f"{output_name}_lineage_flowchart.{format}"
+    if format == "html":
+        content = viz.generate_html_flowchart()
+        chart_path = f"{output_name}_lineage_flowchart.html"
+    else:  # ascii
+        content = viz.generate_ascii_flowchart()
+        chart_path = f"{output_name}_lineage_flowchart.txt"
     
-    viz.create_flowchart(
-        results=results,
-        output_path=chart_path,
-        format=format
-    )
+    with open(chart_path, 'w') as f:
+        f.write(content)
     
     return chart_path
 
@@ -660,6 +671,90 @@ def create_interface():
     
     with gr.Blocks(title="Sparrow SPOT Scale™") as interface:
         
+        # Add custom CSS using gr.HTML
+        gr.HTML("""
+        <style>
+        /* Modern tab styling for Gradio 6.x */
+        .gradio-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        /* Tab improvements */
+        .tab-nav {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px 12px 0 0;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .tab-nav button {
+            background: rgba(255,255,255,0.2) !important;
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            color: white !important;
+            margin-right: 4px;
+            padding: 14px 24px !important;
+            font-weight: 600 !important;
+            border-radius: 8px 8px 0 0 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .tab-nav button:hover {
+            background: rgba(255,255,255,0.3) !important;
+            transform: translateY(-2px);
+        }
+        
+        .tab-nav button.selected,
+        .tab-nav button[aria-selected="true"] {
+            background: white !important;
+            color: #667eea !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        /* Header styling */
+        h1 {
+            color: #2c3e50 !important;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h3 {
+            color: #667eea !important;
+            font-weight: 600 !important;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e1e8ed;
+            padding-bottom: 8px;
+        }
+        
+        /* Button improvements */
+        button.primary, .primary button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 12px 30px !important;
+            font-weight: 600 !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease !important;
+        }
+        
+        button.primary:hover, .primary button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
+        }
+        
+        /* Accordion improvements */
+        .gr-accordion .gr-accordion-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            padding: 16px !important;
+        }
+        </style>
+        """)
+        
         gr.Markdown("""
         # 🦅 Sparrow SPOT Scale™ v8.3
         ### Automated Policy & Journalism Analysis
@@ -725,7 +820,7 @@ def create_interface():
                     choices=["concise", "standard", "detailed", "comprehensive"],
                     value="standard",
                     label="Narrative Length",
-                    info="Concise (~500 words) | Standard (~1000) | Detailed (~2000) | Comprehensive (~3500+)"
+                    info="Concise (500 words) • Standard (1000) • Detailed (2000) • Comprehensive (3500+)"
                 )
                 
                 ollama_model = gr.Dropdown(
@@ -800,7 +895,7 @@ def create_interface():
                 gr.Markdown("### Ready to Analyze")
                 
                 # Settings summary
-                with gr.Accordion("📋 Current Settings Summary", open=True):
+                with gr.Accordion("📋 Current Settings Summary", open=False):
                     settings_summary = gr.Markdown(
                         "**Tip:** Review your settings in the tabs above before clicking Analyze Document.",
                         elem_id="settings-summary"
