@@ -292,6 +292,29 @@ def analyze_document(
                 cert_path = generate_certificate(results, output_name, variant)
                 output_files.append(cert_path)
                 
+                # Generate Ollama summary (if model available)
+                if ollama_model:  # Run Ollama for any selected model
+                    progress(0.88, desc=f"Generating AI summary with {ollama_model}...")
+                    try:
+                        cert_gen = CertificateGenerator()
+                        summary_path = f"{output_name}_ollama_summary.txt"
+                        
+                        # Create directory if needed
+                        os.makedirs(os.path.dirname(summary_path), exist_ok=True) if os.path.dirname(summary_path) else None
+                        
+                        cert_gen.generate_summary_with_ollama(
+                            results, 
+                            variant=variant, 
+                            model=ollama_model, 
+                            length=narrative_length,
+                            output_file=summary_path
+                        )
+                        output_files.append(summary_path)
+                        progress(0.89, desc="AI summary complete")
+                    except Exception as e:
+                        print(f"⚠️ Ollama summary failed: {e}")
+                        # Continue without failing the entire analysis
+                
                 # Narrative (if requested)
                 if narrative_style != "None":
                     progress(0.9, desc=f"Generating {narrative_style} narrative...")
@@ -652,7 +675,7 @@ def generate_lineage_chart(results, output_name, format):
     return chart_path
 
 
-def update_settings_summary(pdf_file, url_input, variant, output_name, quick_paths, narrative_style, 
+def update_settings_summary(pdf_file, url_input, variant, output_name, narrative_style, 
                            narrative_length, ollama_model, deep_analysis, citation_check, 
                            check_urls, enhanced_provenance, generate_ai_disclosure, 
                            trace_data_sources, nist_compliance, lineage_chart_format):
@@ -721,26 +744,43 @@ def get_available_ollama_models():
             lines = result.stdout.strip().split('\n')
             if len(lines) > 1:  # Skip header
                 models = []
+                preferred_models = []  # Prioritize smaller, working models
+                
                 for line in lines[1:]:
-                    # Extract model name (first column)
+                    # Extract model name and size
                     parts = line.split()
-                    if parts:
+                    if len(parts) >= 3:
                         model_name = parts[0]
+                        size_str = parts[2]
+                        
                         # Only remove :latest suffix, keep other tags like :14b
                         if model_name.endswith(':latest'):
                             model_name = model_name.replace(':latest', '')
-                        models.append(model_name)
+                        
+                        # Skip cloud models (no local size), embedding models, and very large models (>10GB)
+                        if (size_str == '-' or 'cloud' in model_name or 
+                            'embed' in model_name.lower() or 'minilm' in model_name.lower() or
+                            ('GB' in size_str and float(size_str.split()[0]) > 10.0)):
+                            continue
+                        
+                        # Prioritize smaller models that work well (granite4, llama3.2:3b, etc)
+                        if any(pref in model_name.lower() for pref in ['granite4', 'llama3.2', 'qwen2.5:3b', 'phi3']) and 'small-h' not in model_name:
+                            preferred_models.append(model_name)
+                        else:
+                            models.append(model_name)
                 
-                if models:
-                    return models
+                # Put preferred models first, then others
+                final_models = preferred_models + models
+                if final_models:
+                    return final_models
         
         # Fallback to common models if ollama list fails
-        return ["llama3.2", "phi4:14b", "mistral", "qwen2.5", "gemma2"]
+        return ["granite4", "llama3.2:3b", "qwen2.5:3b", "phi3", "mistral"]
         
     except Exception as e:
         print(f"Could not check Ollama models: {e}")
-        # Return default list
-        return ["llama3.2", "phi4:14b", "mistral", "qwen2.5", "gemma2"]
+        # Return default list with working models first
+        return ["granite4", "llama3.2:3b", "qwen2.5:3b", "phi3", "mistral"]
 
 
 # Build the Gradio interface
@@ -894,8 +934,10 @@ def create_interface():
                     quick_paths = gr.Dropdown(
                         label="Quick Paths",
                         choices=[
-                            "test_articles/",
                             "test_articles/Bill-C15/",
+                            "test_articles/2025_budget/", 
+                            "test_articles/Bill-C2/",
+                            "test_articles/Bill-C9/",
                             "analysis/2025/",
                             "reports/",
                             "drafts/"
@@ -1052,7 +1094,7 @@ def create_interface():
         
         # Wire up settings summary to update when any input changes
         all_inputs = [
-            pdf_file, url_input, variant, output_name, quick_paths,
+            pdf_file, url_input, variant, output_name,
             narrative_style, narrative_length, ollama_model,
             deep_analysis, citation_check, check_urls,
             enhanced_provenance, generate_ai_disclosure,
@@ -1126,14 +1168,14 @@ if __name__ == "__main__":
     
     🚀 Starting Gradio server...
     📱 Interface will open in your browser automatically
-    🌐 Access at: http://localhost:7860
+    🌐 Access at: http://localhost:7861
     
     Press Ctrl+C to stop the server
     """)
     
     interface.launch(
         server_name="0.0.0.0",  # Allow external access
-        server_port=7860,
+        server_port=7861,  # Use different port to avoid conflicts
         share=False,  # Set to True to get public URL for sharing
         show_error=True
     )
