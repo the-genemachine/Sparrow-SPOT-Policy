@@ -53,6 +53,71 @@ except ImportError as e:
     print(f"⚠️  Sparrow grader not available - running in demo mode: {e}")
 
 
+def browse_output_location():
+    """Open system file explorer to select output directory and return path."""
+    try:
+        import subprocess
+        import platform
+        
+        # Get current working directory as starting point
+        start_dir = os.getcwd()
+        
+        system = platform.system().lower()
+        
+        if system == "windows":
+            # Windows: Open File Explorer
+            subprocess.run(['explorer', start_dir], check=False)
+            return "📁 File Explorer opened - copy path from address bar"
+            
+        elif system == "darwin":  # macOS
+            # macOS: Open Finder
+            subprocess.run(['open', start_dir], check=False)
+            return "📁 Finder opened - copy path from address bar"
+            
+        elif system == "linux":
+            # Linux: Try different file managers
+            file_managers = [
+                ['nautilus', start_dir],           # GNOME Files
+                ['dolphin', start_dir],            # KDE Dolphin
+                ['thunar', start_dir],             # XFCE Thunar
+                ['pcmanfm', start_dir],            # PCManFM
+                ['nemo', start_dir],               # Cinnamon Nemo
+                ['caja', start_dir],               # MATE Caja
+                ['xdg-open', start_dir]            # Generic opener
+            ]
+            
+            for manager in file_managers:
+                try:
+                    subprocess.run(manager, check=False, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                    return "📁 File manager opened - copy path from address bar"
+                except FileNotFoundError:
+                    continue
+                    
+            return "📁 Please navigate manually - file manager not detected"
+        
+        else:
+            return "📁 System file explorer not supported"
+            
+    except Exception as e:
+        print(f"Error opening file explorer: {e}")
+        return "📁 Error opening file explorer"
+
+
+def set_quick_path(selected_path, current_value):
+    """Set quick path in output name field."""
+    if selected_path:
+        # If current value has a filename, keep it and just change the directory
+        if current_value and not current_value.endswith('/'):
+            # Extract just the filename part
+            filename = os.path.basename(current_value)
+            if filename and not filename.startswith('📁'):
+                return f"{selected_path}{filename}"
+        
+        # Otherwise, just use the path with a default filename
+        return f"{selected_path}analysis"
+    return current_value
+
+
 def analyze_document(
     # File input
     pdf_file,
@@ -587,7 +652,7 @@ def generate_lineage_chart(results, output_name, format):
     return chart_path
 
 
-def update_settings_summary(pdf_file, url_input, variant, output_name, narrative_style, 
+def update_settings_summary(pdf_file, url_input, variant, output_name, quick_paths, narrative_style, 
                            narrative_length, ollama_model, deep_analysis, citation_check, 
                            check_urls, enhanced_provenance, generate_ai_disclosure, 
                            trace_data_sources, nist_compliance, lineage_chart_format):
@@ -810,12 +875,35 @@ def create_interface():
                         label="Analysis Variant",
                         info="Policy = SPOT-Policy™ (government docs) | Journalism = SPARROW™ (news articles)"
                     )
-                    
+                
+                with gr.Row():
                     output_name = gr.Textbox(
                         label="Output Filename Prefix",
                         placeholder="my_analysis or folder/my_analysis (leave empty to auto-generate)",
                         lines=1,
-                        info="Can include directory paths - folders will be created automatically"
+                        info="Can include directory paths - folders will be created automatically. Use 🗂️ Open Explorer to browse directories.",
+                        scale=3
+                    )
+                    output_picker = gr.Button(
+                        "🗂️ Open Explorer",
+                        size="sm", 
+                        scale=1,
+                        variant="secondary",
+                        elem_id="output_picker_btn"
+                    )
+                    quick_paths = gr.Dropdown(
+                        label="Quick Paths",
+                        choices=[
+                            "test_articles/",
+                            "test_articles/Bill-C15/",
+                            "analysis/2025/",
+                            "reports/",
+                            "drafts/"
+                        ],
+                        value=None,
+                        scale=1,
+                        container=True,
+                        allow_custom_value=True
                     )
             
             # ========== TAB 2: NARRATIVE SETTINGS ==========
@@ -964,7 +1052,7 @@ def create_interface():
         
         # Wire up settings summary to update when any input changes
         all_inputs = [
-            pdf_file, url_input, variant, output_name,
+            pdf_file, url_input, variant, output_name, quick_paths,
             narrative_style, narrative_length, ollama_model,
             deep_analysis, citation_check, check_urls,
             enhanced_provenance, generate_ai_disclosure,
@@ -1008,6 +1096,20 @@ def create_interface():
                 lineage_chart_format,
             ],
             outputs=[output_status, command_output]
+        )
+        
+        # Connect the output picker button
+        output_picker.click(
+            fn=browse_output_location,
+            inputs=[],
+            outputs=output_name
+        )
+        
+        # Connect quick paths dropdown
+        quick_paths.change(
+            fn=set_quick_path,
+            inputs=[quick_paths, output_name],
+            outputs=output_name
         )
     
     return interface
