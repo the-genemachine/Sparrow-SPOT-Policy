@@ -2103,6 +2103,13 @@ def main():
             pdf_path = args.input_file if is_pdf else None
             report = grader.grade_article(text, doc_type='journalistic', quiet=False, pdf_path=pdf_path)
             
+            # Add document title to report
+            if args.url:
+                doc_title = input_name.rsplit('.', 1)[0] if '.' in input_name else input_name
+            else:
+                doc_title = Path(args.input_file).stem
+            report['document_title'] = doc_title
+            
             print("\n" + "="*70)
             print("SPARROW SCALE™ GRADING REPORT")
             print("="*70)
@@ -2126,6 +2133,13 @@ def main():
             # v6: Pass PDF path for multimodal analysis if available
             pdf_path = args.input_file if is_pdf else None
             report = grader.grade(text, pdf_path=pdf_path)
+            
+            # Add document title to report
+            if args.url:
+                doc_title = input_name.rsplit('.', 1)[0] if '.' in input_name else input_name
+            else:
+                doc_title = Path(args.input_file).stem
+            report['document_title'] = doc_title
             
             print("\n" + "="*70)
             print("SPOT-POLICY™ GRADING REPORT")
@@ -2595,13 +2609,60 @@ def main():
                                  f"Multi-dimensional {args.variant} analysis",
                                  status="completed")
                     
-                    viz.add_stage("AI Detection",
+                    # AI Detection stage with details
+                    ai_stage_idx = viz.add_stage("AI Detection",
                                  "Basic AI content detection",
                                  status="completed")
                     
-                    viz.add_stage("Deep Analysis",
+                    # Add AI detection details
+                    ai_detection = report.get('ai_detection', {})
+                    ai_details = []
+                    if ai_detection:
+                        ai_score = ai_detection.get('ai_detection_score', 0) * 100
+                        ai_details.append(f"AI Content: {ai_score:.1f}%")
+                        
+                        likely_model = ai_detection.get('likely_ai_model', {})
+                        if isinstance(likely_model, dict):
+                            model_name = likely_model.get('model', 'Unknown')
+                            model_conf = likely_model.get('confidence', 0) * 100
+                            if model_name and model_name != 'Unknown':
+                                ai_details.append(f"Detected Model: {model_name} ({model_conf:.0f}% confidence)")
+                            
+                            # Add top model fingerprints
+                            model_scores = likely_model.get('model_scores', {})
+                            if model_scores:
+                                sorted_models = sorted(model_scores.items(), key=lambda x: x[1], reverse=True)[:3]
+                                if sorted_models:
+                                    ai_details.append("Top Model Fingerprints:")
+                                    for model, score in sorted_models:
+                                        ai_details.append(f"  • {model}: {score*100:.1f}%")
+                    
+                    if ai_details:
+                        viz.update_stage(ai_stage_idx, "completed", ai_details)
+                    
+                    # Deep Analysis stage with details
+                    deep_stage_idx = viz.add_stage("Deep Analysis",
                                  "6-level transparency analysis",
                                  status="completed" if deep_analysis_results else "skipped")
+                    
+                    # Add deep analysis details if available
+                    if deep_analysis_results:
+                        deep_details = []
+                        consensus = deep_analysis_results.get('consensus', {})
+                        if consensus:
+                            deep_details.append(f"Consensus AI: {consensus.get('ai_percentage', 0):.1f}%")
+                            deep_details.append(f"Primary Model: {consensus.get('primary_model', 'Unknown')}")
+                            deep_details.append(f"Transparency Score: {consensus.get('transparency_score', 0)}/100")
+                            
+                            # Add level breakdown
+                            level_scores = consensus.get('level_scores', {})
+                            if level_scores:
+                                deep_details.append("Level Breakdown:")
+                                for level, score in level_scores.items():
+                                    deep_details.append(f"  • {level}: {score:.1f}%")
+                        
+                        if deep_details:
+                            viz.update_stage(deep_stage_idx, "completed", deep_details)
                     
                     viz.add_stage("Ethical Framework",
                                  "Risk assessment and bias audit",

@@ -126,6 +126,7 @@ def analyze_document(
     # Basic settings
     variant,
     output_name,
+    document_title,
     
     # Narrative settings
     narrative_style,
@@ -209,6 +210,12 @@ def analyze_document(
             grader = SPARROWGrader()
             results = grader.grade_article(text, input_source)
             
+            # Add document title to results
+            if document_title:
+                results['document_title'] = document_title
+            elif input_source:
+                results['document_title'] = input_source
+            
             progress(0.8, desc="Generating outputs...")
             
             # Generate outputs
@@ -239,6 +246,12 @@ def analyze_document(
             with redirect_stdout(output_buffer):
                 policy = SPOTPolicy()
                 results = policy.grade(text, pdf_path=input_path if is_pdf else None)
+                
+                # Add document title to results
+                if document_title:
+                    results['document_title'] = document_title
+                elif input_source:
+                    results['document_title'] = input_source
                 
                 progress(0.5, desc="Running policy evaluation...")
                 
@@ -998,6 +1011,14 @@ def create_interface():
                         container=True,
                         allow_custom_value=True
                     )
+                
+                document_title = gr.Textbox(
+                    label="Document Title (Optional)",
+                    placeholder="e.g., Bill C-15: Budget Implementation Act, 2025",
+                    lines=1,
+                    info="Enter the actual document title for certificates and reports. If empty, will use filename.",
+                    scale=4
+                )
             
             # ========== TAB 2: NARRATIVE SETTINGS ==========
             with gr.Tab("📝 Narrative Settings"):
@@ -1170,6 +1191,7 @@ def create_interface():
                 # Basic settings
                 variant,
                 output_name,
+                document_title,
                 
                 # Narrative settings
                 narrative_style,
