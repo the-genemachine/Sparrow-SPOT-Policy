@@ -1,7 +1,17 @@
 """
-NIST AI RMF Compliance Checker for Sparrow SPOT Scale™ v8.2
+NIST AI RMF Compliance Checker for Sparrow SPOT Scale™ v8.3.2
 
 Maps existing features to NIST AI Risk Management Framework pillars.
+
+IMPORTANT SCOPE CLARIFICATION (v8.3.2):
+This module assesses the SPARROW ANALYSIS TOOL's compliance with NIST AI RMF,
+NOT the analyzed document's compliance. The distinction is critical:
+
+- Scope: Sparrow SPOT Scale™ tool methodology and features
+- NOT Scope: The policy document being analyzed
+
+This is a self-assessment of the AI analysis tool's governance practices,
+not an assessment of the target document's NIST compliance.
 """
 
 from typing import Dict, List
@@ -9,7 +19,18 @@ from datetime import datetime
 
 
 class NISTComplianceChecker:
-    """Check compliance with NIST AI RMF pillars."""
+    """
+    Check Sparrow SPOT Scale™ tool compliance with NIST AI RMF pillars.
+    
+    SCOPE CLARIFICATION (v8.3.2):
+    This checker validates that the SPARROW ANALYSIS TOOL follows NIST AI RMF
+    principles in its design and operation. It does NOT assess whether the
+    document being analyzed is NIST compliant.
+    
+    Example:
+    - "GOVERN pillar: PASS" = Sparrow tool has governance structures
+    - NOT = "The analyzed budget document has governance structures"
+    """
     
     PILLARS = {
         "GOVERN": "Governance structures and policies",
@@ -372,6 +393,13 @@ class NISTComplianceChecker:
         lines.append("=" * 80)
         lines.append("  NIST AI RISK MANAGEMENT FRAMEWORK (RMF) v1.0 - COMPLIANCE REPORT")
         lines.append("=" * 80)
+        lines.append("")
+        # v8.3.2: Add scope clarification
+        lines.append("┌" + "─" * 78 + "┐")
+        lines.append("│ SCOPE: This report assesses SPARROW SPOT SCALE™ TOOL compliance,        │")
+        lines.append("│        NOT the analyzed document's NIST compliance.                     │")
+        lines.append("│        This is a self-assessment of the analysis methodology.          │")
+        lines.append("└" + "─" * 78 + "┘")
         lines.append("")
         lines.append(f"Assessment Date: {datetime.now().strftime('%B %d, %Y at %H:%M:%S')}")
         lines.append(f"Overall Compliance Score: {compliance['overall_compliance_score']}/100")

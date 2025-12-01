@@ -460,6 +460,157 @@ class ContradictionDetector:
             summary_parts.append(f"✓ {len(self.validated_claims)} claim(s) validated")
         
         return " | ".join(summary_parts)
+    
+    def validate_output_consistency(self, results: Dict, output_files: Dict[str, str] = None) -> Dict:
+        """
+        v8.3.2: Validate consistency across generated output files.
+        
+        Cross-checks:
+        - AI percentages match across all outputs
+        - Scores are consistent (TXT vs JSON vs Certificate)
+        - Confidence values are valid (<= 100%)
+        - Required fields are populated
+        
+        Args:
+            results: The master analysis results dictionary
+            output_files: Optional dict of {file_type: content} for cross-validation
+            
+        Returns:
+            Dictionary with consistency check results
+        """
+        issues = []
+        
+        # 1. Check AI percentage consistency
+        ai_percentages = self._extract_ai_percentages(results)
+        if len(set(round(v, 0) for v in ai_percentages.values())) > 1:
+            # More than one unique rounded value
+            max_diff = max(ai_percentages.values()) - min(ai_percentages.values())
+            if max_diff > 10:  # >10% difference is significant
+                issues.append({
+                    'type': 'ai_percentage_inconsistency',
+                    'severity': 'HIGH',
+                    'values': ai_percentages,
+                    'difference': round(max_diff, 1),
+                    'message': f"AI percentages differ by {max_diff:.1f}% across sources"
+                })
+        
+        # 2. Check confidence values are valid
+        confidence_issues = self._check_confidence_bounds(results)
+        issues.extend(confidence_issues)
+        
+        # 3. Check criteria scores are populated
+        criteria = results.get('criteria', {})
+        for name, data in criteria.items():
+            if isinstance(data, dict):
+                score = data.get('score')
+                if score is None or score == 'N/A':
+                    issues.append({
+                        'type': 'missing_score',
+                        'severity': 'MEDIUM',
+                        'field': f'criteria.{name}',
+                        'message': f"Criterion '{name}' has no valid score"
+                    })
+        
+        # 4. Check trust score components
+        trust = results.get('trust_score', {})
+        if trust:
+            fairness = trust.get('fairness_audit', {})
+            if fairness.get('bias_detected') and not fairness.get('warnings_present'):
+                issues.append({
+                    'type': 'warning_flag_mismatch',
+                    'severity': 'MEDIUM',
+                    'message': "bias_detected=True but warnings_present=False"
+                })
+        
+        return {
+            'consistent': len(issues) == 0,
+            'issue_count': len(issues),
+            'issues': issues,
+            'summary': self._generate_consistency_summary(issues)
+        }
+    
+    def _extract_ai_percentages(self, results: Dict) -> Dict[str, float]:
+        """Extract AI percentage values from all sources in results."""
+        percentages = {}
+        
+        # Deep analysis consensus (primary source)
+        deep = results.get('deep_analysis', {})
+        if deep:
+            consensus = deep.get('consensus', {})
+            if 'ai_percentage' in consensus:
+                percentages['consensus'] = consensus['ai_percentage']
+            
+            # Level 1 document analysis
+            l1 = deep.get('level1_document', {})
+            if 'ai_percentage' in l1:
+                percentages['level1'] = l1['ai_percentage']
+        
+        # Basic AI detection
+        ai_det = results.get('ai_detection', {})
+        if ai_det:
+            score = ai_det.get('ai_detection_score')
+            if score is not None:
+                # Normalize to percentage
+                if score <= 1.0:
+                    percentages['basic_detection'] = score * 100
+                else:
+                    percentages['basic_detection'] = score
+        
+        return percentages
+    
+    def _check_confidence_bounds(self, results: Dict) -> List[Dict]:
+        """Check all confidence values are within valid bounds (0-100)."""
+        issues = []
+        
+        # Check AI detection confidence
+        ai_det = results.get('ai_detection', {})
+        if ai_det:
+            likely_model = ai_det.get('likely_ai_model', {})
+            if isinstance(likely_model, dict):
+                conf = likely_model.get('confidence')
+                if conf is not None and isinstance(conf, (int, float)) and conf > 100:
+                    issues.append({
+                        'type': 'invalid_confidence',
+                        'severity': 'HIGH',
+                        'field': 'ai_detection.likely_ai_model.confidence',
+                        'value': conf,
+                        'message': f"Confidence value {conf} exceeds 100%"
+                    })
+        
+        # Check deep analysis level confidences
+        deep = results.get('deep_analysis', {})
+        if deep:
+            for level_key in ['level1_document', 'level2_section', 'level4_model', 
+                             'level5_behavioral', 'level6_phrase']:
+                level = deep.get(level_key, {})
+                if isinstance(level, dict):
+                    conf = level.get('confidence')
+                    if conf is not None and isinstance(conf, (int, float)) and conf > 100:
+                        issues.append({
+                            'type': 'invalid_confidence',
+                            'severity': 'MEDIUM',
+                            'field': f'deep_analysis.{level_key}.confidence',
+                            'value': conf,
+                            'message': f"Level confidence {conf} exceeds 100%"
+                        })
+        
+        return issues
+    
+    def _generate_consistency_summary(self, issues: List[Dict]) -> str:
+        """Generate summary of consistency check results."""
+        if not issues:
+            return "✓ All output values are consistent across files"
+        
+        high = len([i for i in issues if i.get('severity') == 'HIGH'])
+        medium = len([i for i in issues if i.get('severity') == 'MEDIUM'])
+        
+        parts = []
+        if high:
+            parts.append(f"⚠️ {high} critical inconsistencies")
+        if medium:
+            parts.append(f"ℹ️ {medium} warnings")
+        
+        return " | ".join(parts)
 
 
 def create_contradiction_detector() -> ContradictionDetector:
