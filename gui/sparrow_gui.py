@@ -739,9 +739,9 @@ def generate_lineage_chart(results, output_name, format):
     return chart_path
 
 
-def update_settings_summary(pdf_file, url_input, variant, output_name, narrative_style, 
-                           narrative_length, ollama_model, deep_analysis, citation_check, 
-                           check_urls, enhanced_provenance, generate_ai_disclosure, 
+def update_settings_summary(pdf_file, url_input, variant, output_name, document_title,
+                           narrative_style, narrative_length, ollama_model, deep_analysis, 
+                           citation_check, check_urls, enhanced_provenance, generate_ai_disclosure, 
                            trace_data_sources, nist_compliance, lineage_chart_format):
     """Generate a summary of current settings."""
     
@@ -759,7 +759,8 @@ def update_settings_summary(pdf_file, url_input, variant, output_name, narrative
 {input_src}
 
 **Analysis Variant:** {variant.upper()}  
-**Output Prefix:** {output_name if output_name else '(auto-generated)'}
+**Output Prefix:** {output_name if output_name else '(auto-generated)'}  
+**Document Title:** {document_title if document_title else '(will use filename)'}
 
 ---
 
@@ -1166,7 +1167,7 @@ def create_interface():
         
         # Wire up settings summary to update when any input changes
         all_inputs = [
-            pdf_file, url_input, variant, output_name,
+            pdf_file, url_input, variant, output_name, document_title,
             narrative_style, narrative_length, ollama_model,
             deep_analysis, citation_check, check_urls,
             enhanced_provenance, generate_ai_disclosure,

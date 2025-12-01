@@ -703,9 +703,71 @@ class CertificateGenerator:
             burstiness = metrics.get('burstiness', 0)
             lexical_diversity = metrics.get('lexical_diversity', 0)
             
+            # v8.3.1: Generate pattern details section with locations
+            pattern_details_html = ''
+            detailed_patterns = level3.get('detailed_matches', {})
+            if detailed_patterns:
+                pattern_items = []
+                for category, data in list(detailed_patterns.items())[:5]:
+                    category_name = category.replace('_', ' ').title()
+                    count = data.get('count', 0)
+                    samples = data.get('samples', [])[:3]
+                    
+                    sample_html = ''
+                    for sample in samples:
+                        line = sample.get('line_number', '?')
+                        text = sample.get('matched_text', '')[:50]
+                        sample_html += f'<div style="font-size: 0.8em; color: #666; margin-left: 15px; margin-bottom: 3px;"><em>Line {line}:</em> "{text}"</div>'
+                    
+                    pattern_items.append(f'''
+                        <div style="margin-bottom: 8px;">
+                            <strong>{category_name}:</strong> {count} occurrences
+                            {sample_html}
+                        </div>
+                    ''')
+                
+                if pattern_items:
+                    pattern_details_html = f'''
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer; font-weight: 600; color: #0369a1;">📍 Pattern Locations (click to expand)</summary>
+                        <div style="padding: 10px; background: white; border-radius: 4px; margin-top: 5px;">
+                            {''.join(pattern_items)}
+                        </div>
+                    </details>
+                    '''
+            
+            # v8.3.1: Generate fingerprint details section with locations
+            fingerprint_details_html = ''
+            all_samples = level5.get('all_detailed_samples', [])
+            if all_samples:
+                fp_items = []
+                for sample in all_samples[:8]:
+                    model = sample.get('model', 'Unknown')
+                    category = sample.get('category', '').replace('_', ' ').title()
+                    phrase = sample.get('phrase', '')
+                    line = sample.get('line_number', '?')
+                    
+                    fp_items.append(f'''
+                        <div style="margin-bottom: 6px; font-size: 0.85em;">
+                            <span style="background: #e0f2fe; padding: 2px 6px; border-radius: 3px; font-weight: 600;">{model}</span>
+                            <span style="color: #555;">({category})</span>
+                            <em>Line {line}:</em> "<strong>{phrase}</strong>"
+                        </div>
+                    ''')
+                
+                if fp_items:
+                    fingerprint_details_html = f'''
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer; font-weight: 600; color: #0369a1;">🔍 Fingerprint Locations (click to expand)</summary>
+                        <div style="padding: 10px; background: white; border-radius: 4px; margin-top: 5px;">
+                            {''.join(fp_items)}
+                        </div>
+                    </details>
+                    '''
+            
             deep_analysis_section = f"""
             <div class="deep-analysis" style="background: #f0f9ff; padding: 25px; margin: 25px 0; border-left: 5px solid #0ea5e9; border-radius: 4px;">
-                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v8.2)</h3>
+                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v8.3.1)</h3>
                 <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div style="text-align: center;">
@@ -727,10 +789,12 @@ class CertificateGenerator:
                         <div style="background: #f8fafc; padding: 12px; border-radius: 4px;">
                             <div style="font-size: 0.85em; color: #555; font-weight: 600; margin-bottom: 5px;">Pattern Detection</div>
                             <div style="font-size: 1.1em; color: #0369a1;"><strong>{total_patterns}</strong> AI patterns found</div>
+                            {pattern_details_html}
                         </div>
                         <div style="background: #f8fafc; padding: 12px; border-radius: 4px;">
                             <div style="font-size: 0.85em; color: #555; font-weight: 600; margin-bottom: 5px;">Phrase Fingerprints</div>
                             <div style="font-size: 1.1em; color: #0369a1;"><strong>{total_fingerprints}</strong> model signatures</div>
+                            {fingerprint_details_html}
                         </div>
                     </div>
                 </div>

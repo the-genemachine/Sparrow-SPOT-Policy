@@ -196,13 +196,20 @@ class DeepAnalyzer:
         }
     
     def _run_level3(self, text: str) -> Dict:
-        """Level 3: Pattern detection"""
+        """Level 3: Pattern detection with locations"""
+        # Get basic pattern counts
         patterns = self.section_analyzer._detect_cohere_patterns(text)
         total = sum(patterns.values())
+        
+        # v8.3.1: Get detailed patterns with locations
+        detailed = self.section_analyzer.detect_patterns_with_locations(text, max_samples=15)
+        
         return {
             'total_patterns': total,
-            'patterns_by_model': {'Cohere': total},  # Expand when other models added
+            'patterns_by_model': {'Cohere': total},
             'pattern_details': patterns,
+            'detailed_matches': detailed.get('patterns_by_category', {}),
+            'sample_locations': detailed.get('sample_matches', [])
         }
     
     def _run_level4(self, text: str) -> Dict:
@@ -210,8 +217,9 @@ class DeepAnalyzer:
         return self.sentence_detector.analyze_document(text)
     
     def _run_level5(self, text: str) -> Dict:
-        """Level 5: Phrase fingerprinting"""
-        return self.phrase_scanner.scan_text(text)
+        """Level 5: Phrase fingerprinting with locations"""
+        # v8.3.1: Use enhanced method with location tracking
+        return self.phrase_scanner.scan_text_with_locations(text, max_samples=15)
     
     def _run_level6(self, text: str) -> Dict:
         """Level 6: Statistical analysis"""

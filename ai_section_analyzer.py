@@ -154,6 +154,78 @@ class AISectionAnalyzer:
         
         return pattern_counts
     
+    def detect_patterns_with_locations(self, text: str, max_samples: int = 10) -> Dict[str, any]:
+        """Detect patterns with their locations and context in the document.
+        
+        v8.3.1: Enhanced pattern detection that captures WHERE patterns occur.
+        
+        Args:
+            text: Document text to analyze
+            max_samples: Maximum samples per pattern category
+            
+        Returns:
+            Dictionary with pattern counts and detailed location samples
+        """
+        results = {
+            'total_patterns': 0,
+            'patterns_by_category': {},
+            'sample_matches': []
+        }
+        
+        # Track line numbers
+        lines = text.split('\n')
+        line_positions = []
+        pos = 0
+        for i, line in enumerate(lines):
+            line_positions.append((pos, pos + len(line), i + 1))  # (start, end, line_num)
+            pos += len(line) + 1  # +1 for newline
+        
+        def get_line_number(char_pos):
+            """Get line number for a character position."""
+            for start, end, line_num in line_positions:
+                if start <= char_pos < end:
+                    return line_num
+            return len(lines)
+        
+        def get_context(match_start, match_end, context_chars=80):
+            """Get surrounding context for a match."""
+            ctx_start = max(0, match_start - context_chars)
+            ctx_end = min(len(text), match_end + context_chars)
+            return text[ctx_start:ctx_end].replace('\n', ' ').strip()
+        
+        all_samples = []
+        
+        for pattern_name, pattern_regex in self.cohere_patterns.items():
+            category_matches = []
+            
+            for match in re.finditer(pattern_regex, text, re.IGNORECASE | re.MULTILINE):
+                results['total_patterns'] += 1
+                match_text = match.group()
+                match_start = match.start()
+                match_end = match.end()
+                line_num = get_line_number(match_start)
+                
+                match_info = {
+                    'pattern_type': pattern_name,
+                    'matched_text': match_text[:100],  # Truncate long matches
+                    'line_number': line_num,
+                    'char_position': match_start,
+                    'context': get_context(match_start, match_end)
+                }
+                category_matches.append(match_info)
+                all_samples.append(match_info)
+            
+            if category_matches:
+                results['patterns_by_category'][pattern_name] = {
+                    'count': len(category_matches),
+                    'samples': category_matches[:max_samples]  # Store limited samples per category
+                }
+        
+        # Store top samples overall (most interesting/diverse)
+        results['sample_matches'] = all_samples[:max_samples * 2]
+        
+        return results
+    
     def _count_ai_patterns(self, text: str) -> Dict[str, int]:
         """Count general AI patterns in text."""
         pattern_counts = {}

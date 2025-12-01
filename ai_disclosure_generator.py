@@ -259,7 +259,19 @@ def _add_comprehensive_methods():
     """Add comprehensive disclosure generation methods to AIDisclosureGenerator class"""
     
     def _get_ai_percentage(self) -> float:
-        """Extract AI percentage from detection results."""
+        """Extract AI percentage from detection results.
+        
+        v8.3.1: Prioritize deep analysis consensus over basic detection for consistency
+        with certificate generation.
+        """
+        # First, check for deep analysis consensus (most accurate, 6-level weighted analysis)
+        deep_analysis = self.data.get('deep_analysis', {})
+        if deep_analysis:
+            consensus = deep_analysis.get('consensus', {})
+            if consensus and 'ai_percentage' in consensus:
+                return consensus['ai_percentage']
+        
+        # Fallback to basic ai_detection score
         if not self.ai_detection:
             return 0.0
         # Handle both formats: decimal (0.532) or percentage (53.2)

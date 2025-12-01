@@ -246,6 +246,106 @@ class PhraseFingerprints:
         
         return results
     
+    def scan_text_with_locations(self, text: str, max_samples: int = 15) -> Dict[str, any]:
+        """
+        Scan text for phrase fingerprints WITH their exact locations and context.
+        
+        v8.3.1: Enhanced fingerprint detection that shows WHERE signatures occur.
+        
+        Args:
+            text: Document text to scan
+            max_samples: Maximum samples per model/category
+            
+        Returns:
+            Dictionary with model matches, phrases found, and their locations
+        """
+        results = {}
+        total_matches = 0
+        all_detailed_matches = []
+        
+        # Build line number lookup
+        lines = text.split('\n')
+        line_positions = []
+        pos = 0
+        for i, line in enumerate(lines):
+            line_positions.append((pos, pos + len(line), i + 1))
+            pos += len(line) + 1
+        
+        def get_line_number(char_pos):
+            for start, end, line_num in line_positions:
+                if start <= char_pos < end:
+                    return line_num
+            return len(lines)
+        
+        def get_context(match_start, match_end, context_chars=60):
+            ctx_start = max(0, match_start - context_chars)
+            ctx_end = min(len(text), match_end + context_chars)
+            return text[ctx_start:ctx_end].replace('\n', ' ').strip()
+        
+        for model, categories in self.phrase_db.items():
+            model_matches = {}
+            model_total = 0
+            model_detailed = []
+            
+            for category, patterns in categories.items():
+                category_detailed = []
+                
+                for pattern in patterns:
+                    for match in re.finditer(pattern, text, re.IGNORECASE):
+                        model_total += 1
+                        total_matches += 1
+                        
+                        match_info = {
+                            'model': model,
+                            'category': category,
+                            'phrase': match.group(),
+                            'line_number': get_line_number(match.start()),
+                            'char_position': match.start(),
+                            'context': get_context(match.start(), match.end())
+                        }
+                        category_detailed.append(match_info)
+                        model_detailed.append(match_info)
+                        all_detailed_matches.append(match_info)
+                
+                if category_detailed:
+                    # Get unique phrases with their first locations
+                    unique_phrases = {}
+                    for m in category_detailed:
+                        phrase_lower = m['phrase'].lower()
+                        if phrase_lower not in unique_phrases:
+                            unique_phrases[phrase_lower] = m
+                    
+                    model_matches[category] = {
+                        'count': len(category_detailed),
+                        'examples': [m['phrase'] for m in list(unique_phrases.values())[:5]],
+                        'detailed_matches': category_detailed[:max_samples]
+                    }
+            
+            if model_matches:
+                results[model] = {
+                    'categories': model_matches,
+                    'total_matches': model_total,
+                    'confidence': self._calculate_confidence(model_total, len(text)),
+                    'sample_locations': model_detailed[:max_samples]
+                }
+        
+        # Determine primary model
+        if results:
+            primary_model = max(
+                [(k, v) for k, v in results.items() if k not in ['primary_model', 'primary_confidence', 'total_fingerprints_found', 'all_detailed_samples']],
+                key=lambda x: x[1]['total_matches']
+            )
+            results['primary_model'] = primary_model[0]
+            results['primary_confidence'] = primary_model[1]['confidence']
+        else:
+            results['primary_model'] = 'Unknown'
+            results['primary_confidence'] = 0
+        
+        results['total_fingerprints_found'] = total_matches
+        results['all_detailed_samples'] = all_detailed_matches[:max_samples * 2]
+        
+        return results
+    
     def _calculate_confidence(self, match_count: int, text_length: int) -> float:
         """
         Calculate confidence level based on phrase density.
