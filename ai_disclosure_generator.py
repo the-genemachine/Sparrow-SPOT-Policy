@@ -400,16 +400,17 @@ All content was reviewed by human experts, and the government takes full respons
         ai_pct = self._get_ai_percentage()
         model_info = self._get_model_info()
         
+        # v8.3.2: Standardize AI percentage display - use consistent .1f format everywhere
         if document_name:
-            twitter = f"🔍 AI Transparency ({document_name}): ~{ai_pct:.0f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
+            twitter = f"🔍 AI Transparency ({document_name}): {ai_pct:.1f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
         else:
-            twitter = f"🔍 AI Transparency: This document is ~{ai_pct:.0f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
-        
+            twitter = f"🔍 AI Transparency: This document is {ai_pct:.1f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
+
         doc_line = f"\nDocument: {document_name}\n" if document_name else ""
         linkedin = f"""AI Transparency Disclosure{doc_line}
 This {self.metadata['document_type']} was prepared with AI assistance:
 
-📊 AI Content: ~{ai_pct:.0f}%
+📊 AI Content: {ai_pct:.1f}%
 🤖 Model: {model_info['model']}
 ✓ Human Review: Complete
 

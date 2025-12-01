@@ -24,10 +24,60 @@ class CitationQualityScorer:
             r'[A-Z][a-z]+ states?',  # Smith states
             r'reported by [A-Z][a-z]+',  # reported by Reuters
         ]
+        
+        # v8.3.2: Document type patterns for scoring adjustment
+        self.legislative_patterns = [
+            r'\bBill\s+[A-Z]?-?\d+\b',  # Bill C-15, Bill S-20
+            r'\bAct\s+[A-Z]',  # Act of Parliament
+            r'\bSection\s+\d+',  # Section 42
+            r'\bsubsection\s+\(\d+\)',  # subsection (1)
+            r'\bSchedule\s+[A-Z0-9]',  # Schedule A
+            r'\bHer Majesty|His Majesty\b',  # Royal reference
+            r'\bParliament\s+of\s+Canada\b',
+            r'\benacted\s+by\b',  # enacted by
+            r'\bChapter\s+\d+\b',  # Chapter 12 (in legislation)
+            r'\bStatutes\s+of\s+Canada\b',
+        ]
+    
+    def _detect_document_type(self, text: str) -> str:
+        """v8.3.2: Detect document type for appropriate scoring.
+        
+        Legislative documents (bills, acts) are self-authoritative and 
+        shouldn't be penalized for low external citations.
+        
+        Returns:
+            'legislation': Bills, Acts, legal documents
+            'policy_brief': Policy analysis, recommendations
+            'report': General reports and analysis
+            'unknown': Cannot determine
+        """
+        text_lower = text[:5000].lower()  # Check first 5000 chars for efficiency
+        
+        # Count legislative pattern matches
+        leg_matches = 0
+        for pattern in self.legislative_patterns:
+            if re.search(pattern, text[:5000], re.IGNORECASE):
+                leg_matches += 1
+        
+        # Legislation typically has 3+ pattern matches
+        if leg_matches >= 3:
+            return 'legislation'
+        
+        # Check for policy brief indicators
+        policy_indicators = ['executive summary', 'recommendations', 'key findings', 
+                            'policy options', 'impact assessment', 'stakeholder']
+        policy_matches = sum(1 for ind in policy_indicators if ind in text_lower)
+        if policy_matches >= 2:
+            return 'policy_brief'
+        
+        return 'report'  # Default to general report
     
     def analyze_citations(self, text: str, check_urls: bool = False) -> Dict:
         """
         Analyze all citations in document.
+        
+        v8.3.2: Added document type detection for context-aware scoring.
+        Legislative documents are not penalized for low external citations.
         
         Args:
             text: Document text
@@ -39,6 +89,9 @@ class CitationQualityScorer:
         # Validate input
         if not isinstance(text, str):
             raise TypeError(f"Expected string for text parameter, got {type(text)}")
+        
+        # v8.3.2: Detect document type for context-aware scoring
+        document_type = self._detect_document_type(text)
         
         # Extract URLs
         urls = self.url_pattern.findall(text)
@@ -59,8 +112,8 @@ class CitationQualityScorer:
         words = len(text.split())
         citations_per_1000_words = (len(urls) + len(citation_markers)) / words * 1000 if words > 0 else 0
         
-        # Generate quality score
-        quality_score = self._calculate_quality_score(url_analysis, citations_per_1000_words)
+        # v8.3.2: Generate quality score with document type awareness
+        quality_score = self._calculate_quality_score(url_analysis, citations_per_1000_words, document_type)
         
         return {
             "total_urls": len(urls),
@@ -69,6 +122,7 @@ class CitationQualityScorer:
             "citations_per_1000_words": round(citations_per_1000_words, 2),
             "url_analysis": url_analysis,
             "citation_markers": citation_markers[:20],  # Sample
+            "document_type": document_type,  # v8.3.2: Include detected type
             "quality_score": quality_score,
             "quality_level": self._get_quality_level(quality_score),
             "summary": self._generate_citation_summary(url_analysis, citations_per_1000_words, quality_score)
@@ -238,15 +292,37 @@ class CitationQualityScorer:
         except:
             return False
     
-    def _calculate_quality_score(self, url_analysis: Dict, citations_per_1000: float) -> float:
+    def _calculate_quality_score(self, url_analysis: Dict, citations_per_1000: float, 
+                                   document_type: str = 'report') -> float:
         """
         Calculate overall citation quality score (0-100).
         
+        v8.3.2: Added document type awareness.
+        - Legislative documents (bills, acts) are self-authoritative
+        - Policy briefs require external citations for credibility
+        - Reports use standard scoring
+        
         Scoring:
         - Source diversity: 40 points
-        - Citation density: 30 points
+        - Citation density: 30 points  
         - URL accessibility: 30 points
+        
+        For legislation: Base score starts at 60 (self-authoritative)
         """
+        # v8.3.2: Legislative documents are self-authoritative
+        if document_type == 'legislation':
+            # Legislation doesn't need external citations - it IS the source
+            # Start with high base score, add bonus for any external references
+            base_score = 70.0  # Legislation is authoritative by definition
+            
+            # Bonus points for any government/official references (up to 30)
+            source_types = url_analysis.get("source_types", {})
+            gov_bonus = min(source_types.get("government", 0) * 5, 15)
+            other_bonus = min(citations_per_1000 * 3, 15)
+            
+            return round(min(base_score + gov_bonus + other_bonus, 100), 1)
+        
+        # Standard scoring for policy briefs and reports
         score = 0.0
         
         # Source diversity (40 points)

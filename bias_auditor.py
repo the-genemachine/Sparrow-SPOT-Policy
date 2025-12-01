@@ -117,6 +117,10 @@ class BiasAuditor:
         bias_detected = any(m.status == "fail" for m in fairness_metrics)
         warnings = any(m.status == "warning" for m in fairness_metrics)
         
+        # v8.3.2 Fix: warnings_present should be True when ANY issue is detected
+        # (both "warning" and "fail" statuses should trigger warnings_present)
+        warnings_present = warnings or bias_detected
+        
         # Calculate overall fairness score
         overall_score = self._calculate_overall_fairness_score(fairness_metrics)
         
@@ -133,7 +137,7 @@ class BiasAuditor:
             "demographic_groups": [self._group_to_dict(g) for g in demographic_groups],
             "fairness_metrics": [self._metric_to_dict(m) for m in fairness_metrics],
             "bias_detected": bias_detected,
-            "warnings_present": warnings,
+            "warnings_present": warnings_present,  # v8.3.2: Fixed - True when any issue detected
             "overall_fairness_score": round(overall_score, 1),
             "reference_group": reference_group,
             "recommendations": recommendations,

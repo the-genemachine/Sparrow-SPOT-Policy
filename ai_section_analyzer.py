@@ -158,6 +158,7 @@ class AISectionAnalyzer:
         """Detect patterns with their locations and context in the document.
         
         v8.3.1: Enhanced pattern detection that captures WHERE patterns occur.
+        v8.3.2: Added quality filtering to reduce false positives from OCR artifacts.
         
         Args:
             text: Document text to analyze
@@ -193,24 +194,58 @@ class AISectionAnalyzer:
             ctx_end = min(len(text), match_end + context_chars)
             return text[ctx_start:ctx_end].replace('\n', ' ').strip()
         
+        def is_quality_context(context: str) -> bool:
+            """v8.3.2: Check if context is clean (not OCR garbage).
+            
+            Returns False for:
+            - Very short contexts (likely fragments)
+            - High ratio of special characters
+            - Excessive consecutive consonants (bilingual OCR issue)
+            - French diacritics clusters (bilingual PDF artifacts)
+            """
+            if len(context) < 20:
+                return False
+            
+            # Check for excessive special characters
+            special_count = sum(1 for c in context if not c.isalnum() and c not in ' .,;:\'"-()[]')
+            if special_count / len(context) > 0.15:
+                return False
+            
+            # Check for garbled patterns (5+ consecutive consonants)
+            import re
+            if re.search(r'[bcdfghjklmnpqrstvwxz]{5,}', context, re.IGNORECASE):
+                return False
+            
+            # Check for excessive French diacritics (bilingual OCR artifacts)
+            diacritic_count = sum(1 for c in context if c in 'àâäèéêëîïôùûüÿçÀÂÄÈÉÊËÎÏÔÙÛÜŸÇ')
+            if diacritic_count > 5 and diacritic_count / len(context) > 0.1:
+                return False
+            
+            return True
+        
         all_samples = []
         
         for pattern_name, pattern_regex in self.cohere_patterns.items():
             category_matches = []
             
             for match in re.finditer(pattern_regex, text, re.IGNORECASE | re.MULTILINE):
-                results['total_patterns'] += 1
                 match_text = match.group()
                 match_start = match.start()
                 match_end = match.end()
                 line_num = get_line_number(match_start)
+                context = get_context(match_start, match_end)
                 
+                # v8.3.2: Skip matches in low-quality contexts (OCR garbage)
+                if not is_quality_context(context):
+                    continue
+                
+                results['total_patterns'] += 1
                 match_info = {
                     'pattern_type': pattern_name,
                     'matched_text': match_text[:100],  # Truncate long matches
                     'line_number': line_num,
                     'char_position': match_start,
-                    'context': get_context(match_start, match_end)
+                    'context': context
                 }
                 category_matches.append(match_info)
                 all_samples.append(match_info)
