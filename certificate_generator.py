@@ -15,6 +15,13 @@ try:
 except ImportError:
     OLLAMA_AVAILABLE = False
 
+# v8.3.2: Import AnalysisResults for single source of truth
+try:
+    from analysis_results import AnalysisResults, create_analysis_results, ConfidenceLevel
+    ANALYSIS_RESULTS_AVAILABLE = True
+except ImportError:
+    ANALYSIS_RESULTS_AVAILABLE = False
+
 
 class CertificateGenerator:
     """Generate HTML certificates for v7 grading results with ethical framework data."""
@@ -512,6 +519,58 @@ class CertificateGenerator:
 </body>
 </html>
 """
+    
+    def _get_confidence_label(self, confidence_pct: float) -> str:
+        """
+        v8.3.2: Get human-readable confidence label.
+        
+        Args:
+            confidence_pct: Confidence percentage (0-100)
+            
+        Returns:
+            Confidence label string
+        """
+        if confidence_pct >= 85:
+            return "High Confidence"
+        elif confidence_pct >= 60:
+            return "Medium Confidence"
+        elif confidence_pct >= 30:
+            return "Low Confidence"
+        else:
+            return "Uncertain"
+    
+    def _get_ai_confidence_label(self, report: dict) -> str:
+        """
+        v8.3.2: Determine confidence label for AI detection.
+        
+        Uses multiple factors:
+        - Number of detection levels with data
+        - Agreement between levels
+        - Model detection confidence
+        """
+        deep = report.get('deep_analysis', {})
+        if not deep:
+            return "Low Confidence - limited analysis"
+        
+        # Count levels with data
+        levels = ['level1_document', 'level2_section', 'level4_model', 
+                 'level5_behavioral', 'level6_phrase']
+        level_count = sum(1 for l in levels if deep.get(l))
+        
+        consensus = deep.get('consensus', {})
+        confidence = consensus.get('confidence', 0)
+        
+        # Normalize confidence
+        if confidence <= 2:
+            confidence = confidence * 100
+        confidence = min(confidence, 100)
+        
+        if level_count >= 5 and confidence >= 80:
+            return "High Confidence - multi-method consensus"
+        elif level_count >= 3 and confidence >= 60:
+            return "Medium Confidence - partial consensus"
+        else:
+            return "Low Confidence - limited data"
     
     def generate_policy_certificate(self, report, document_title="", output_file=None):
         """Generate HTML certificate for policy grading with ethical framework."""

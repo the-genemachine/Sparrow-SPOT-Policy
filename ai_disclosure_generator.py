@@ -1,5 +1,5 @@
 """
-AI Disclosure Generator Module for v8.3
+AI Disclosure Generator Module for v8.3.2
 
 Generates standardized AI Use Statements for public outputs per Recommendation #4:
 "Improve Public-Facing AI Disclosure in Policy Summaries"
@@ -13,6 +13,7 @@ This module creates transparent disclosure language for:
 - Email footers
 
 v8.3 Enhancement: Added comprehensive multi-format generation for full transparency compliance
+v8.3.2 Enhancement: Added confidence level indicators for transparency
 """
 
 import os
@@ -20,6 +21,13 @@ from typing import Dict, Optional, List
 from datetime import datetime
 import json
 import argparse
+
+# v8.3.2: Import AnalysisResults for single source of truth
+try:
+    from analysis_results import AnalysisResults, create_analysis_results, ConfidenceLevel
+    ANALYSIS_RESULTS_AVAILABLE = True
+except ImportError:
+    ANALYSIS_RESULTS_AVAILABLE = False
 
 
 class AIDisclosureGenerator:
@@ -339,6 +347,41 @@ def _add_comprehensive_methods():
         else:
             return "Heavy AI Assistance"
     
+    def _get_confidence_indicator(self) -> str:
+        """
+        v8.3.2: Get confidence level indicator for AI detection.
+        
+        Returns a human-readable confidence assessment based on:
+        - Number of analysis levels with data
+        - Agreement between detection methods
+        - Model identification confidence
+        """
+        deep = self.data.get('deep_analysis', {})
+        if not deep:
+            return "Low Confidence - limited analysis data"
+        
+        # Count levels with data
+        levels = ['level1_document', 'level2_section', 'level4_model', 
+                 'level5_behavioral', 'level6_phrase']
+        level_count = sum(1 for l in levels if deep.get(l))
+        
+        consensus = deep.get('consensus', {})
+        confidence = consensus.get('confidence', 0)
+        
+        # Normalize confidence
+        if confidence <= 2:
+            confidence = confidence * 100
+        confidence = min(confidence, 100)
+        
+        if level_count >= 5 and confidence >= 80:
+            return "High Confidence - multi-method consensus"
+        elif level_count >= 3 and confidence >= 60:
+            return "Medium Confidence - partial consensus"
+        elif level_count >= 2:
+            return "Low Confidence - limited consensus"
+        else:
+            return "Uncertain - insufficient data"
+    
     def generate_government_formal(self, document_name: str = None) -> str:
         """Generate formal government disclosure statement (NEW in v8.3)"""
         if not self.data:
@@ -347,6 +390,7 @@ def _add_comprehensive_methods():
         ai_pct = self._get_ai_percentage()
         model_info = self._get_model_info()
         ai_level = self._get_ai_level(ai_pct)
+        confidence_indicator = self._get_confidence_indicator()  # v8.3.2
         
         doc_line = f"Document: {document_name}\n" if document_name else ""
         
@@ -355,7 +399,7 @@ def _add_comprehensive_methods():
 Analysis Version: Sparrow SPOT Scale™ {self.metadata['version']}
 
 AI USAGE SUMMARY
-• Overall AI Content: {ai_pct:.1f}%
+• Overall AI Content: {ai_pct:.1f}% ({confidence_indicator})
 • Classification: {ai_level}
 • Primary AI Model: {model_info['model']}
 • Detection Confidence: {model_info['confidence']:.1f}%
@@ -511,6 +555,7 @@ LINKEDIN: {self.generate_social_media(document_name).get('linkedin', 'N/A')}</pr
     AIDisclosureGenerator._get_model_info = _get_model_info
     AIDisclosureGenerator._get_flagged_sections = _get_flagged_sections
     AIDisclosureGenerator._get_ai_level = _get_ai_level
+    AIDisclosureGenerator._get_confidence_indicator = _get_confidence_indicator  # v8.3.2
     AIDisclosureGenerator.generate_government_formal = generate_government_formal
     AIDisclosureGenerator.generate_plain_language = generate_plain_language
     AIDisclosureGenerator.generate_social_media = generate_social_media
