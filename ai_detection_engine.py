@@ -849,12 +849,14 @@ class AIDetectionEngine:
             }
         
         # Check if this model significantly stands out
+        # Reduced margin from 0.15 to 0.10 - if a model is >0.10 ahead, report it
         other_scores = [score for name, score in model_specific_scores.items() if name != model_name]
         if other_scores:
             max_other = max(other_scores)
             margin = model_score - max_other
             
-            if margin < 0.15:
+            # Also report specific model if its score is very high (>0.7) even with low margin
+            if margin < 0.10 and model_score < 0.7:
                 return {
                     "model": "Mixed/Uncertain",
                     "confidence": model_score,

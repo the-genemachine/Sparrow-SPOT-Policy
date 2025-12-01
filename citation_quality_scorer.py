@@ -49,6 +49,9 @@ class CitationQualityScorer:
             matches = re.findall(pattern, text, re.IGNORECASE)
             citation_markers.extend(matches)
         
+        # Fix #3: Deduplicate and clean citation markers
+        citation_markers = self._deduplicate_citations(citation_markers)
+        
         # Analyze URL quality
         url_analysis = self._analyze_urls(urls, check_urls)
         
@@ -135,6 +138,97 @@ class CitationQualityScorer:
                 categories["other"] += 1
         
         return categories
+    
+    def _deduplicate_citations(self, citations: List[str]) -> List[str]:
+        """
+        Deduplicate and clean citation markers.
+        
+        Fix #3: Removes duplicates and filters out OCR artifacts like:
+        - Truncated words (e.g., 'nancial state' instead of 'financial state')
+        - Repetitive patterns from poor PDF text extraction
+        - Very short or garbled text
+        
+        Args:
+            citations: Raw list of citation markers
+            
+        Returns:
+            Cleaned and deduplicated list
+        """
+        if not citations:
+            return []
+        
+        # Count occurrences for frequency analysis
+        from collections import Counter
+        citation_counts = Counter(citations)
+        
+        cleaned = []
+        seen = set()
+        
+        for citation in citations:
+            # Skip if already seen (deduplication)
+            citation_lower = citation.lower().strip()
+            if citation_lower in seen:
+                continue
+            
+            # Skip very short citations (likely OCR artifacts)
+            if len(citation.strip()) < 4:
+                continue
+            
+            # Skip if this looks like a truncated word (starts with lowercase and matches a fragment)
+            # e.g., 'nancial state' is a truncation of 'financial state'
+            if citation_lower[0].islower() and not citation_lower.startswith(('according', 'reported')):
+                # Check if it might be part of a longer citation we already have
+                is_fragment = False
+                for seen_cit in seen:
+                    if citation_lower in seen_cit or seen_cit.endswith(citation_lower):
+                        is_fragment = True
+                        break
+                if is_fragment:
+                    continue
+            
+            # Skip citations that appear too frequently (likely OCR false positives)
+            # More than 10 occurrences of the same pattern is suspicious
+            if citation_counts.get(citation, 0) > 10:
+                continue
+            
+            # Skip garbled text (contains unusual character patterns)
+            if self._is_garbled_text(citation):
+                continue
+            
+            seen.add(citation_lower)
+            cleaned.append(citation)
+        
+        return cleaned
+    
+    def _is_garbled_text(self, text: str) -> bool:
+        """
+        Check if text appears to be OCR-garbled.
+        
+        Returns True for text that:
+        - Has excessive consecutive consonants
+        - Contains unusual diacritics patterns (bilingual OCR artifacts)
+        - Has very low vowel-to-consonant ratio
+        """
+        if not text or len(text) < 3:
+            return True
+        
+        # Check for unusual character patterns
+        garbled_patterns = [
+            r'[bcdfghjklmnpqrstvwxz]{5,}',  # 5+ consecutive consonants
+            r'[àâäèéêëîïôùûüÿç]{3,}',  # 3+ consecutive French diacritics (bilingual OCR issue)
+            r'[A-Z]{2}[a-z][A-Z]',  # Mixed case gibberish like "ABcD"
+        ]
+        
+        for pattern in garbled_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        
+        # Check vowel ratio - very low ratio suggests garbled text
+        vowels = sum(1 for c in text.lower() if c in 'aeiouàâäèéêëîïôùûüÿ')
+        if len(text) > 5 and vowels / len(text) < 0.15:
+            return True
+        
+        return False
     
     def _check_url_accessible(self, url: str, timeout: int = 5) -> bool:
         """Check if URL is accessible."""

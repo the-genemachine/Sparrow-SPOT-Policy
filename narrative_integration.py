@@ -102,6 +102,13 @@ class NarrativeGenerationPipeline:
         print(f"🔄 Step 2: Adapting tone to '{tone}' (length: {length})...")
         narrative_text = self.tone_adaptor.adapt(narrative_components, tone, length=length)
         
+        # Step 2.1: Fix #5 - Expand narrative with Ollama for longer formats
+        if length in ['detailed', 'comprehensive'] and ollama_model:
+            print(f"🔄 Step 2.1: Expanding narrative with {ollama_model}...")
+            narrative_text = self._expand_narrative_with_ollama(
+                narrative_text, analysis, length, ollama_model
+            )
+        
         # Step 2.5: Add Flags and Contradictions section if contradictions detected (Recommendation #5)
         contradiction_analysis = analysis.get('contradiction_analysis', {})
         contradictions = contradiction_analysis.get('contradictions', [])
@@ -418,6 +425,98 @@ class NarrativeGenerationPipeline:
         text = re.sub(r' ([.!?,;:])', r'\1', text)
         
         return text.strip()
+    
+    def _expand_narrative_with_ollama(self, narrative_text: str, analysis: Dict, 
+                                       length: str, ollama_model: str) -> str:
+        """
+        Fix #5: Expand narrative to target word count using Ollama.
+        
+        Args:
+            narrative_text: Base narrative from tone adaptor
+            analysis: Full analysis results for context
+            length: Target length (detailed=2000, comprehensive=3500)
+            ollama_model: Ollama model to use
+            
+        Returns:
+            Expanded narrative text
+        """
+        import requests
+        
+        length_targets = {
+            'detailed': 2000,
+            'comprehensive': 3500
+        }
+        target_words = length_targets.get(length, 2000)
+        current_words = len(narrative_text.split())
+        
+        # If already at target, return as-is
+        if current_words >= target_words * 0.8:  # 80% threshold
+            return narrative_text
+        
+        # Prepare context from analysis
+        composite_score = analysis.get('composite_score', 0)
+        grade = analysis.get('composite_grade') or analysis.get('grade', 'N/A')
+        criteria = analysis.get('criteria', {})
+        
+        # Fix #1: Include custom query if provided
+        custom_query = analysis.get('custom_narrative_query', '')
+        custom_query_section = ""
+        if custom_query:
+            custom_query_section = f"\nADDITIONAL USER CONTEXT/FOCUS:\n{custom_query}\n"
+        
+        criteria_summary = ""
+        for key, data in criteria.items():
+            if isinstance(data, dict):
+                criteria_summary += f"- {key}: {data.get('score', 0):.0f}/100 - {data.get('interpretation', 'N/A')}\n"
+        
+        prompt = f"""You are a professional policy analyst writing a comprehensive analysis narrative.
+
+EXISTING NARRATIVE (current length: {current_words} words):
+{narrative_text}
+
+ANALYSIS DATA:
+- Composite Score: {composite_score}/100 ({grade})
+{criteria_summary}
+{custom_query_section}
+TASK: Expand this narrative to approximately {target_words} words while:
+1. Maintaining the same tone and style
+2. Adding deeper analysis of each criterion
+3. Including more context about policy implications
+4. Discussing potential impacts on stakeholders
+5. Adding comparative context where appropriate
+6. Expanding on the key findings with supporting details
+{f'7. Address the user context/focus: {custom_query}' if custom_query else ''}
+
+Write the expanded narrative now. Do not include any meta-commentary - just the narrative text:"""
+
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.7,
+                    "num_predict": target_words * 2,  # Allow generous token count
+                },
+                timeout=120  # 2 minute timeout for longer generation
+            )
+            response.raise_for_status()
+            
+            expanded = response.json().get("response", "")
+            if expanded and len(expanded.split()) > current_words:
+                print(f"   ✓ Expanded narrative from {current_words} to {len(expanded.split())} words")
+                return expanded
+            else:
+                print(f"   ⚠️ Expansion failed, using original narrative")
+                return narrative_text
+                
+        except requests.exceptions.RequestException as e:
+            print(f"   ⚠️ Ollama expansion error: {e}")
+            return narrative_text
+        except Exception as e:
+            print(f"   ⚠️ Unexpected error in expansion: {e}")
+            return narrative_text
     
     def _generate_contradiction_section(self, contradictions: List[Dict], length: str) -> str:
         """

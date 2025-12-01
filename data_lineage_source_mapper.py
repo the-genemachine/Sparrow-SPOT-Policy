@@ -120,6 +120,72 @@ class DataLineageSourceMapper:
             }
         }
     
+    def _clean_ocr_artifacts(self, text: str) -> str:
+        """
+        Clean OCR artifacts from PDF-extracted text.
+        
+        Fix #4: Handles common bilingual PDF OCR issues:
+        - Truncated words (missing first letters)
+        - Garbled French/English bilingual text
+        - Unusual character sequences
+        - Repeated whitespace and line breaks
+        
+        Args:
+            text: Raw extracted text with potential OCR issues
+            
+        Returns:
+            Cleaned text with artifacts removed or corrected
+        """
+        if not text:
+            return text
+        
+        # Normalize whitespace
+        cleaned = re.sub(r'\s+', ' ', text)
+        
+        # Remove garbled bilingual text (French-English mixed OCR artifacts)
+        # Pattern: sequences of unusual diacritics mixed with consonants
+        cleaned = re.sub(r'[àâäèéêëîïôùûüÿç]{2,}[bcdfghjklmnpqrstvwxz]{3,}', '', cleaned)
+        cleaned = re.sub(r'[bcdfghjklmnpqrstvwxz]{5,}[àâäèéêëîïôùûüÿç]+', '', cleaned)
+        
+        # Remove sequences that look like OCR garbage
+        # e.g., "smueb pdaértaegrrmapinhé", "aapftreèrs Dlee"
+        cleaned = re.sub(r'\b[a-z]{2,}[àâäèéêëîïôùûüÿç]{2,}[a-z]*\b', '', cleaned, flags=re.IGNORECASE)
+        
+        # Fix common truncation patterns - restore likely beginnings
+        # These are heuristic fixes for common PDF OCR issues
+        ocr_fixes = {
+            r'\baxation\b': 'taxation',  # 't' dropped
+            r'\bconomic\b': 'economic',  # 'e' dropped
+            r'\bnancial\b': 'financial',  # 'fi' dropped
+            r'\bercent\b': 'percent',  # 'p' dropped
+            r'\billion\b': 'billion',  # 'b' dropped
+            r'\bllion\b': 'billion',  # 'bi' dropped
+            r'\brillion\b': 'trillion',  # 't' dropped
+            r'\bevenue\b': 'revenue',  # 'r' dropped
+            r'\budget\b': 'budget',  # 'b' dropped
+            r'\bovernment\b': 'government',  # 'g' dropped
+        }
+        
+        for pattern, replacement in ocr_fixes.items():
+            cleaned = re.sub(pattern, replacement, cleaned, flags=re.IGNORECASE)
+        
+        # Remove remaining garbled words (words with very low vowel ratio)
+        words = cleaned.split()
+        cleaned_words = []
+        for word in words:
+            if len(word) > 4:
+                vowels = sum(1 for c in word.lower() if c in 'aeiouàâäèéêëîïôùûüÿ')
+                if vowels / len(word) < 0.12:  # Less than 12% vowels = likely garbage
+                    continue
+            cleaned_words.append(word)
+        
+        cleaned = ' '.join(cleaned_words)
+        
+        # Final cleanup - remove double spaces
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        
+        return cleaned
+    
     def extract_quantitative_claims(self, text: str) -> List[Dict]:
         """
         Extract quantitative claims from document text.
@@ -262,8 +328,11 @@ class DataLineageSourceMapper:
         Returns:
             Comprehensive lineage report
         """
+        # Fix #4: Clean OCR artifacts from text before processing
+        cleaned_text = self._clean_ocr_artifacts(document_text)
+        
         # Extract all quantitative claims
-        all_claims = self.extract_quantitative_claims(document_text)
+        all_claims = self.extract_quantitative_claims(cleaned_text)
         
         # Categorize and validate
         traced_claims = []

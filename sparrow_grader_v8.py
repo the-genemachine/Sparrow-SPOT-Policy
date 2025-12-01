@@ -565,7 +565,7 @@ class SPARROWGrader:
         
         report = {
             'variant': 'SPARROW Scale™',
-            'version': '5.0',
+            'version': '8.3.1',
             'document_type': doc_type,
             'timestamp': datetime.now().isoformat(),
             'sparrow_scores': sparrow_scores,
@@ -1474,7 +1474,7 @@ class SPOTPolicy:
         
         report = {
             'variant': 'SPOT-Policy™',
-            'version': '8.0',  # Fix #2: Updated to v8.0 for narrative engine consistency
+            'version': '8.3.1',
             'document_type': document_type,
             'timestamp': master_timestamp,
             'criteria': {},

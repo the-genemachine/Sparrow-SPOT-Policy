@@ -132,6 +132,7 @@ def analyze_document(
     narrative_style,
     narrative_length,
     ollama_model,
+    ollama_custom_query,  # Fix #1: Custom query for Ollama
     
     # Analysis flags
     deep_analysis,
@@ -343,7 +344,7 @@ def analyze_document(
                     progress(0.9, desc=f"Generating {narrative_style} narrative...")
                     narrative_files = generate_narrative(
                         results, text, output_name, narrative_style, 
-                        narrative_length, ollama_model
+                        narrative_length, ollama_model, ollama_custom_query
                     )
                     output_files.extend(narrative_files)
                 
@@ -508,10 +509,24 @@ def format_journalism_summary(results):
     lines.append("=" * 60)
     lines.append("SPARROW SCALE™ - JOURNALISM ANALYSIS")
     lines.append("=" * 60)
-    lines.append(f"\nDocument: {results.get('document_name', 'Unknown')}")
-    lines.append(f"Analysis Date: {results.get('analysis_date', 'Unknown')}")
+    
+    # Fix #7: Use correct field names from results
+    doc_name = results.get('document_title') or results.get('document_name', 'Unknown')
+    analysis_date = results.get('timestamp') or results.get('analysis_date', datetime.now().isoformat())
+    # Format date nicely if it's an ISO timestamp
+    if 'T' in str(analysis_date):
+        try:
+            analysis_date = datetime.fromisoformat(analysis_date.replace('Z', '+00:00')).strftime('%B %d, %Y at %H:%M')
+        except:
+            pass
+    
+    # Get letter grade from multiple possible fields
+    letter_grade = results.get('composite_letter_grade') or results.get('composite_grade') or results.get('grade', 'N/A')
+    
+    lines.append(f"\nDocument: {doc_name}")
+    lines.append(f"Analysis Date: {analysis_date}")
     lines.append(f"\nComposite Score: {results.get('composite_score', 0):.1f}/100")
-    lines.append(f"Letter Grade: {results.get('composite_letter_grade', 'N/A')}")
+    lines.append(f"Letter Grade: {letter_grade}")
     lines.append("\n" + "-" * 60)
     lines.append("CATEGORY SCORES:")
     lines.append("-" * 60)
@@ -530,10 +545,24 @@ def format_policy_summary(results):
     lines.append("=" * 60)
     lines.append("SPOT POLICY™ - POLICY DOCUMENT ANALYSIS")
     lines.append("=" * 60)
-    lines.append(f"\nDocument: {results.get('document_name', 'Unknown')}")
-    lines.append(f"Analysis Date: {results.get('analysis_date', 'Unknown')}")
+    
+    # Fix #7: Use correct field names from results
+    doc_name = results.get('document_title') or results.get('document_name', 'Unknown')
+    analysis_date = results.get('timestamp') or results.get('analysis_date', datetime.now().isoformat())
+    # Format date nicely if it's an ISO timestamp
+    if 'T' in str(analysis_date):
+        try:
+            analysis_date = datetime.fromisoformat(analysis_date.replace('Z', '+00:00')).strftime('%B %d, %Y at %H:%M')
+        except:
+            pass
+    
+    # Get letter grade from multiple possible fields
+    letter_grade = results.get('composite_letter_grade') or results.get('composite_grade') or results.get('grade', 'N/A')
+    
+    lines.append(f"\nDocument: {doc_name}")
+    lines.append(f"Analysis Date: {analysis_date}")
     lines.append(f"\nComposite Score: {results.get('composite_score', 0):.1f}/100")
-    lines.append(f"Letter Grade: {results.get('composite_letter_grade', 'N/A')}")
+    lines.append(f"Letter Grade: {letter_grade}")
     lines.append("\n" + "-" * 60)
     lines.append("CATEGORY SCORES:")
     lines.append("-" * 60)
@@ -677,13 +706,27 @@ def add_nist_compliance(results, text):
     return results
 
 
-def generate_narrative(results, text, output_name, style, length, model):
-    """Generate narrative outputs."""
+def generate_narrative(results, text, output_name, style, length, model, custom_query=""):
+    """Generate narrative outputs.
+    
+    Args:
+        results: Analysis results dict
+        text: Original document text
+        output_name: Output file prefix
+        style: Narrative style (journalistic, academic, etc.)
+        length: Target length (concise, standard, detailed, comprehensive)
+        model: Ollama model to use
+        custom_query: Optional custom context/question for the narrative
+    """
     from narrative_integration import create_pipeline
     
     pipeline = create_pipeline()
     
     output_files = []
+    
+    # Fix #1: Add custom query to analysis for the pipeline to use
+    if custom_query and custom_query.strip():
+        results['custom_narrative_query'] = custom_query.strip()
     
     # Generate complete narrative
     narrative_result = pipeline.generate_complete_narrative(
@@ -740,9 +783,10 @@ def generate_lineage_chart(results, output_name, format):
 
 
 def update_settings_summary(pdf_file, url_input, variant, output_name, document_title,
-                           narrative_style, narrative_length, ollama_model, deep_analysis, 
-                           citation_check, check_urls, enhanced_provenance, generate_ai_disclosure, 
-                           trace_data_sources, nist_compliance, lineage_chart_format):
+                           narrative_style, narrative_length, ollama_model, ollama_custom_query,
+                           deep_analysis, citation_check, check_urls, enhanced_provenance, 
+                           generate_ai_disclosure, trace_data_sources, nist_compliance, 
+                           lineage_chart_format):
     """Generate a summary of current settings."""
     
     # Input source
@@ -752,6 +796,12 @@ def update_settings_summary(pdf_file, url_input, variant, output_name, document_
         input_src = f"🌐 **URL:** {url_input}"
     else:
         input_src = "⚠️ **No input selected**"
+    
+    # Custom query display
+    custom_query_display = ""
+    if ollama_custom_query and ollama_custom_query.strip():
+        truncated = ollama_custom_query[:50] + "..." if len(ollama_custom_query) > 50 else ollama_custom_query
+        custom_query_display = f"\n- Custom Query: _{truncated}_"
     
     # Build summary
     summary = f"""### Current Configuration
@@ -767,7 +817,7 @@ def update_settings_summary(pdf_file, url_input, variant, output_name, document_
 **Narrative Generation:**
 - Style: {narrative_style.title() if narrative_style != 'None' else 'Disabled'}
 - Length: {narrative_length.title()}
-- Model: {ollama_model}
+- Model: {ollama_model}{custom_query_display}
 
 ---
 
@@ -1050,6 +1100,20 @@ def create_interface():
                     info=f"Available local models ({len(available_models)} found). Run 'ollama pull <model>' to add more.",
                     allow_custom_value=True
                 )
+                
+                # Fix #1: Add custom query textbox for Ollama
+                gr.Markdown("""
+                ### Custom Query (Optional)
+                Add context or specific questions for the AI to address in the narrative.
+                """)
+                
+                ollama_custom_query = gr.Textbox(
+                    label="Custom Query/Context",
+                    placeholder="e.g., 'Focus on environmental policy implications' or 'Compare to previous budget measures' or 'Address concerns about stakeholder impact'",
+                    lines=3,
+                    info="Optional: Provide additional context or specific questions for the narrative generation.",
+                    value=""
+                )
             
             # ========== TAB 3: ANALYSIS OPTIONS ==========
             with gr.Tab("🔍 Analysis Options"):
@@ -1168,7 +1232,7 @@ def create_interface():
         # Wire up settings summary to update when any input changes
         all_inputs = [
             pdf_file, url_input, variant, output_name, document_title,
-            narrative_style, narrative_length, ollama_model,
+            narrative_style, narrative_length, ollama_model, ollama_custom_query,
             deep_analysis, citation_check, check_urls,
             enhanced_provenance, generate_ai_disclosure,
             trace_data_sources, nist_compliance, lineage_chart_format
@@ -1198,6 +1262,7 @@ def create_interface():
                 narrative_style,
                 narrative_length,
                 ollama_model,
+                ollama_custom_query,  # Fix #1: Custom query for Ollama
                 
                 # Analysis flags
                 deep_analysis,
