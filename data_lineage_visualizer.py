@@ -46,7 +46,7 @@ class DataLineageVisualizer:
         """Generate ASCII art flowchart of analysis pipeline."""
         lines = []
         lines.append("=" * 80)
-        lines.append("  SPARROW SPOT SCALE™ v8.2 - DATA LINEAGE FLOWCHART")
+        lines.append("  SPARROW SPOT SCALE™ v8.3.2 - DATA LINEAGE FLOWCHART")
         lines.append("=" * 80)
         lines.append("")
         
@@ -185,7 +185,7 @@ class DataLineageVisualizer:
 <body>
     <div class="container">
         <h1>🔬 Data Lineage Flowchart</h1>
-        <p style="text-align: center; color: #666;">Sparrow SPOT Scale™ v8.2 Analysis Pipeline</p>
+        <p style="text-align: center; color: #666;">Sparrow SPOT Scale™ v8.3.2 Analysis Pipeline</p>
 """
         
         for i, stage in enumerate(self.stages):
@@ -230,7 +230,7 @@ class DataLineageVisualizer:
     def generate_json_lineage(self) -> Dict:
         """Generate JSON representation of lineage for programmatic use."""
         return {
-            "pipeline": "Sparrow SPOT Scale v8.2",
+            "pipeline": "Sparrow SPOT Scale v8.3.2",
             "timestamp": datetime.now().isoformat(),
             "total_stages": len(self.stages),
             "completed_stages": sum(1 for s in self.stages if s["status"] == "completed"),

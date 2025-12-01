@@ -572,7 +572,11 @@ class CertificateGenerator:
                         }
                         ai_model = model_name_map.get(highest_model.lower(), highest_model.title())
             
-            ai_model_confidence = int(consensus.get('confidence', 0))
+            # v8.3.2 Fix: Cap confidence at 100% - values 0-2 are 0-1 scale, values >2 are percentages
+            raw_confidence = consensus.get('confidence', 0)
+            # Values between 0-2 treated as 0-1 scale (handles edge cases like 1.2)
+            ai_model_confidence = int(raw_confidence * 100) if raw_confidence <= 2 else int(raw_confidence)
+            ai_model_confidence = min(ai_model_confidence, 100)  # Cap at 100%
             transparency_score = consensus.get('transparency_score', 0)
             has_deep_analysis = True
         else:
@@ -608,12 +612,14 @@ class CertificateGenerator:
                         else:
                             ai_model = model_name
                         
-                        ai_model_confidence = int(confidence * 100)
+                        # v8.3.2 Fix: Cap at 100%
+                        ai_model_confidence = min(int(confidence * 100), 100)
                         print(f'DEBUG: Found highest model: {ai_model} with {ai_model_confidence}% confidence')
                     else:
                         # Fallback to the likely_ai_model.model if no model_scores
                         ai_model = likely_model.get('model', 'Unknown')
-                        ai_model_confidence = int(likely_model.get('confidence', 0) * 100)
+                        raw_conf = likely_model.get('confidence', 0)
+                        ai_model_confidence = min(int(raw_conf * 100) if raw_conf <= 1 else int(raw_conf), 100)
             
             transparency_score = 0
             has_deep_analysis = False
@@ -918,7 +924,11 @@ class CertificateGenerator:
                         }
                         ai_model = model_name_map.get(highest_model.lower(), highest_model.title())
             
-            ai_model_confidence = int(consensus.get('confidence', 0))
+            # v8.3.2 Fix: Cap confidence at 100% - values 0-2 are 0-1 scale, values >2 are percentages
+            raw_confidence = consensus.get('confidence', 0)
+            # Values between 0-2 treated as 0-1 scale (handles edge cases like 1.2)
+            ai_model_confidence = int(raw_confidence * 100) if raw_confidence <= 2 else int(raw_confidence)
+            ai_model_confidence = min(ai_model_confidence, 100)  # Cap at 100%
             transparency_score = consensus.get('transparency_score', 0)
             has_deep_analysis = True
         else:

@@ -426,6 +426,36 @@ class NarrativeGenerationPipeline:
         
         return text.strip()
     
+    def _strip_meta_commentary(self, text: str) -> str:
+        """
+        v8.3.2 Fix #4: Remove meta-commentary and internal prompts from narrative output.
+        
+        Strips out:
+        - TASK: ... sections
+        - ADDITIONAL USER CONTEXT/FOCUS: ... sections
+        - Internal prompt markers
+        - Analysis Data footers that expose internal structure
+        """
+        import re
+        
+        # Remove TASK: sections (including multi-line)
+        text = re.sub(r'TASK:.*?(?=\n\n|\Z)', '', text, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Remove ADDITIONAL USER CONTEXT/FOCUS sections
+        text = re.sub(r'ADDITIONAL USER CONTEXT/FOCUS:.*?(?=\n\n|\Z)', '', text, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Remove "Analysis Data:" footer sections that expose internal structure
+        text = re.sub(r'\nAnalysis Data:\n.*?(?=\n\n[A-Z]|\Z)', '', text, flags=re.DOTALL)
+        
+        # Remove internal prompt markers
+        text = re.sub(r'\[INTERNAL\].*?(?=\n|\Z)', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\[PROMPT\].*?(?=\n|\Z)', '', text, flags=re.IGNORECASE)
+        
+        # Clean up any resulting double newlines
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        
+        return text.strip()
+    
     def _expand_narrative_with_ollama(self, narrative_text: str, analysis: Dict, 
                                        length: str, ollama_model: str) -> str:
         """
@@ -505,6 +535,8 @@ Write the expanded narrative now. Do not include any meta-commentary - just the 
             
             expanded = response.json().get("response", "")
             if expanded and len(expanded.split()) > current_words:
+                # v8.3.2 Fix: Remove meta-commentary before returning
+                expanded = self._strip_meta_commentary(expanded)
                 print(f"   ✓ Expanded narrative from {current_words} to {len(expanded.split())} words")
                 return expanded
             else:

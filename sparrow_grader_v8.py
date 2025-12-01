@@ -565,7 +565,7 @@ class SPARROWGrader:
         
         report = {
             'variant': 'SPARROW Scale™',
-            'version': '8.3.1',
+            'version': '8.3.2',
             'document_type': doc_type,
             'timestamp': datetime.now().isoformat(),
             'sparrow_scores': sparrow_scores,
@@ -1474,7 +1474,7 @@ class SPOTPolicy:
         
         report = {
             'variant': 'SPOT-Policy™',
-            'version': '8.3.1',
+            'version': '8.3.2',
             'document_type': document_type,
             'timestamp': master_timestamp,
             'criteria': {},
