@@ -64,7 +64,7 @@ class AIDisclosureGenerator:
         ai_detection: float,
         trust_score: float,
         risk_tier: str,
-        human_reviewed: bool = True,
+        human_reviewed: bool = False,
         review_date: Optional[str] = None,
         format_type: str = 'standard'
     ) -> str:
@@ -75,8 +75,8 @@ class AIDisclosureGenerator:
             ai_detection: AI detection percentage (0-100)
             trust_score: Trust score (0-100)
             risk_tier: Risk tier (LOW, MEDIUM, HIGH)
-            human_reviewed: Whether human expert review completed
-            review_date: Date of human review (YYYY-MM-DD format)
+            human_reviewed: Whether expert review has been attested
+            review_date: Date of expert review (YYYY-MM-DD format)
             format_type: 'standard', 'extended', 'twitter', 'linkedin', 'email'
             
         Returns:
@@ -103,7 +103,7 @@ class AIDisclosureGenerator:
     ) -> str:
         """Generate standard disclosure statement for summaries/reports"""
         review_status = f"completed on {review_date}" if review_date else "completed"
-        review_note = f"Human expert review {review_status}." if human_reviewed else "Human expert review recommended."
+        review_note = f"Expert review {review_status}." if human_reviewed else "Expert review recommended."
         
         return (
             f"This policy assessment includes AI-assisted analysis ({ai_detection:.0f}% detected). "
@@ -138,7 +138,7 @@ class AIDisclosureGenerator:
     ) -> str:
         """Generate professional disclosure for LinkedIn"""
         review_status = f"completed on {review_date}" if review_date else "completed"
-        review_note = f"Human expert review {review_status}." if human_reviewed else "Human expert review recommended."
+        review_note = f"Expert review {review_status}." if human_reviewed else "Expert review recommended."
         
         risk_context = {
             'LOW': 'minimal governance concerns',
@@ -164,7 +164,7 @@ class AIDisclosureGenerator:
     ) -> str:
         """Generate comprehensive disclosure with context for formal reports"""
         review_status = f"on {review_date}" if review_date else "upon request"
-        review_note = f"Human expert review completed {review_status}." if human_reviewed else "Human expert review required before publication."
+        review_note = f"Expert review completed {review_status}." if human_reviewed else "Expert review required before publication."
         
         risk_details = {
             'LOW': (
@@ -173,7 +173,7 @@ class AIDisclosureGenerator:
             ),
             'MEDIUM': (
                 'This assessment carries material AI-related governance risks. '
-                'Key findings require human expert validation and institutional oversight. '
+                'Key findings require expert validation and institutional oversight. '
                 'Recommend escalation for senior policy review.'
             ),
             'HIGH': (
@@ -188,7 +188,7 @@ class AIDisclosureGenerator:
             f"**AI Detection Level**: {ai_detection:.0f}% of content identified as AI-assisted\n"
             f"**Trust Score**: {trust_score:.0f}/100 (confidence in assessment validity)\n"
             f"**Risk Tier**: {risk_tier}\n"
-            f"**Human Review Status**: {review_note}\n\n"
+            f"**Expert Review Status**: {review_note}\n\n"
             f"**Risk Context**: {risk_details}\n\n"
             f"**Methodology**: Assessment conducted using Sparrow SPOT Scale™ v8.0, "
             f"integrating NIST AI RMF governance principles with multi-stakeholder critique integration. "
@@ -213,7 +213,7 @@ class AIDisclosureGenerator:
             f"• AI Detection: {ai_detection:.0f}%\n"
             f"• Trust Score: {trust_score:.0f}/100\n"
             f"• Risk Tier: {risk_tier}\n"
-            f"• Human Review: {review_emoji} {review_status}\n"
+            f"• Expert Review: {review_emoji} {review_status}\n"
             f"→ See attached certificate for complete assessment details.\n"
         )
     
@@ -407,7 +407,7 @@ AI USAGE SUMMARY
 • Detection Confidence: {model_info['confidence']:.1f}%
 
 This {self.metadata['document_type']} was prepared with artificial intelligence assistance.
-All AI-generated content has been reviewed by qualified human experts.
+Expert review of AI-generated content is recommended before use.
 
 For complete disclosure and methodology, see full transparency certificate."""
     
@@ -423,9 +423,9 @@ For complete disclosure and methodology, see full transparency certificate."""
         if ai_pct < 25:
             meaning = "AI played a minor role - mostly helping with routine tasks."
         elif ai_pct < 50:
-            meaning = "AI played a moderate role - helping draft content that was reviewed by people."
+            meaning = "AI played a moderate role - helping draft content. Expert review is recommended."
         else:
-            meaning = "AI played a major role - creating substantial content, though people reviewed everything."
+            meaning = "AI played a major role - creating substantial content. Expert review is essential."
         
         doc_line = f"\nDocument: {document_name}" if document_name else ""
         
@@ -436,7 +436,7 @@ The AI system used was likely: {model_info['model']}
 
 {meaning}
 
-All content was reviewed by human experts, and the government takes full responsibility for accuracy."""
+Expert review of AI-generated content is recommended. The publisher takes responsibility for accuracy."""
     
     def generate_social_media(self, document_name: str = None) -> Dict[str, str]:
         """Generate short-form disclosures for social media (NEW in v8.3)"""
@@ -446,11 +446,11 @@ All content was reviewed by human experts, and the government takes full respons
         ai_pct = self._get_ai_percentage()
         model_info = self._get_model_info()
         
-        # v8.3.2: Standardize AI percentage display - use consistent .1f format everywhere
+        # v8.3.3: Updated to honest language - no unverifiable claims
         if document_name:
-            twitter = f"🔍 AI Transparency ({document_name}): {ai_pct:.1f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
+            twitter = f"🔍 AI Transparency ({document_name}): {ai_pct:.1f}% AI-generated ({model_info['model']}). Expert review recommended. #AITransparency"
         else:
-            twitter = f"🔍 AI Transparency: This document is {ai_pct:.1f}% AI-generated ({model_info['model']}). All content reviewed by human experts. #AITransparency"
+            twitter = f"🔍 AI Transparency: This document is {ai_pct:.1f}% AI-generated ({model_info['model']}). Expert review recommended. #AITransparency"
 
         doc_line = f"\nDocument: {document_name}\n" if document_name else ""
         linkedin = f"""AI Transparency Disclosure{doc_line}
@@ -458,7 +458,7 @@ This {self.metadata['document_type']} was prepared with AI assistance:
 
 📊 AI Content: {ai_pct:.1f}%
 🤖 Model: {model_info['model']}
-✓ Human Review: Complete
+⚠️ Expert Review: Recommended
 
 We believe in transparency about AI use in government.
 
