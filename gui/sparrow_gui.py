@@ -125,6 +125,7 @@ def analyze_document(
     
     # Basic settings
     variant,
+    document_type,  # v8.3.3: Document type for citation scoring
     output_name,
     document_title,
     
@@ -254,6 +255,12 @@ def analyze_document(
                 elif input_source:
                     results['document_title'] = input_source
                 
+                # v8.3.3: Store document type in results and override auto-detected if user selected
+                results['document_type_selected'] = document_type
+                if document_type and document_type != 'auto':
+                    # User selection takes priority over auto-detection
+                    results['document_type'] = document_type
+                
                 progress(0.5, desc="Running policy evaluation...")
                 
                 # Initialize output files list
@@ -266,7 +273,7 @@ def analyze_document(
                 
                 if citation_check:
                     progress(0.65, desc="Checking citation quality...")
-                    results, citation_file = add_citation_analysis(results, text, check_urls, output_name)
+                    results, citation_file = add_citation_analysis(results, text, check_urls, output_name, document_type)
                     output_files.append(citation_file)
                 
                 if generate_ai_disclosure:
@@ -634,10 +641,40 @@ def add_deep_analysis(results, text, input_path):
     return results
 
 
-def add_citation_analysis(results, text, check_urls, output_name):
-    """Add citation quality scoring."""
+def add_citation_analysis(results, text, check_urls, output_name, document_type='auto'):
+    """Add citation quality scoring.
+    
+    v8.3.3: Added document_type parameter for context-aware scoring.
+    
+    Args:
+        results: Analysis results dict
+        text: Document text
+        check_urls: Whether to check URL accessibility
+        output_name: Output file prefix
+        document_type: Document type for scoring ('auto', 'legislation', 'policy_brief', etc.)
+    """
     scorer = CitationQualityScorer()
+    
+    # v8.3.3: Analyze with document type awareness
     citation_results = scorer.analyze_citations(text, check_urls=check_urls)
+    
+    # If user specified a document type (not auto), override the detected type
+    if document_type and document_type != 'auto':
+        from citation_quality_scorer import DocumentType, DOCUMENT_TYPE_CONFIG
+        try:
+            override_type = DocumentType(document_type)
+            # Recalculate score with user-specified type
+            url_analysis = citation_results.get('url_analysis', {})
+            citations_per_1000 = citation_results.get('citations_per_1000_words', 0)
+            new_score = scorer._calculate_quality_score(url_analysis, citations_per_1000, override_type)
+            
+            citation_results['document_type'] = document_type
+            citation_results['document_type_info'] = scorer.get_document_type_info(override_type)
+            citation_results['quality_score'] = new_score
+            citation_results['quality_level'] = scorer._get_quality_level(new_score)
+            citation_results['document_type_override'] = True
+        except ValueError:
+            pass  # Keep auto-detected type if invalid
     
     # Save citation report - Handle test_articles path to go to root directory
     if output_name.startswith('test_articles/'):
@@ -647,15 +684,54 @@ def add_citation_analysis(results, text, check_urls, output_name):
         
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(citation_file), exist_ok=True) if os.path.dirname(citation_file) else None
+    
+    # v8.3.3 Fix: Clarify citation report to avoid confusion between raw count and document-adjusted score
+    doc_type_info = citation_results.get('document_type_info', {})
+    doc_type = doc_type_info.get('description', citation_results.get('document_type', 'Unknown'))
+    citation_expectation = doc_type_info.get('citation_expectation', 'MEDIUM')
+    quality_score = citation_results.get('quality_score', 0)
+    quality_level = citation_results.get('quality_level', 'Unknown')
+    total_citations = citation_results.get('total_citations', 0)
+    
     with open(citation_file, 'w') as f:
         f.write("=" * 70 + "\n")
         f.write("CITATION QUALITY ANALYSIS REPORT\n")
         f.write("=" * 70 + "\n\n")
-        f.write(f"Overall Score: {citation_results.get('overall_score', 0):.1f}/100\n\n")
-        f.write("Details:\n")
-        for key, value in citation_results.items():
-            if key != 'overall_score':
-                f.write(f"  {key}: {value}\n")
+        
+        # Document type context
+        f.write(f"Document Type: {doc_type}\n")
+        f.write(f"Citation Expectation: {citation_expectation}\n\n")
+        
+        # Raw metrics
+        f.write("--- Raw Metrics ---\n")
+        f.write(f"Total Citations Found: {total_citations}\n")
+        f.write(f"URLs: {citation_results.get('total_urls', 0)}\n")
+        f.write(f"Citation Markers: {citation_results.get('total_citation_markers', 0)}\n")
+        f.write(f"Citations per 1,000 words: {citation_results.get('citations_per_1000_words', 0)}\n\n")
+        
+        # Document-adjusted score
+        f.write("--- Document-Adjusted Quality ---\n")
+        f.write(f"Quality Score: {quality_score}/100\n")
+        f.write(f"Quality Level: {quality_level}\n\n")
+        
+        # Interpretation
+        if citation_expectation == 'LOW':
+            f.write("Interpretation: Low/no citations is APPROPRIATE for this document type.\n")
+            f.write("Legislative and primary source documents are self-authoritative.\n\n")
+        elif total_citations == 0:
+            f.write("⚠️ Warning: No citations found. This document type typically requires citations.\n\n")
+        
+        # Source types if available
+        url_analysis = citation_results.get('url_analysis', {})
+        source_types = url_analysis.get('source_types', {})
+        if any(source_types.values()):
+            f.write("--- Source Types ---\n")
+            for stype, count in source_types.items():
+                if count > 0:
+                    f.write(f"  {stype.replace('_', ' ').title()}: {count}\n")
+            f.write("\n")
+        
+        f.write("=" * 70 + "\n")
     
     results['citation_quality'] = citation_results
     return results, citation_file
@@ -816,7 +892,7 @@ def generate_lineage_chart(results, output_name, format):
     return chart_path
 
 
-def update_settings_summary(pdf_file, url_input, variant, output_name, document_title,
+def update_settings_summary(pdf_file, url_input, variant, document_type, output_name, document_title,
                            narrative_style, narrative_length, ollama_model, ollama_custom_query,
                            deep_analysis, citation_check, check_urls, enhanced_provenance, 
                            generate_ai_disclosure, trace_data_sources, nist_compliance, 
@@ -837,12 +913,25 @@ def update_settings_summary(pdf_file, url_input, variant, output_name, document_
         truncated = ollama_custom_query[:50] + "..." if len(ollama_custom_query) > 50 else ollama_custom_query
         custom_query_display = f"\n- Custom Query: _{truncated}_"
     
+    # v8.3.3: Document type display
+    doc_type_labels = {
+        'auto': 'Auto-Detect',
+        'legislation': 'Legislation (Bill, Act)',
+        'budget': 'Budget Document',
+        'policy_brief': 'Policy Brief',
+        'research_report': 'Research Report',
+        'analysis': 'Analysis/Audit',
+        'report': 'General Report'
+    }
+    doc_type_display = doc_type_labels.get(document_type, document_type)
+    
     # Build summary
     summary = f"""### Current Configuration
 
 {input_src}
 
 **Analysis Variant:** {variant.upper()}  
+**Document Type:** {doc_type_display}  
 **Output Prefix:** {output_name if output_name else '(auto-generated)'}  
 **Document Title:** {document_title if document_title else '(will use filename)'}
 
@@ -1064,6 +1153,20 @@ def create_interface():
                         label="Analysis Variant",
                         info="Policy = SPOT-Policy™ (government docs) | Journalism = SPARROW™ (news articles)"
                     )
+                    document_type = gr.Dropdown(
+                        choices=[
+                            ("Auto-Detect", "auto"),
+                            ("Legislation (Bill, Act, Statute)", "legislation"),
+                            ("Budget Document", "budget"),
+                            ("Policy Brief", "policy_brief"),
+                            ("Research Report", "research_report"),
+                            ("Analysis/Audit", "analysis"),
+                            ("General Report", "report")
+                        ],
+                        value="auto",
+                        label="Document Type",
+                        info="v8.3.3: Affects citation scoring. Legislation has LOW citation expectation."
+                    )
                 
                 with gr.Row():
                     output_name = gr.Textbox(
@@ -1265,7 +1368,7 @@ def create_interface():
         
         # Wire up settings summary to update when any input changes
         all_inputs = [
-            pdf_file, url_input, variant, output_name, document_title,
+            pdf_file, url_input, variant, document_type, output_name, document_title,
             narrative_style, narrative_length, ollama_model, ollama_custom_query,
             deep_analysis, citation_check, check_urls,
             enhanced_provenance, generate_ai_disclosure,
@@ -1289,6 +1392,7 @@ def create_interface():
                 
                 # Basic settings
                 variant,
+                document_type,  # v8.3.3: Document type for citation scoring
                 output_name,
                 document_title,
                 

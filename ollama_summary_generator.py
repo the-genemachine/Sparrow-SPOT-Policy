@@ -60,6 +60,23 @@ class OllamaSummaryGenerator:
             for name, data in criteria.items()
         ])
         
+        # v8.3.3: Include AI Transparency dimension if available
+        ai_transparency_text = ""
+        deep_analysis = report.get('deep_analysis', {})
+        if deep_analysis:
+            consensus = deep_analysis.get('consensus', {})
+            ai_percentage = consensus.get('ai_percentage', 0)
+            transparency_score = consensus.get('transparency_score', 0)
+            primary_model = consensus.get('primary_model', 'Unknown')
+            if transparency_score > 0:
+                ai_transparency_text = f"""
+
+AI Transparency (AT):
+- AI Content Detected: {ai_percentage:.1f}%
+- Likely AI Model: {primary_model}
+- Transparency Score: {transparency_score}/100"""
+                scores_text += f"\n- AT (AI Transparency): {transparency_score}/100"
+        
         prompt = f"""You are a policy analyst writing for the general public (reading level: Grade 8).
 
 Document: {document_title}
@@ -68,13 +85,15 @@ Classification: {classification}
 
 Criteria Scores:
 {scores_text}
+{ai_transparency_text}
 
 Write a 400-500 word plain-language summary that:
 1. Explains what the SPOT grading means in simple terms
 2. Highlights the strongest area
 3. Identifies the weakest area
-4. Suggests what this means for the public
-5. Is written in accessible language (no jargon)
+4. If AI content was detected, briefly explain what this means for transparency
+5. Suggests what this means for the public
+6. Is written in accessible language (no jargon)
 
 Start with: "This policy document received a grade of {grade}..."
 Focus on clarity over technical accuracy."""
@@ -120,6 +139,7 @@ SPOT Scale™ Criteria Explained:
 - ER (Economic Rigor): Is the economic analysis sound?
 - PA (Public Accessibility): How easy is this to understand?
 - PC (Policy Consequentiality): How much impact will this have?
+- AT (AI Transparency): How much AI assistance was used and is it disclosed?
 
 For full details, visit: https://sparrowspot.example/
 """

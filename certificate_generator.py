@@ -149,7 +149,7 @@ class CertificateGenerator:
             <div class="header">
                 <h1>Sparrow SPOT Scale™ Certification</h1>
                 <p class="subtitle">Policy & Legislative Document Quality Assessment</p>
-                <div class="doc-type-badge">POLICY DOCUMENT</div>
+                <div class="doc-type-badge">{doc_type_badge}</div>
                 <div class="seal">★</div>
             </div>
 
@@ -600,21 +600,25 @@ class CertificateGenerator:
         
         # v7: Extract ethical framework data
         trust_score_data = report.get('trust_score', {})
-        trust_score = int(trust_score_data.get('trust_score', 0)) if trust_score_data else 0
+        # v8.3.3 Fix: Show 1 decimal place instead of rounding to integer (58.7 not 58)
+        trust_score = round(trust_score_data.get('trust_score', 0), 1) if trust_score_data else 0
         
         # v8.2: Prefer deep analysis data when available
         deep_analysis = report.get('deep_analysis', {})
         if deep_analysis and 'consensus' in deep_analysis:
             # Use deep analysis consensus data (more accurate)
             consensus = deep_analysis.get('consensus', {})
-            ai_confidence = int(consensus.get('ai_percentage', 0))
+            # v8.3.3 Fix: Use 1 decimal place for AI percentage (31.8% not 31%)
+            ai_confidence = round(consensus.get('ai_percentage', 0), 1)
             ai_model = consensus.get('primary_model', 'Unknown')
             
             # v8.3: Override Mixed/Uncertain with highest scoring individual model
-            if ai_model == 'Mixed/Uncertain':
-                ai_detection = report.get('ai_detection', {})
-                likely_ai_model = ai_detection.get('likely_ai_model', {})
-                model_scores = likely_ai_model.get('model_scores', {})
+            # Also get the model-specific confidence
+            ai_detection = report.get('ai_detection', {})
+            likely_ai_model = ai_detection.get('likely_ai_model', {})
+            model_scores = likely_ai_model.get('model_scores', {})
+            
+            if ai_model == 'Mixed/Uncertain' or model_scores:
                 if model_scores:
                     # Find the model with the highest score
                     highest_model = max(model_scores, key=model_scores.get)
@@ -629,13 +633,21 @@ class CertificateGenerator:
                             'ollama': 'Ollama',
                             'gemini': 'Google Gemini'
                         }
-                        ai_model = model_name_map.get(highest_model.lower(), highest_model.title())
+                        if ai_model == 'Mixed/Uncertain':
+                            ai_model = model_name_map.get(highest_model.lower(), highest_model.title())
+                        # v8.3.3 Fix: Use model-specific confidence (90%) not consensus confidence (120%)
+                        ai_model_confidence = round(highest_score * 100, 1)
             
-            # v8.3.2 Fix: Cap confidence at 100% - values 0-2 are 0-1 scale, values >2 are percentages
-            raw_confidence = consensus.get('confidence', 0)
-            # Values between 0-2 treated as 0-1 scale (handles edge cases like 1.2)
-            ai_model_confidence = int(raw_confidence * 100) if raw_confidence <= 2 else int(raw_confidence)
-            ai_model_confidence = min(ai_model_confidence, 100)  # Cap at 100%
+            # Fallback to consensus confidence if no model_scores
+            if 'ai_model_confidence' not in dir() or ai_model_confidence == 0:
+                raw_confidence = consensus.get('confidence', 0)
+                # Values between 0-2 treated as 0-1 scale
+                if raw_confidence <= 2:
+                    ai_model_confidence = round(raw_confidence * 100, 1)
+                else:
+                    ai_model_confidence = round(raw_confidence, 1)
+                # Cap at 100% - values over 100 are data errors
+                ai_model_confidence = min(ai_model_confidence, 100.0)
             transparency_score = consensus.get('transparency_score', 0)
             has_deep_analysis = True
         else:
@@ -874,9 +886,13 @@ class CertificateGenerator:
             </div>
             """
         
+        # v8.3.3: Determine document type badge from report data
+        doc_type_badge = self._get_document_type_badge(report)
+        
         html = self.policy_certificate_template.format(
             title=f"Sparrow SPOT Scale™ - {document_title}",
             document_title=document_title or "Policy Document",
+            doc_type_badge=doc_type_badge,
             ft_score=criteria.get('FT', {}).get('score', 'N/A'),
             sb_score=criteria.get('SB', {}).get('score', 'N/A'),
             er_score=criteria.get('ER', {}).get('score', 'N/A'),
@@ -1374,6 +1390,61 @@ IMPORTANT - Consistency Rules:
             return 'd'
         else:
             return 'f'
+    
+    def _get_document_type_badge(self, report):
+        """
+        v8.3.3: Determine document type badge text from report data.
+        
+        Checks multiple sources:
+        1. User-selected document_type_selected
+        2. Citation quality detected document_type
+        3. Document title patterns (Bill, Act, Budget)
+        4. Default to POLICY DOCUMENT
+        
+        Returns:
+            Badge text like "LEGISLATIVE DOCUMENT" or "POLICY DOCUMENT"
+        """
+        # Check user-selected type first
+        selected_type = report.get('document_type_selected', 'auto')
+        if selected_type and selected_type != 'auto':
+            type_badges = {
+                'legislation': 'LEGISLATIVE DOCUMENT',
+                'budget': 'BUDGET DOCUMENT',
+                'policy_brief': 'POLICY BRIEF',
+                'research_report': 'RESEARCH REPORT',
+                'analysis': 'ANALYSIS DOCUMENT',
+                'legal_judgment': 'LEGAL DOCUMENT',
+                'report': 'POLICY DOCUMENT'
+            }
+            return type_badges.get(selected_type, 'POLICY DOCUMENT')
+        
+        # Check citation quality detected type
+        citation_quality = report.get('citation_quality', {})
+        detected_type = citation_quality.get('document_type', '')
+        if detected_type:
+            type_badges = {
+                'legislation': 'LEGISLATIVE DOCUMENT',
+                'budget': 'BUDGET DOCUMENT',
+                'policy_brief': 'POLICY BRIEF',
+                'research_report': 'RESEARCH REPORT',
+                'analysis': 'ANALYSIS DOCUMENT',
+                'legal_judgment': 'LEGAL DOCUMENT',
+                'report': 'POLICY DOCUMENT'
+            }
+            if detected_type in type_badges:
+                return type_badges[detected_type]
+        
+        # Check document title for legislative patterns
+        doc_title = report.get('document_title', '')
+        if doc_title:
+            title_lower = doc_title.lower()
+            if any(pattern in title_lower for pattern in ['bill c-', 'bill s-', ' act,', ' act ', 'statute']):
+                return 'LEGISLATIVE DOCUMENT'
+            if 'budget' in title_lower:
+                return 'BUDGET DOCUMENT'
+        
+        # Default
+        return 'POLICY DOCUMENT'
 
 
 if __name__ == '__main__':
