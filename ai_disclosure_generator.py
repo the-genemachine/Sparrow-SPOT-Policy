@@ -361,8 +361,9 @@ def _add_comprehensive_methods():
             return "Low Confidence - limited analysis data"
         
         # Count levels with data
-        levels = ['level1_document', 'level2_section', 'level4_model', 
-                 'level5_behavioral', 'level6_phrase']
+        # v8.3.3 Fix: Use correct key names from deep_analyzer.py
+        levels = ['level1_document', 'level2_sections', 'level3_patterns',
+                 'level4_sentences', 'level5_fingerprints', 'level6_statistics']
         level_count = sum(1 for l in levels if deep.get(l))
         
         consensus = deep.get('consensus', {})
