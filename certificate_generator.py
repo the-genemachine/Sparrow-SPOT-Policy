@@ -254,7 +254,7 @@ class CertificateGenerator:
             <div class="methodology">
                 <h3>Assessment Methodology</h3>
                 <ul>
-                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v8.0 with Narrative Engine</li>
+                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v8.3 with Narrative Engine</li>
                     <li>Advanced NLP with machine learning</li>
                     <li>Policy-adapted evaluation framework with AI detection</li>
                     <li>Expert-level assessment protocols with fairness auditing</li>
@@ -498,7 +498,7 @@ class CertificateGenerator:
             <div class="methodology">
                 <h3>Assessment Methodology</h3>
                 <ul>
-                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v8.0 with Narrative Engine</li>
+                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v8.3 with Narrative Engine</li>
                     <li>Advanced NLP with machine learning</li>
                     <li>Journalism-adapted evaluation framework with AI detection</li>
                     <li>Credibility scoring protocols with fairness auditing</li>
@@ -713,7 +713,7 @@ class CertificateGenerator:
             escalation_warning = f"""
                 <div style="background: #ffe6e6; border: 2px solid #e74c3c; padding: 12px; border-radius: 4px; margin-top: 15px;">
                     <div style="font-weight: 700; color: #e74c3c; margin-bottom: 5px;">⚠️ Escalation Required</div>
-                    <div style="font-size: 0.9em; color: #555;">{ethical_summary.get('overall_recommendation', 'Human review required')}</div>
+                    <div style="font-size: 0.9em; color: #555;">{ethical_summary.get('overall_recommendation', 'Professional review required')}</div>
                 </div>
             """
         
@@ -1029,7 +1029,7 @@ class CertificateGenerator:
             escalation_warning = f"""
                 <div style="background: #ffe6e6; border: 2px solid #e74c3c; padding: 12px; border-radius: 4px; margin-top: 15px;">
                     <div style="font-weight: 700; color: #e74c3c; margin-bottom: 5px;">⚠️ Escalation Required</div>
-                    <div style="font-size: 0.9em; color: #555;">{ethical_summary.get('overall_recommendation', 'Human review required')}</div>
+                    <div style="font-size: 0.9em; color: #555;">{ethical_summary.get('overall_recommendation', 'Professional review required')}</div>
                 </div>
             """
         

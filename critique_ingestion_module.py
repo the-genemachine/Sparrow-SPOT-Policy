@@ -505,7 +505,7 @@ class CritiqueIngestionModule:
         if critical_count >= 3:
             recommendations.append(
                 f"Multiple critical perspectives ({critical_count} sources) suggest "
-                f"potential policy risks requiring human expert review"
+                f"potential policy risks requiring professional review"
             )
         
         return recommendations

@@ -935,9 +935,9 @@ class AIDetectionEngine:
         elif score < 0.6:
             return f"Document appears {score*100:.1f}% AI-generated (Moderate). Mixed human and AI content. Consider reviewing flagged sections."
         elif score < 0.8:
-            return f"Document appears {score*100:.1f}% AI-generated (Moderate-High). Significant AI content detected. Human oversight recommended."
+            return f"Document appears {score*100:.1f}% AI-generated (Moderate-High). Significant AI content detected. Professional oversight recommended."
         else:
-            return f"Document appears {score*100:.1f}% AI-generated (High). Likely substantially AI-generated. Human expert review required."
+            return f"Document appears {score*100:.1f}% AI-generated (High). Likely substantially AI-generated. Professional review required."
     
     def _generate_recommendation(self, score: float) -> str:
         """Generate actionable recommendation."""
@@ -946,9 +946,9 @@ class AIDetectionEngine:
         elif score < 0.4:
             return "⚠ Proceed with analysis. Review flagged sections for potential AI bias."
         elif score < 0.6:
-            return "⚠ Proceed with caution. Human expert review of flagged sections recommended."
+            return "⚠ Proceed with caution. Specialist review of flagged sections recommended."
         elif score < 0.8:
-            return "⚠ Request human-written version. Consider alternative sources if AI-generation is problematic."
+            return "⚠ Request original version. Consider alternative sources if AI-generation is problematic."
         else:
             return "❌ Do not use for critical decisions. Require human-authored original or substantial revision."
 

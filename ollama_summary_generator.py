@@ -247,23 +247,268 @@ For full analysis, visit: https://sparrowspot.example/
         self,
         json_file: str,
         variant: str = 'policy',
+        document_type: str = None,
         output_file: Optional[str] = None
     ) -> str:
-        """Generate summary from existing JSON report."""
+        """Generate summary from existing JSON report.
+        
+        Args:
+            json_file: Path to analysis JSON
+            variant: 'policy' or 'journalism'
+            document_type: Override document type (legislation, budget, policy_brief, etc.)
+            output_file: Optional output path
+        """
         
         with open(json_file, 'r') as f:
             report = json.load(f)
         
         doc_title = report.get('document_title', 'Document')
         
+        # Auto-detect document type if not provided
+        if not document_type:
+            document_type = report.get('document_type', 'policy_brief')
+        
         if not output_file:
             base = json_file.replace('.json', '')
             output_file = f"{base}_summary.txt"
         
-        if variant == 'policy':
-            return self.generate_policy_summary(report, doc_title, output_file)
-        else:
+        # Route to appropriate generator based on document type
+        if document_type == 'legislation':
+            return self.generate_legislative_summary(report, doc_title, output_file)
+        elif document_type == 'budget':
+            return self.generate_budget_summary(report, doc_title, output_file)
+        elif variant == 'journalism':
             return self.generate_journalism_summary(report, doc_title, output_file)
+        else:
+            return self.generate_policy_summary(report, doc_title, output_file)
+    
+    def generate_legislative_summary(
+        self, 
+        report: Dict[str, Any],
+        document_title: str = "",
+        output_file: Optional[str] = None
+    ) -> str:
+        """Generate plain-language summary for LEGISLATIVE documents (Bills, Acts).
+        
+        Legislative documents are PRIMARY SOURCES that create law - they should be
+        analyzed for clarity, scope, and implementation rather than policy effectiveness.
+        """
+        
+        criteria = report.get('criteria', {})
+        composite = report.get('composite_score', 0)
+        grade = report.get('composite_grade', 'F')
+        
+        # Build context with legislative-appropriate framing
+        scores_text = "\n".join([
+            f"- {name}: {data.get('score', 'N/A')}/100"
+            for name, data in criteria.items()
+        ])
+        
+        # v8.3.3: Include AI Transparency dimension if available
+        ai_transparency_text = ""
+        deep_analysis = report.get('deep_analysis', {})
+        if deep_analysis:
+            consensus = deep_analysis.get('consensus', {})
+            ai_percentage = consensus.get('ai_percentage', 0)
+            primary_model = consensus.get('primary_model', 'Unknown')
+            if ai_percentage > 0:
+                ai_transparency_text = f"""
+
+AI Content Analysis:
+- AI-Assisted Content: {ai_percentage:.1f}%
+- Likely AI Model: {primary_model}
+Note: AI detection in legislation may reflect drafting assistance rather than substantive issues."""
+        
+        prompt = f"""You are a legislative analyst writing for the general public (reading level: Grade 10).
+
+Document: {document_title}
+Document Type: LEGISLATION (Bill/Act)
+Assessment Grade: {grade} | Score: {composite}/100
+
+Analysis Scores:
+{scores_text}
+{ai_transparency_text}
+
+IMPORTANT CONTEXT: This is a LEGISLATIVE document (a Bill or Act). Unlike policy proposals:
+- Legislation CREATES legal framework - it defines what IS law, not what SHOULD be
+- Legislation does not need external citations - it IS the primary source
+- Economic projections in legislation are authoritative statutory figures, not proposals
+- The goal is legal clarity, not policy advocacy
+
+Write a 400-500 word analysis that:
+1. Explains the legislative assessment grade in accessible terms
+2. Evaluates the LEGAL CLARITY of the bill (is the language unambiguous?)
+3. Assesses the REGULATORY SCOPE (what powers does it grant or restrict?)
+4. Reviews IMPLEMENTATION PROVISIONS (are enforcement mechanisms clear?)
+5. Notes any TRANSPARENCY concerns about how the legislation was drafted
+6. Explains what this means for citizens affected by this law
+
+DO NOT:
+- Suggest the legislation needs "revision" or "improvement" (it's enacted law)
+- Critique it as if it were a policy proposal
+- Recommend "stakeholder consultation" (legislative process already occurred)
+- Use phrases like "before implementation" (legislation IS implementation)
+
+Start with: "This legislative analysis of {document_title} received a grade of {grade}..."
+Focus on helping citizens understand the law's structure and implications."""
+
+        print("📝 Generating legislative analysis summary (Ollama)...")
+        print(f"   Model: {self.model}")
+        print(f"   Document: {document_title}")
+        print(f"   Type: LEGISLATION")
+        
+        summary = self._call_ollama(prompt)
+        
+        if not summary:
+            print("⚠️  Primary model failed, trying fallback...")
+            summary = self._call_ollama(prompt, self.fallback_model)
+        
+        if not summary:
+            print("❌ Summary generation failed")
+            return None
+        
+        # Add metadata with legislative-specific framing
+        full_summary = f"""LEGISLATIVE ANALYSIS SUMMARY
+{'=' * 70}
+
+Title: {document_title}
+Document Type: Legislation (Bill/Act)
+Assessment Grade: {grade} ({composite}/100)
+Generated: {datetime.now().strftime('%B %d, %Y')}
+Reading Level: Grade 10+ (Civic Literacy)
+
+{'=' * 70}
+
+{summary.strip()}
+
+{'=' * 70}
+
+About This Analysis:
+This analysis was generated to help citizens understand legislative documents.
+Legislation is a PRIMARY SOURCE - it creates law rather than proposing policy.
+
+Assessment Criteria for Legislation:
+- FT (Fiscal Transparency): How clearly are budgetary provisions disclosed?
+- SB (Stakeholder Balance): Does the legislation consider diverse affected parties?
+- ER (Economic Rigor): Are economic provisions well-defined and calculable?
+- PA (Public Accessibility): How readable is the legislative language?
+- PC (Policy Consequentiality): What real-world changes does this law create?
+- AT (AI Transparency): Was AI assistance used in drafting or analysis?
+
+Note: Legislative documents are self-authorizing and do not require external
+citations in the same way policy proposals do.
+
+For full technical analysis, see the complete assessment report.
+"""
+        
+        # Save to file if specified
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(full_summary)
+            print(f"   ✓ Saved: {output_file}")
+            return output_file
+        
+        return full_summary
+    
+    def generate_budget_summary(
+        self, 
+        report: Dict[str, Any],
+        document_title: str = "",
+        output_file: Optional[str] = None
+    ) -> str:
+        """Generate plain-language summary for BUDGET documents.
+        
+        Budget documents are PRIMARY SOURCES that allocate public funds.
+        """
+        
+        criteria = report.get('criteria', {})
+        composite = report.get('composite_score', 0)
+        grade = report.get('composite_grade', 'F')
+        
+        scores_text = "\n".join([
+            f"- {name}: {data.get('score', 'N/A')}/100"
+            for name, data in criteria.items()
+        ])
+        
+        # AI transparency
+        ai_transparency_text = ""
+        deep_analysis = report.get('deep_analysis', {})
+        if deep_analysis:
+            consensus = deep_analysis.get('consensus', {})
+            ai_percentage = consensus.get('ai_percentage', 0)
+            if ai_percentage > 0:
+                ai_transparency_text = f"\n- AI-Assisted Content Detected: {ai_percentage:.1f}%"
+        
+        prompt = f"""You are a fiscal analyst writing for taxpayers (reading level: Grade 9).
+
+Document: {document_title}
+Document Type: GOVERNMENT BUDGET
+Assessment Grade: {grade} | Score: {composite}/100
+
+Analysis Scores:
+{scores_text}
+{ai_transparency_text}
+
+IMPORTANT CONTEXT: This is a BUDGET document - an official allocation of public funds.
+- Budget figures are authoritative - they represent actual spending commitments
+- Fiscal Transparency is especially important (how clearly is spending itemized?)
+- Economic Rigor matters (are projections realistic and well-supported?)
+
+Write a 400-500 word analysis that:
+1. Explains the budget assessment grade in plain language
+2. Highlights how clearly spending is itemized and explained
+3. Assesses whether revenue projections appear realistic
+4. Notes any transparency gaps in how funds are allocated
+5. Explains what this means for taxpayers
+
+Start with: "This budget analysis of {document_title} received a grade of {grade}..."
+Focus on fiscal accountability and taxpayer understanding."""
+
+        print("📝 Generating budget analysis summary (Ollama)...")
+        print(f"   Model: {self.model}")
+        print(f"   Document: {document_title}")
+        print(f"   Type: BUDGET")
+        
+        summary = self._call_ollama(prompt)
+        
+        if not summary:
+            summary = self._call_ollama(prompt, self.fallback_model)
+        
+        if not summary:
+            return None
+        
+        full_summary = f"""BUDGET ANALYSIS SUMMARY
+{'=' * 70}
+
+Title: {document_title}
+Document Type: Government Budget
+Assessment Grade: {grade} ({composite}/100)
+Generated: {datetime.now().strftime('%B %d, %Y')}
+Reading Level: Grade 9+ (Taxpayer Literacy)
+
+{'=' * 70}
+
+{summary.strip()}
+
+{'=' * 70}
+
+Budget Assessment Criteria:
+- FT (Fiscal Transparency): How clearly is spending itemized?
+- SB (Stakeholder Balance): Are different sectors fairly represented?
+- ER (Economic Rigor): Are revenue/spending projections realistic?
+- PA (Public Accessibility): Can taxpayers understand the allocations?
+- PC (Policy Consequentiality): What real-world impact will spending have?
+
+For full technical analysis, see the complete assessment report.
+"""
+        
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(full_summary)
+            print(f"   ✓ Saved: {output_file}")
+            return output_file
+        
+        return full_summary
     
     def test_connection(self) -> bool:
         """Test Ollama connection."""

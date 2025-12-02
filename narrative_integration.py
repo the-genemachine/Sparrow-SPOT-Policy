@@ -488,6 +488,9 @@ class NarrativeGenerationPipeline:
         grade = analysis.get('composite_grade') or analysis.get('grade', 'N/A')
         criteria = analysis.get('criteria', {})
         
+        # v8.3.3: Get document type for appropriate framing
+        document_type = analysis.get('document_type', 'policy_brief')
+        
         # Fix #1: Include custom query if provided
         custom_query = analysis.get('custom_narrative_query', '')
         custom_query_section = ""
@@ -499,7 +502,44 @@ class NarrativeGenerationPipeline:
             if isinstance(data, dict):
                 criteria_summary += f"- {key}: {data.get('score', 0):.0f}/100 - {data.get('interpretation', 'N/A')}\n"
         
-        prompt = f"""You are a professional policy analyst writing a comprehensive analysis narrative.
+        # v8.3.3: Document-type-specific prompts
+        if document_type == 'legislation':
+            doc_type_context = """
+DOCUMENT TYPE: LEGISLATION (Bill/Act)
+IMPORTANT: This is enacted LAW, not a policy proposal. Do NOT:
+- Suggest it needs "revision" or "improvement"
+- Recommend "stakeholder consultation" (already occurred in legislative process)
+- Critique it as a proposal - analyze it as established legal framework
+- Use phrases like "before implementation" (legislation IS implementation)
+
+FOCUS ON:
+- Legal clarity and unambiguous language
+- Regulatory scope and powers granted/restricted
+- Implementation and enforcement provisions
+- Citizen rights and obligations created
+- Constitutional and jurisdictional alignment"""
+        elif document_type == 'budget':
+            doc_type_context = """
+DOCUMENT TYPE: GOVERNMENT BUDGET
+IMPORTANT: This is an official fiscal allocation, not a proposal.
+
+FOCUS ON:
+- Fiscal transparency and spending itemization
+- Revenue projection realism
+- Allocation priorities and trade-offs
+- Taxpayer impact and accountability
+- Economic assumptions underlying projections"""
+        else:
+            doc_type_context = f"""
+DOCUMENT TYPE: {document_type.upper().replace('_', ' ')}
+
+FOCUS ON:
+- Policy implications and effectiveness
+- Stakeholder impacts
+- Economic rigor and evidence base
+- Implementation feasibility"""
+        
+        prompt = f"""You are a professional analyst writing a comprehensive analysis narrative.
 
 EXISTING NARRATIVE (current length: {current_words} words):
 {narrative_text}
@@ -507,12 +547,13 @@ EXISTING NARRATIVE (current length: {current_words} words):
 ANALYSIS DATA:
 - Composite Score: {composite_score}/100 ({grade})
 {criteria_summary}
+{doc_type_context}
 {custom_query_section}
 TASK: Expand this narrative to approximately {target_words} words while:
 1. Maintaining the same tone and style
-2. Adding deeper analysis of each criterion
-3. Including more context about policy implications
-4. Discussing potential impacts on stakeholders
+2. Adding deeper analysis appropriate to the DOCUMENT TYPE
+3. Including context relevant to the document's purpose
+4. Discussing impacts on affected parties
 5. Adding comparative context where appropriate
 6. Expanding on the key findings with supporting details
 {f'7. Address the user context/focus: {custom_query}' if custom_query else ''}

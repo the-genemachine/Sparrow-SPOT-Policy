@@ -374,9 +374,9 @@ class NISTRiskMapper:
         if risk_tier == RiskTier.LOW:
             explanation += "✓ Proceed with standard analysis process."
         elif risk_tier == RiskTier.MEDIUM:
-            explanation += "⚠ Proceed with analysis. Plan for human review of results."
+            explanation += "⚠ Proceed with analysis. Plan for qualified review of results."
         else:  # HIGH
-            explanation += "⚠ Proceed with analysis AND mandatory human expert review."
+            explanation += "⚠ Proceed with analysis AND mandatory professional review."
         
         return explanation
 

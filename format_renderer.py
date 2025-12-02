@@ -373,7 +373,7 @@ class FormatRenderer:
                         model_disclosure += " Mixed AI model patterns detected."
                     if model_analysis:
                         model_disclosure += f" {model_analysis}"
-            model_disclosure += " Human expert review completed."
+            model_disclosure += " Professional review recommended."
             
             article.append(model_disclosure)
             article.append(f"Trust Assessment: {trust_score:.1f}/100 confidence score.")

@@ -95,6 +95,9 @@ class NarrativeEngine:
         # Extract key data - composite_score is in the root level
         composite_score = analysis.get('composite_score', 0)
         
+        # v8.3.3: Get document type for appropriate framing
+        document_type = analysis.get('document_type', 'policy_brief')
+        
         # Calculate grade from composite score if not present
         # Check 'grade', 'composite_grade', or calculate from score
         grade = analysis.get('grade', analysis.get('composite_grade', self._calculate_grade(composite_score)))
@@ -102,12 +105,13 @@ class NarrativeEngine:
         # Create a modified analysis dict with grade for lede generation
         analysis_with_grade = analysis.copy()
         analysis_with_grade['grade'] = grade
+        analysis_with_grade['document_type'] = document_type
         
-        # Generate components
+        # Generate components with document-type awareness
         lede = self._generate_lede(analysis_with_grade)
-        criteria_narratives = self._generate_criteria_narratives(analysis)
+        criteria_narratives = self._generate_criteria_narratives(analysis, document_type)
         tensions = self._identify_tensions(analysis)
-        implications = self._extract_implications(analysis)
+        implications = self._extract_implications(analysis, document_type)
         escalations = self._identify_escalations(analysis)
         
         return {
@@ -119,12 +123,14 @@ class NarrativeEngine:
             'escalations': escalations,
             'composite_score': composite_score,
             'grade': grade,
+            'document_type': document_type,
             'trust_score': analysis.get('trust_score', {}),
             'risk_tier': analysis.get('risk_tier', 'MEDIUM'),
             'metadata': {
-                'generated_by': 'NarrativeEngine v1',
+                'generated_by': 'NarrativeEngine v1.1',
                 'source_version': analysis.get('version', 'v7'),
-                'analysis_type': analysis.get('analysis_type', 'policy')
+                'analysis_type': analysis.get('analysis_type', 'policy'),
+                'document_type': document_type
             }
         }
     
@@ -137,25 +143,57 @@ class NarrativeEngine:
         composite = analysis.get('composite_score', 0)
         grade = analysis.get('grade', 'N/A')
         title = analysis.get('title', 'This document')
-        analysis_type = analysis.get('analysis_type', 'policy')
+        document_type = analysis.get('document_type', 'policy_brief')
         
-        # Determine overall assessment
-        if composite >= 90:
-            assessment = "excels across multiple dimensions"
-        elif composite >= 80:
-            assessment = "demonstrates strong quality"
-        elif composite >= 70:
-            assessment = "meets baseline standards"
-        elif composite >= 60:
-            assessment = "has significant gaps"
+        # v8.3.3: Document-type-specific assessments
+        if document_type == 'legislation':
+            # Legislative framing - focus on clarity and structure
+            if composite >= 90:
+                assessment = "demonstrates exceptional legal clarity"
+            elif composite >= 80:
+                assessment = "provides clear regulatory framework"
+            elif composite >= 70:
+                assessment = "meets baseline legislative standards"
+            elif composite >= 60:
+                assessment = "has areas requiring clarification"
+            else:
+                assessment = "may present implementation challenges"
+            
+            lede = f"This legislative analysis of {title} scores {grade} ({composite}/100), indicating the bill {assessment}."
+        
+        elif document_type == 'budget':
+            # Budget framing - focus on fiscal accountability
+            if composite >= 90:
+                assessment = "provides exceptional fiscal transparency"
+            elif composite >= 80:
+                assessment = "demonstrates strong accountability standards"
+            elif composite >= 70:
+                assessment = "meets baseline transparency requirements"
+            elif composite >= 60:
+                assessment = "has fiscal transparency gaps"
+            else:
+                assessment = "raises fiscal accountability concerns"
+            
+            lede = f"This budget analysis of {title} scores {grade} ({composite}/100), indicating {assessment}."
+        
         else:
-            assessment = "raises serious concerns"
-        
-        lede = f"{title} scores {grade} ({composite}/100) for {assessment}, with notable strengths in transparency and areas for improvement in accessibility."
+            # Default policy framing
+            if composite >= 90:
+                assessment = "excels across multiple dimensions"
+            elif composite >= 80:
+                assessment = "demonstrates strong quality"
+            elif composite >= 70:
+                assessment = "meets baseline standards"
+            elif composite >= 60:
+                assessment = "has significant gaps"
+            else:
+                assessment = "raises serious concerns"
+            
+            lede = f"{title} scores {grade} ({composite}/100) for {assessment}, with notable strengths in transparency and areas for improvement in accessibility."
         
         return lede
     
-    def _generate_criteria_narratives(self, analysis: Dict) -> Dict[str, str]:
+    def _generate_criteria_narratives(self, analysis: Dict, document_type: str = 'policy_brief') -> Dict[str, str]:
         """
         Generate narrative interpretation for each criterion.
         
@@ -357,24 +395,49 @@ class NarrativeEngine:
         
         return tensions
     
-    def _extract_implications(self, analysis: Dict) -> List[str]:
+    def _extract_implications(self, analysis: Dict, document_type: str = 'policy_brief') -> List[str]:
         """
-        Extract meaningful policy implications from the analysis.
-        Recommendation #2: Generate comprehensive implications for completeness.
+        Extract meaningful implications from the analysis.
+        v8.3.3: Document-type-aware implications.
         """
         implications = []
         
         # Check composite score for overall implication
         composite = analysis.get('composite_score', 0)
         
-        if composite >= 85:
-            implications.append("Implementation-ready: This document has sufficient rigor for immediate use")
-        elif composite >= 75:
-            implications.append("Generally sound: Minor refinements recommended before final implementation")
-        elif composite >= 65:
-            implications.append("Requires revision: Substantial improvements needed before implementation")
+        # v8.3.3: Document-type-specific implications
+        if document_type == 'legislation':
+            # Legislative implications - focus on clarity and enforcement
+            if composite >= 85:
+                implications.append("Clear legal framework: Legislation provides unambiguous regulatory guidance")
+            elif composite >= 75:
+                implications.append("Generally clear: Minor clarifications may benefit implementation")
+            elif composite >= 65:
+                implications.append("Interpretation challenges: Some provisions may require regulatory guidance")
+            else:
+                implications.append("Implementation risk: Ambiguous provisions may lead to inconsistent enforcement")
+        
+        elif document_type == 'budget':
+            # Budget implications - focus on fiscal accountability
+            if composite >= 85:
+                implications.append("Fiscally transparent: Budget provides clear accountability framework")
+            elif composite >= 75:
+                implications.append("Adequate transparency: Main allocations clear with some detail gaps")
+            elif composite >= 65:
+                implications.append("Transparency gaps: Key spending areas need additional itemization")
+            else:
+                implications.append("Accountability concerns: Significant spending opacity requires review")
+        
         else:
-            implications.append("Major restructuring: Document needs fundamental rework to be viable")
+            # Default policy implications
+            if composite >= 85:
+                implications.append("Implementation-ready: This document has sufficient rigor for immediate use")
+            elif composite >= 75:
+                implications.append("Generally sound: Minor refinements recommended before final implementation")
+            elif composite >= 65:
+                implications.append("Requires revision: Substantial improvements needed before implementation")
+            else:
+                implications.append("Major restructuring: Document needs fundamental rework to be viable")
         
         # Get criteria scores from backend format
         criteria_data = analysis.get('criteria', {})
@@ -391,37 +454,61 @@ class NarrativeEngine:
             # Fallback to old format
             return analysis.get(internal_key, {}).get('score', 0)
         
-        # Check accessibility implication
+        # Document-type-aware criteria implications
         accessibility = get_score('public_accessibility')
-        if accessibility < 60:
-            implications.append("Communication challenge: Develop plain-language summary for public distribution")
-        elif accessibility < 75:
-            implications.append("Communication challenge: Develop plain-language summary for public distribution")
-        
-        # Check for stakeholder implications
         stakeholder = get_score('stakeholder_balance')
-        if stakeholder < 70:
-            implications.append("Stakeholder engagement gap: Expand consultation process before finalization")
-        elif stakeholder >= 80:
-            implications.append("Strong stakeholder representation: Multiple perspectives well-integrated")
-        
-        # Check economic rigor
         rigor = get_score('economic_rigor')
-        if rigor >= 85:
-            implications.append("Economic assumptions are well-supported and defensible")
-        elif rigor < 70:
-            implications.append("Economic vulnerability: Subject to challenge on methodological grounds")
-        
-        # Check policy consequentiality
         consequentiality = get_score('policy_consequentiality')
-        if consequentiality >= 90:
+        
+        if document_type == 'legislation':
+            # Legislative-specific implications
+            if accessibility < 70:
+                implications.append("Plain-language guidance needed: Citizens may struggle to understand obligations")
+            if rigor < 70:
+                implications.append("Economic provisions unclear: May require regulatory interpretation")
+            if consequentiality >= 90:
+                implications.append("High-impact legislation: Significant regulatory scope with broad effects")
+        
+        elif document_type == 'budget':
+            # Budget-specific implications
+            if accessibility < 70:
+                implications.append("Taxpayer accessibility gap: Budget language may hinder public oversight")
+            if rigor < 70:
+                implications.append("Revenue projections uncertain: Economic assumptions may need validation")
+            if stakeholder < 70:
+                implications.append("Sector representation uneven: Some constituencies underrepresented")
+        
+        else:
+            # Policy document implications (existing logic)
+            if accessibility < 60:
+                implications.append("Communication challenge: Develop plain-language summary for public distribution")
+            elif accessibility < 75:
+                implications.append("Communication challenge: Develop plain-language summary for public distribution")
+            
+            if stakeholder < 70:
+                implications.append("Stakeholder engagement gap: Expand consultation process before finalization")
+            elif stakeholder >= 80:
+                implications.append("Strong stakeholder representation: Multiple perspectives well-integrated")
+            
+            if rigor >= 85:
+                implications.append("Economic assumptions are well-supported and defensible")
+            elif rigor < 70:
+                implications.append("Economic vulnerability: Subject to challenge on methodological grounds")
+        
+        # Universal implication for policy consequentiality
+        if consequentiality >= 90 and document_type != 'legislation':
             implications.append("High-impact policy: Transformative potential with significant societal reach")
-        elif consequentiality < 70:
+        elif consequentiality < 70 and document_type not in ['legislation', 'budget']:
             implications.append("Unclear impact: Define and communicate real-world consequences more clearly")
         
         # Ensure at least 3 implications always present
         if len(implications) < 3:
-            implications.append("Recommend expert review before final decision-making")
+            if document_type == 'legislation':
+                implications.append("Legal counsel review recommended for implementation guidance")
+            elif document_type == 'budget':
+                implications.append("Fiscal analysis review recommended for projection validation")
+            else:
+                implications.append("Recommend expert review before final decision-making")
         
         return implications
     

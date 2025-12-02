@@ -1860,7 +1860,7 @@ class SPOTPolicy:
         # Overall recommendation
         if summary['escalation_required']:
             triggers_text = '; '.join(summary['escalation_triggers'])
-            summary['overall_recommendation'] = f"⚠️ HUMAN EXPERT REVIEW REQUIRED ({triggers_text})"
+            summary['overall_recommendation'] = f"⚠️ PROFESSIONAL REVIEW REQUIRED ({triggers_text})"
         else:
             summary['overall_recommendation'] = "✓ Proceed with standard governance review."
         

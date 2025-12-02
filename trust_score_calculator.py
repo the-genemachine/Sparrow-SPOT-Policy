@@ -301,14 +301,14 @@ class TrustScoreCalculator:
             recommendations.append("   Conduct impact assessment before any implementation.")
         
         elif level == TrustLevel.LOW:
-            recommendations.append("⚠️  Require comprehensive human expert review.")
+            recommendations.append("⚠️  Require comprehensive professional review.")
             recommendations.append("   Investigate low-scoring components.")
-            recommendations.append("   Document all assumptions and limitations.")
+            recommendations.append("   Document all assumptions and limitations."
         
         elif level == TrustLevel.MEDIUM:
-            recommendations.append("🟡 Proceed with caution. Standard human review required.")
+            recommendations.append("🟡 Proceed with caution. Standard review required.")
             recommendations.append("   Strengthen weakest components if possible.")
-            recommendations.append("   Monitor for bias and drift during implementation.")
+            recommendations.append("   Monitor for bias and drift during implementation."
         
         elif level == TrustLevel.HIGH:
             recommendations.append("🟢 Suitable for decision support.")
