@@ -8,7 +8,7 @@ ethical compliance checking.
 Version: 8.3
 """
 
-__version__ = "8.3.0"
+__version__ = "8.3.3"
 __author__ = "The Gene Machine"
 
 from .sparrow_grader_v8 import SPARROWGrader, SPOTPolicy

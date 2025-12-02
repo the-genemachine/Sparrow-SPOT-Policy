@@ -1,5 +1,5 @@
 """
-AI Disclosure Generator Module for v8.3.2
+AI Disclosure Generator Module for v8.3.3
 
 Generates standardized AI Use Statements for public outputs per Recommendation #4:
 "Improve Public-Facing AI Disclosure in Policy Summaries"
@@ -14,6 +14,7 @@ This module creates transparent disclosure language for:
 
 v8.3 Enhancement: Added comprehensive multi-format generation for full transparency compliance
 v8.3.2 Enhancement: Added confidence level indicators for transparency
+v8.3.3 Enhancement: Fixed confidence indicator key mappings for accurate multi-level detection
 """
 
 import os
