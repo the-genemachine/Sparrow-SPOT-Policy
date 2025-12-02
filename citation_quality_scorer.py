@@ -1,7 +1,9 @@
 """
-Citation Quality Scorer for Sparrow SPOT Scale™ v8.2
+Citation Quality Scorer for Sparrow SPOT Scale™ v8.3.3
 
 Extracts and verifies citations/sources from documents for transparency.
+
+v8.3.3: Enhanced document type detection with legislative and analysis variants.
 """
 
 import re
@@ -9,6 +11,100 @@ from typing import Dict, List, Tuple
 from urllib.parse import urlparse
 import requests
 from datetime import datetime
+from enum import Enum
+
+
+class DocumentType(Enum):
+    """
+    Document type classification for context-aware scoring.
+    
+    v8.3.3: Added comprehensive document type taxonomy.
+    
+    PRIMARY SOURCES (Self-Authoritative):
+        - LEGISLATION: Bills, Acts, Statutes - IS the source, doesn't need citations
+        - BUDGET: Government financial documents - authoritative fiscal data
+        - LEGAL_JUDGMENT: Court rulings, judicial decisions
+    
+    SECONDARY SOURCES (Citation-Dependent):
+        - POLICY_BRIEF: Policy recommendations, white papers
+        - RESEARCH_REPORT: Academic/research analysis
+        - NEWS_ARTICLE: Journalism, reporting
+    
+    META-EVALUATIVE SOURCES (Analysis):
+        - ANALYSIS: Fact-checks, audits, trust assessments
+        - REPORT: General reports (default)
+    """
+    # Primary Sources - self-authoritative
+    LEGISLATION = "legislation"
+    BUDGET = "budget"
+    LEGAL_JUDGMENT = "legal_judgment"
+    
+    # Secondary Sources - citation-dependent  
+    POLICY_BRIEF = "policy_brief"
+    RESEARCH_REPORT = "research_report"
+    NEWS_ARTICLE = "news_article"
+    
+    # Meta-Evaluative Sources
+    ANALYSIS = "analysis"
+    REPORT = "report"  # Default fallback
+
+
+# Document type scoring configuration
+DOCUMENT_TYPE_CONFIG = {
+    # Primary sources: high base score, bonus for references
+    DocumentType.LEGISLATION: {
+        "base_score": 75.0,
+        "description": "Legislative document (Bill, Act, Statute)",
+        "citation_expectation": "LOW",
+        "rationale": "Self-authoritative primary source; creates law rather than citing it"
+    },
+    DocumentType.BUDGET: {
+        "base_score": 70.0,
+        "description": "Government budget/fiscal document",
+        "citation_expectation": "LOW",
+        "rationale": "Authoritative fiscal data; internal references expected"
+    },
+    DocumentType.LEGAL_JUDGMENT: {
+        "base_score": 70.0,
+        "description": "Court ruling or judicial decision",
+        "citation_expectation": "MEDIUM",
+        "rationale": "Cites precedents but is itself authoritative"
+    },
+    
+    # Secondary sources: standard scoring, citations required
+    DocumentType.POLICY_BRIEF: {
+        "base_score": 0.0,
+        "description": "Policy analysis or recommendations",
+        "citation_expectation": "HIGH",
+        "rationale": "Must cite evidence to support recommendations"
+    },
+    DocumentType.RESEARCH_REPORT: {
+        "base_score": 0.0,
+        "description": "Academic or research report",
+        "citation_expectation": "HIGH",
+        "rationale": "Academic standards require extensive citations"
+    },
+    DocumentType.NEWS_ARTICLE: {
+        "base_score": 0.0,
+        "description": "News or journalism",
+        "citation_expectation": "MEDIUM",
+        "rationale": "Should attribute claims to sources"
+    },
+    
+    # Meta-evaluative sources: methodology-focused
+    DocumentType.ANALYSIS: {
+        "base_score": 50.0,
+        "description": "Analysis, audit, or fact-check",
+        "citation_expectation": "MODERATE",
+        "rationale": "References analyzed document + methodology standards"
+    },
+    DocumentType.REPORT: {
+        "base_score": 0.0,
+        "description": "General report (default)",
+        "citation_expectation": "MEDIUM",
+        "rationale": "Standard citation expectations"
+    }
+}
 
 
 class CitationQualityScorer:
@@ -25,59 +121,200 @@ class CitationQualityScorer:
             r'reported by [A-Z][a-z]+',  # reported by Reuters
         ]
         
-        # v8.3.2: Document type patterns for scoring adjustment
+        # v8.3.3: Enhanced document type patterns
+        self._init_document_patterns()
+    
+    def _init_document_patterns(self):
+        """Initialize document type detection patterns."""
+        
+        # Legislative document patterns (Bills, Acts, Statutes)
         self.legislative_patterns = [
             r'\bBill\s+[A-Z]?-?\d+\b',  # Bill C-15, Bill S-20
-            r'\bAct\s+[A-Z]',  # Act of Parliament
-            r'\bSection\s+\d+',  # Section 42
+            r'\bAct\s+to\s+(implement|amend|repeal|establish)',  # Act to implement
+            r'\bSection\s+\d+(\.\d+)?',  # Section 42, Section 3.2
             r'\bsubsection\s+\(\d+\)',  # subsection (1)
+            r'\bparagraph\s+\([a-z]\)',  # paragraph (a)
             r'\bSchedule\s+[A-Z0-9]',  # Schedule A
-            r'\bHer Majesty|His Majesty\b',  # Royal reference
+            r'\b(Her|His)\s+Majesty\b',  # Royal reference
             r'\bParliament\s+of\s+Canada\b',
             r'\benacted\s+by\b',  # enacted by
-            r'\bChapter\s+\d+\b',  # Chapter 12 (in legislation)
+            r'\bChapter\s+\d+\s+of\s+the\s+Statutes\b',  # Chapter 12 of the Statutes
             r'\bStatutes\s+of\s+Canada\b',
+            r'\bS\.C\.\s+\d{4}',  # S.C. 2024 (Statutes of Canada)
+            r'\bR\.S\.C\.\s+\d{4}',  # R.S.C. 1985 (Revised Statutes)
+            r'\bFirst\s+Reading\b',  # Legislative stages
+            r'\bRoyal\s+Assent\b',
+            r'\bHouse\s+of\s+Commons\b',
+            r'\bSenate\s+of\s+Canada\b',
+            r'\bcoming\s+into\s+force\b',  # Legislative language
+            r'\bGovernor\s+(General|in\s+Council)\b',
+        ]
+        
+        # Budget/fiscal document patterns
+        self.budget_patterns = [
+            r'\bBudget\s+\d{4}\b',  # Budget 2025
+            r'\bfiscal\s+(year|framework|outlook)\b',
+            r'\bappropriation\b',
+            r'\bexpenditure\s+(plan|estimate)\b',
+            r'\brevenue\s+projection\b',
+            r'\bMain\s+Estimates\b',
+            r'\bSupplementary\s+Estimates\b',
+            r'\bDepartmental\s+Plan\b',
+            r'\bPublic\s+Accounts\b',
+            r'\bDebt\s+Management\s+Strategy\b',
+        ]
+        
+        # Legal judgment patterns
+        self.legal_judgment_patterns = [
+            r'\b\d{4}\s+(SCC|FC|FCA|ONCA|BCCA)\s+\d+\b',  # 2024 SCC 1
+            r'\bthe\s+(Honourable|Hon\.)\s+Justice\b',
+            r'\bplaintiff|defendant|appellant|respondent\b',
+            r'\bREASONS\s+FOR\s+JUDGMENT\b',
+            r'\bORDER\s+OF\s+THE\s+COURT\b',
+            r'\bcosts\s+awarded\b',
+            r'\b(dismiss|allow)\s+the\s+appeal\b',
+        ]
+        
+        # Policy brief patterns
+        self.policy_brief_patterns = [
+            r'\bexecutive\s+summary\b',
+            r'\brecommendations?\b',
+            r'\bkey\s+findings\b',
+            r'\bpolicy\s+options?\b',
+            r'\bimpact\s+assessment\b',
+            r'\bstakeholder\s+analysis\b',
+            r'\bpolicy\s+brief\b',
+            r'\bwhite\s+paper\b',
+        ]
+        
+        # Research report patterns
+        self.research_report_patterns = [
+            r'\bmethodology\b',
+            r'\bliterature\s+review\b',
+            r'\breferences\b',
+            r'\babstract\b',
+            r'\b(table|figure)\s+\d+\b',
+            r'\bdata\s+analysis\b',
+            r'\bsample\s+size\b',
+            r'\bp\s*[<>=]\s*0?\.\d+\b',  # p-value notation
+            r'\bconfidence\s+interval\b',
+        ]
+        
+        # Analysis/audit patterns
+        self.analysis_patterns = [
+            r'\bfact[\s-]?check\b',
+            r'\baudit\s+(report|findings)\b',
+            r'\btrust\s+(score|assessment)\b',
+            r'\bbias\s+(audit|assessment)\b',
+            r'\bverification\s+results?\b',
+            r'\banalysis\s+of\b',
+            r'\bevaluation\s+criteria\b',
+            r'\bNIST\s+(SP|Framework)\b',
+            r'\bcompliance\s+(check|assessment)\b',
+            r'\bSPOT\s+Scale\b',  # Our own analysis tool
         ]
     
-    def _detect_document_type(self, text: str) -> str:
-        """v8.3.2: Detect document type for appropriate scoring.
+    def _detect_document_type(self, text: str) -> DocumentType:
+        """
+        v8.3.3: Enhanced document type detection for context-aware scoring.
         
-        Legislative documents (bills, acts) are self-authoritative and 
-        shouldn't be penalized for low external citations.
+        Detects document type to apply appropriate citation expectations:
+        - Legislative documents are self-authoritative (don't need external citations)
+        - Policy briefs require citations to support recommendations
+        - Analysis documents focus on methodology, not traditional citations
         
         Returns:
-            'legislation': Bills, Acts, legal documents
-            'policy_brief': Policy analysis, recommendations
-            'report': General reports and analysis
-            'unknown': Cannot determine
+            DocumentType enum value
         """
-        text_lower = text[:5000].lower()  # Check first 5000 chars for efficiency
+        # Use first 8000 chars for efficiency (covers most headers/intros)
+        sample = text[:8000]
+        sample_lower = sample.lower()
         
-        # Count legislative pattern matches
-        leg_matches = 0
-        for pattern in self.legislative_patterns:
-            if re.search(pattern, text[:5000], re.IGNORECASE):
-                leg_matches += 1
+        # Score each document type
+        type_scores = {}
         
-        # Legislation typically has 3+ pattern matches
-        if leg_matches >= 3:
-            return 'legislation'
+        # Check legislative patterns
+        leg_matches = sum(1 for p in self.legislative_patterns 
+                         if re.search(p, sample, re.IGNORECASE))
+        type_scores[DocumentType.LEGISLATION] = leg_matches
         
-        # Check for policy brief indicators
-        policy_indicators = ['executive summary', 'recommendations', 'key findings', 
-                            'policy options', 'impact assessment', 'stakeholder']
-        policy_matches = sum(1 for ind in policy_indicators if ind in text_lower)
-        if policy_matches >= 2:
-            return 'policy_brief'
+        # Check budget patterns
+        budget_matches = sum(1 for p in self.budget_patterns 
+                            if re.search(p, sample, re.IGNORECASE))
+        type_scores[DocumentType.BUDGET] = budget_matches
         
-        return 'report'  # Default to general report
+        # Check legal judgment patterns
+        legal_matches = sum(1 for p in self.legal_judgment_patterns 
+                           if re.search(p, sample, re.IGNORECASE))
+        type_scores[DocumentType.LEGAL_JUDGMENT] = legal_matches
+        
+        # Check policy brief patterns
+        policy_matches = sum(1 for p in self.policy_brief_patterns 
+                            if re.search(p, sample_lower))
+        type_scores[DocumentType.POLICY_BRIEF] = policy_matches
+        
+        # Check research report patterns
+        research_matches = sum(1 for p in self.research_report_patterns 
+                              if re.search(p, sample_lower))
+        type_scores[DocumentType.RESEARCH_REPORT] = research_matches
+        
+        # Check analysis patterns
+        analysis_matches = sum(1 for p in self.analysis_patterns 
+                              if re.search(p, sample, re.IGNORECASE))
+        type_scores[DocumentType.ANALYSIS] = analysis_matches
+        
+        # Determine best match with threshold requirements
+        # Primary sources need strong evidence (3+ matches)
+        if type_scores[DocumentType.LEGISLATION] >= 4:
+            return DocumentType.LEGISLATION
+        if type_scores[DocumentType.BUDGET] >= 3:
+            return DocumentType.BUDGET
+        if type_scores[DocumentType.LEGAL_JUDGMENT] >= 3:
+            return DocumentType.LEGAL_JUDGMENT
+        
+        # Secondary sources need 2+ matches
+        if type_scores[DocumentType.RESEARCH_REPORT] >= 3:
+            return DocumentType.RESEARCH_REPORT
+        if type_scores[DocumentType.POLICY_BRIEF] >= 2:
+            return DocumentType.POLICY_BRIEF
+        
+        # Analysis documents
+        if type_scores[DocumentType.ANALYSIS] >= 2:
+            return DocumentType.ANALYSIS
+        
+        # Weak legislative match (2-3 patterns) - still likely legislation
+        if type_scores[DocumentType.LEGISLATION] >= 2:
+            return DocumentType.LEGISLATION
+        
+        # Default to general report
+        return DocumentType.REPORT
+    
+    def get_document_type_info(self, doc_type: DocumentType) -> Dict:
+        """
+        Get detailed information about a document type.
+        
+        Args:
+            doc_type: DocumentType enum value
+            
+        Returns:
+            Dict with description, citation expectations, and rationale
+        """
+        config = DOCUMENT_TYPE_CONFIG.get(doc_type, DOCUMENT_TYPE_CONFIG[DocumentType.REPORT])
+        return {
+            "type": doc_type.value,
+            "description": config["description"],
+            "citation_expectation": config["citation_expectation"],
+            "rationale": config["rationale"],
+            "base_score": config["base_score"]
+        }
     
     def analyze_citations(self, text: str, check_urls: bool = False) -> Dict:
         """
         Analyze all citations in document.
         
-        v8.3.2: Added document type detection for context-aware scoring.
-        Legislative documents are not penalized for low external citations.
+        v8.3.3: Enhanced document type detection with full taxonomy.
+        Legislative, budget, and legal documents are self-authoritative.
+        Analysis documents focus on methodology rather than citations.
         
         Args:
             text: Document text
@@ -90,8 +327,9 @@ class CitationQualityScorer:
         if not isinstance(text, str):
             raise TypeError(f"Expected string for text parameter, got {type(text)}")
         
-        # v8.3.2: Detect document type for context-aware scoring
+        # v8.3.3: Enhanced document type detection
         document_type = self._detect_document_type(text)
+        doc_type_info = self.get_document_type_info(document_type)
         
         # Extract URLs
         urls = self.url_pattern.findall(text)
@@ -112,7 +350,7 @@ class CitationQualityScorer:
         words = len(text.split())
         citations_per_1000_words = (len(urls) + len(citation_markers)) / words * 1000 if words > 0 else 0
         
-        # v8.3.2: Generate quality score with document type awareness
+        # v8.3.3: Generate quality score with full document type awareness
         quality_score = self._calculate_quality_score(url_analysis, citations_per_1000_words, document_type)
         
         return {
@@ -122,10 +360,11 @@ class CitationQualityScorer:
             "citations_per_1000_words": round(citations_per_1000_words, 2),
             "url_analysis": url_analysis,
             "citation_markers": citation_markers[:20],  # Sample
-            "document_type": document_type,  # v8.3.2: Include detected type
+            "document_type": document_type.value,  # v8.3.3: String value for JSON compatibility
+            "document_type_info": doc_type_info,  # v8.3.3: Full type information
             "quality_score": quality_score,
             "quality_level": self._get_quality_level(quality_score),
-            "summary": self._generate_citation_summary(url_analysis, citations_per_1000_words, quality_score)
+            "summary": self._generate_citation_summary(url_analysis, citations_per_1000_words, quality_score, document_type)
         }
     
     def _analyze_urls(self, urls: List[str], check_accessibility: bool = False) -> Dict:
@@ -293,54 +532,96 @@ class CitationQualityScorer:
             return False
     
     def _calculate_quality_score(self, url_analysis: Dict, citations_per_1000: float, 
-                                   document_type: str = 'report') -> float:
+                                   document_type: DocumentType = DocumentType.REPORT) -> float:
         """
         Calculate overall citation quality score (0-100).
         
-        v8.3.2: Added document type awareness.
-        - Legislative documents (bills, acts) are self-authoritative
-        - Policy briefs require external citations for credibility
-        - Reports use standard scoring
+        v8.3.3: Full document type taxonomy support.
         
-        Scoring:
+        PRIMARY SOURCES (self-authoritative):
+        - Legislation: Base 75, bonus for government refs
+        - Budget: Base 70, bonus for fiscal refs
+        - Legal Judgment: Base 70, considers precedent citations
+        
+        SECONDARY SOURCES (citation-dependent):
+        - Policy Brief: Standard scoring, high citation expectation
+        - Research Report: Academic standards, highest expectation
+        - News Article: Standard scoring
+        
+        META-EVALUATIVE:
+        - Analysis: Base 50, methodology-focused
+        - Report: Standard scoring (default)
+        
+        Scoring components:
         - Source diversity: 40 points
         - Citation density: 30 points  
         - URL accessibility: 30 points
-        
-        For legislation: Base score starts at 60 (self-authoritative)
         """
-        # v8.3.2: Legislative documents are self-authoritative
-        if document_type == 'legislation':
-            # Legislation doesn't need external citations - it IS the source
-            # Start with high base score, add bonus for any external references
-            base_score = 70.0  # Legislation is authoritative by definition
-            
-            # Bonus points for any government/official references (up to 30)
-            source_types = url_analysis.get("source_types", {})
-            gov_bonus = min(source_types.get("government", 0) * 5, 15)
-            other_bonus = min(citations_per_1000 * 3, 15)
-            
-            return round(min(base_score + gov_bonus + other_bonus, 100), 1)
+        config = DOCUMENT_TYPE_CONFIG.get(document_type, DOCUMENT_TYPE_CONFIG[DocumentType.REPORT])
+        base_score = config["base_score"]
+        source_types = url_analysis.get("source_types", {})
         
-        # Standard scoring for policy briefs and reports
-        score = 0.0
+        # PRIMARY SOURCES: Self-authoritative, high base score
+        if document_type in (DocumentType.LEGISLATION, DocumentType.BUDGET, DocumentType.LEGAL_JUDGMENT):
+            # Start with high base score - these documents ARE the source
+            
+            if document_type == DocumentType.LEGISLATION:
+                # Legislation: Bonus for government/official references
+                gov_bonus = min(source_types.get("government", 0) * 5, 15)
+                ref_bonus = min(citations_per_1000 * 3, 10)
+                return round(min(base_score + gov_bonus + ref_bonus, 100), 1)
+            
+            elif document_type == DocumentType.BUDGET:
+                # Budget: Bonus for government and news coverage
+                gov_bonus = min(source_types.get("government", 0) * 5, 15)
+                coverage_bonus = min(source_types.get("news", 0) * 3, 10)
+                return round(min(base_score + gov_bonus + coverage_bonus, 100), 1)
+            
+            elif document_type == DocumentType.LEGAL_JUDGMENT:
+                # Legal: Bonus for precedent citations (typically marked as academic)
+                precedent_bonus = min(citations_per_1000 * 5, 20)
+                gov_bonus = min(source_types.get("government", 0) * 3, 10)
+                return round(min(base_score + precedent_bonus + gov_bonus, 100), 1)
+        
+        # META-EVALUATIVE: Analysis documents
+        if document_type == DocumentType.ANALYSIS:
+            # Analysis: Focus on methodology references, not traditional citations
+            # Base 50 + bonuses for standards refs
+            gov_bonus = min(source_types.get("government", 0) * 8, 20)
+            academic_bonus = min(source_types.get("academic", 0) * 8, 20)
+            density_bonus = min(citations_per_1000 * 2, 10)
+            return round(min(base_score + gov_bonus + academic_bonus + density_bonus, 100), 1)
+        
+        # SECONDARY SOURCES: Standard citation-dependent scoring
+        score = base_score
         
         # Source diversity (40 points)
-        source_types = url_analysis.get("source_types", {})
         gov_score = min(source_types.get("government", 0) * 10, 15)
         academic_score = min(source_types.get("academic", 0) * 10, 15)
         news_score = min(source_types.get("news", 0) * 5, 10)
         score += gov_score + academic_score + news_score
         
         # Citation density (30 points)
-        if citations_per_1000 >= 10:
-            density_score = 30
-        elif citations_per_1000 >= 5:
-            density_score = 20
-        elif citations_per_1000 >= 2:
-            density_score = 10
+        # Research reports have higher expectations
+        if document_type == DocumentType.RESEARCH_REPORT:
+            if citations_per_1000 >= 15:
+                density_score = 30
+            elif citations_per_1000 >= 10:
+                density_score = 25
+            elif citations_per_1000 >= 5:
+                density_score = 15
+            else:
+                density_score = citations_per_1000 * 2
         else:
-            density_score = citations_per_1000 * 2
+            # Standard density scoring
+            if citations_per_1000 >= 10:
+                density_score = 30
+            elif citations_per_1000 >= 5:
+                density_score = 20
+            elif citations_per_1000 >= 2:
+                density_score = 10
+            else:
+                density_score = citations_per_1000 * 2
         score += density_score
         
         # URL accessibility (30 points) - only if checked
@@ -368,18 +649,27 @@ class CitationQualityScorer:
         else:
             return "Very Poor"
     
-    def _generate_citation_summary(self, url_analysis: Dict, citations_per_1000: float, score: float) -> str:
-        """Generate human-readable summary."""
+    def _generate_citation_summary(self, url_analysis: Dict, citations_per_1000: float, 
+                                     score: float, document_type: DocumentType = DocumentType.REPORT) -> str:
+        """Generate human-readable summary with document type context."""
         parts = []
+        
+        # Add document type context
+        config = DOCUMENT_TYPE_CONFIG.get(document_type, DOCUMENT_TYPE_CONFIG[DocumentType.REPORT])
+        parts.append(f"Document Type: {config['description']}")
         
         total = url_analysis.get("total", 0)
         unique = url_analysis.get("unique", 0)
         
+        # Handle zero citations differently based on document type
         if total == 0:
-            return "No citations found. Document lacks source attribution."
-        
-        parts.append(f"Found {total} citations ({unique} unique)")
-        parts.append(f"{citations_per_1000:.1f} citations per 1,000 words")
+            if document_type in (DocumentType.LEGISLATION, DocumentType.BUDGET, DocumentType.LEGAL_JUDGMENT):
+                parts.append(f"No external citations (expected for {document_type.value})")
+            else:
+                parts.append("No citations found - document lacks source attribution")
+        else:
+            parts.append(f"Found {total} citations ({unique} unique)")
+            parts.append(f"{citations_per_1000:.1f} citations per 1,000 words")
         
         source_types = url_analysis.get("source_types", {})
         if source_types.get("government", 0) > 0:
@@ -389,6 +679,9 @@ class CitationQualityScorer:
         
         quality_level = self._get_quality_level(score)
         parts.append(f"Overall quality: {quality_level} ({score}/100)")
+        
+        # Add citation expectation context
+        parts.append(f"Citation expectation: {config['citation_expectation']}")
         
         return " | ".join(parts)
     
@@ -443,19 +736,96 @@ class CitationQualityScorer:
 if __name__ == "__main__":
     import sys
     
-    # Test with sample text
-    sample_text = """
-    According to Smith (2024), the Canadian government allocated $250 million for AI development.
-    This was reported by Reuters [1] and confirmed on the official website https://budget.gc.ca/2025.
-    Research from MIT (https://mit.edu/research/ai) supports these findings.
-    
-    [1] https://reuters.com/article/canada-budget-2025
-    """
-    
     scorer = CitationQualityScorer()
     
-    if len(sys.argv) > 1 and sys.argv[1] == "--check-urls":
-        print("Checking URL accessibility (this may take a moment)...")
-        print(scorer.generate_citation_report(sample_text, check_urls=True))
-    else:
-        print(scorer.generate_citation_report(sample_text, check_urls=False))
+    # Test with different document types
+    print("=" * 80)
+    print("  DOCUMENT TYPE DETECTION TEST")
+    print("=" * 80)
+    
+    # Legislative document sample
+    legislative_sample = """
+    Bill C-15: An Act to implement certain provisions of the budget
+    
+    Her Majesty, by and with the advice and consent of the Senate and House of Commons 
+    of Canada, enacts as follows:
+    
+    Section 1. Short Title
+    This Act may be cited as the Budget Implementation Act, 2025.
+    
+    Section 2. Interpretation
+    In this Act, unless the context otherwise requires:
+    (a) "Minister" means the Minister of Finance;
+    (b) "prescribed" means prescribed by regulation.
+    
+    subsection (1) The Governor in Council may make regulations...
+    
+    Schedule A - Tax Rate Amendments
+    Coming into force: Royal Assent
+    """
+    
+    # Policy brief sample
+    policy_sample = """
+    Executive Summary
+    
+    This policy brief provides recommendations for improving fiscal transparency.
+    Key findings indicate that stakeholder engagement is critical.
+    
+    According to Smith (2024), budget transparency has improved.
+    Research from https://transparency.gc.ca supports these findings.
+    
+    Policy Options:
+    1. Implement real-time reporting
+    2. Enhance stakeholder consultation
+    
+    Impact Assessment indicates positive outcomes.
+    """
+    
+    # Analysis document sample
+    analysis_sample = """
+    SPOT Scale™ Trust Assessment Report
+    
+    Bias Audit Results:
+    This analysis of Bill C-15 reveals the following:
+    
+    Verification Results:
+    - Trust Score: 72/100
+    - NIST SP 800-53 Compliance: Partial
+    
+    Evaluation Criteria applied per methodology.
+    Fact-check complete.
+    """
+    
+    print("\n1. LEGISLATIVE DOCUMENT:")
+    result = scorer.analyze_citations(legislative_sample)
+    print(f"   Type: {result['document_type']}")
+    print(f"   Info: {result['document_type_info']['description']}")
+    print(f"   Citation Expectation: {result['document_type_info']['citation_expectation']}")
+    print(f"   Quality Score: {result['quality_score']}/100")
+    
+    print("\n2. POLICY BRIEF:")
+    result = scorer.analyze_citations(policy_sample)
+    print(f"   Type: {result['document_type']}")
+    print(f"   Info: {result['document_type_info']['description']}")
+    print(f"   Citation Expectation: {result['document_type_info']['citation_expectation']}")
+    print(f"   Quality Score: {result['quality_score']}/100")
+    
+    print("\n3. ANALYSIS DOCUMENT:")
+    result = scorer.analyze_citations(analysis_sample)
+    print(f"   Type: {result['document_type']}")
+    print(f"   Info: {result['document_type_info']['description']}")
+    print(f"   Citation Expectation: {result['document_type_info']['citation_expectation']}")
+    print(f"   Quality Score: {result['quality_score']}/100")
+    
+    print("\n" + "=" * 80)
+    print("  DOCUMENT TYPE TAXONOMY")
+    print("=" * 80)
+    for doc_type in DocumentType:
+        config = DOCUMENT_TYPE_CONFIG[doc_type]
+        print(f"\n{doc_type.value.upper()}:")
+        print(f"  Description: {config['description']}")
+        print(f"  Base Score: {config['base_score']}")
+        print(f"  Citation Expectation: {config['citation_expectation']}")
+        print(f"  Rationale: {config['rationale']}")
+    
+    print("\n" + "=" * 80)
