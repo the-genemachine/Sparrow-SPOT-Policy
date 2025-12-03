@@ -1,5 +1,5 @@
 """
-AI Usage Explanation Generator for Sparrow SPOT Scale™ v8.3.3
+AI Usage Explanation Generator for Sparrow SPOT Scale™ v8.3.4
 
 Generates detailed, plain-language explanations of how AI was used in analyzed documents.
 This module synthesizes detection data into actionable insights about:
@@ -10,6 +10,8 @@ This module synthesizes detection data into actionable insights about:
 - Transparency assessment and recommendations
 
 NEW in v8.3.3: Addresses the need for detailed AI usage reports beyond raw detection data.
+v8.3.4: Integrates comprehensive document type baselines to recognize domain conventions
+        and provide accurate context in reports.
 """
 
 import json
@@ -27,7 +29,7 @@ class AIUsageExplainer:
         self.ollama_url = ollama_url
         self.model = "granite4:tiny-h"  # Primary model for explanations
         self.fallback_model = "qwen2.5:7b"
-        self.version = "8.3.3"
+        self.version = "8.3.4"
     
     def _call_ollama(self, prompt: str, model: Optional[str] = None, max_tokens: int = 2000) -> Optional[str]:
         """Call Ollama API for text generation."""
@@ -134,6 +136,14 @@ class AIUsageExplainer:
         primary_model = model_info.get('model', 'Unknown')
         model_confidence = model_info.get('confidence', 0) * 100
         
+        # v8.3.4: Get document baseline if available
+        document_baseline = ai_detection.get('document_baseline', {})
+        detected_type = ai_detection.get('detected_document_type', document_type)
+        is_specialized = document_baseline.get('is_specialized', False)
+        baseline_pattern_count = document_baseline.get('pattern_count', 0)
+        score_adjustment = document_baseline.get('score_adjustment', 0) * 100
+        conventions = document_baseline.get('conventions', [])
+        
         # v8.3.3: Get detection spread if available
         detection_spread = ai_detection.get('detection_spread', 0) * 100
         domain_warnings = ai_detection.get('domain_warnings', [])
@@ -155,8 +165,16 @@ class AIUsageExplainer:
             usage_level = "Very High"
             usage_description = "shows patterns strongly consistent with AI generation (requires verification)"
         
-        # Document type context - v8.3.3: Add domain warning for legislation
-        if document_type == 'legislation':
+        # v8.3.4: Generate document type context based on detected type and baseline
+        if is_specialized:
+            conventions_text = ", ".join(conventions[:2]) if conventions else "domain-specific patterns"
+            doc_context = (
+                f"⚠️ **SPECIALIZED DOCUMENT**: This {detected_type.replace('_', ' ')} uses "
+                f"standard domain conventions ({conventions_text}) that may trigger false positives. "
+                f"Detected {baseline_pattern_count:,} standard patterns. "
+                f"Score adjusted by {score_adjustment:.0f}% to reduce false positives."
+            )
+        elif document_type == 'legislation':
             doc_context = (
                 "⚠️ **IMPORTANT**: Legislative text uses formulaic drafting conventions "
                 "(enumerated lists, legal terminology, standardized phrases) that may "

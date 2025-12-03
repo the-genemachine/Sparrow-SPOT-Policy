@@ -1,5 +1,5 @@
 """
-AI Detection Engine for SPOT-Policy™ v8.3.3
+AI Detection Engine for SPOT-Policy™ v8.3.4
 
 Detects AI-generated content in policy documents using multi-model consensus.
 Implements Pillar 1: INPUT TRANSPARENCY
@@ -28,7 +28,14 @@ v8.3.3 Enhancement: Legislative Baseline Calibration
 - Adds confidence penalties when methods disagree significantly
 - Detects encoding corruption that can skew results
 
-Author: SPOT-Policy™ v8.3.3 Ethical Framework
+v8.3.4 Enhancement: Comprehensive Document Type Calibration
+- Baselines for ALL document types: legislation, budget, legal_judgment,
+  policy_brief, research_report, news_article, analysis, report
+- Auto-detection of document type from content
+- Type-specific pattern recognition and score adjustments
+- Reference: "The AI Detection Paradox" critique informed calibration approach
+
+Author: SPOT-Policy™ v8.3.4 Ethical Framework
 Date: December 2, 2025
 """
 
@@ -39,7 +46,14 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import re
 
-# v8.3.3: Import legislative baseline detector
+# v8.3.4: Import comprehensive document type baselines
+try:
+    from document_type_baselines import DocumentTypeDetector
+    DOCUMENT_BASELINES_AVAILABLE = True
+except ImportError:
+    DOCUMENT_BASELINES_AVAILABLE = False
+
+# Legacy fallback: legislative baseline only
 try:
     from legislative_baseline import LegislativePatternDetector, analyze_for_legislative_baseline
     LEGISLATIVE_BASELINE_AVAILABLE = True
@@ -52,15 +66,17 @@ class AIDetectionEngine:
     Detects AI-generated content in text documents.
     Uses multi-model consensus for improved accuracy.
     
-    v8.3.3: Added legislative baseline calibration to reduce false positives
-    on legal text that uses formulaic drafting conventions.
+    v8.3.4: Added comprehensive document type calibration to reduce false positives
+    on specialized documents (legislation, budgets, legal judgments, etc.).
+    Each document type has conventions that may incorrectly trigger AI detection.
     
     Accuracy: 97-99% for unedited AI text, 70-85% for hybrid content
-    Note: Accuracy on legislative/legal text is lower due to domain conventions.
+    Note: Accuracy on specialized documents is lower due to domain conventions.
+          The system now applies calibration baselines to account for this.
     """
     
     def __init__(self):
-        self.model_name = "ensemble_consensus_v2.2"  # v8.3.3 update
+        self.model_name = "ensemble_consensus_v2.3"  # v8.3.4 update
         self.models = [
             "gptzero_simulated", 
             "copyleaks_simulated", 
@@ -71,9 +87,13 @@ class AIDetectionEngine:
             "mistral_detector",
             "cohere_detector"
         ]
-        # v8.3.3: Initialize legislative detector
+        # v8.3.4: Initialize comprehensive document type detector
+        self.document_type_detector = None
+        if DOCUMENT_BASELINES_AVAILABLE:
+            self.document_type_detector = DocumentTypeDetector()
+        # Legacy fallback
         self.legislative_detector = None
-        if LEGISLATIVE_BASELINE_AVAILABLE:
+        if not DOCUMENT_BASELINES_AVAILABLE and LEGISLATIVE_BASELINE_AVAILABLE:
             self.legislative_detector = LegislativePatternDetector()
         
     def analyze_document(self, text: str, confidence_threshold: float = 0.95, 
@@ -146,11 +166,31 @@ class AIDetectionEngine:
         # Calculate confidence (agreement between models)
         confidence = self._calculate_confidence(scores)
         
-        # v8.3.3: Apply legislative baseline calibration
-        legislative_analysis = None
+        # v8.3.4: Apply document type calibration
+        baseline_analysis = None
         domain_warnings = []
+        detected_document_type = document_type or 'unknown'
         
-        if self.legislative_detector and document_type in ['legislation', 'bill', 'act', 'budget', 'legal']:
+        if self.document_type_detector:
+            # Comprehensive document type detection and calibration
+            baseline_analysis = self.document_type_detector.analyze(text, document_type)
+            detected_document_type = baseline_analysis.document_type
+            
+            if baseline_analysis.is_specialized:
+                # Apply score adjustment (reduces false positives)
+                if baseline_analysis.ai_score_adjustment < 0:
+                    original_score = consensus_score
+                    consensus_score = max(0, consensus_score + baseline_analysis.ai_score_adjustment)
+                    
+                # Apply confidence penalty (detection less reliable on specialized text)
+                if baseline_analysis.confidence_penalty > 0:
+                    confidence = confidence * (1 - baseline_analysis.confidence_penalty)
+            
+            # Collect domain warnings
+            domain_warnings = baseline_analysis.warnings.copy()
+            
+        elif self.legislative_detector and document_type in ['legislation', 'bill', 'act', 'budget', 'legal']:
+            # Legacy fallback: legislative baseline only
             legislative_analysis = self.legislative_detector.analyze(text, document_type)
             
             # Apply score adjustment (reduces false positives)
@@ -200,19 +240,23 @@ class AIDetectionEngine:
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         
-        # v8.3.3: Add legislative analysis if available
-        if legislative_analysis:
-            result["legislative_baseline"] = {
-                "is_legislative": legislative_analysis.is_legislative,
-                "pattern_count": legislative_analysis.legislative_pattern_count,
-                "score_adjustment": legislative_analysis.ai_score_adjustment,
-                "confidence_penalty": legislative_analysis.confidence_penalty
+        # v8.3.4: Add document type baseline analysis if available
+        if baseline_analysis:
+            result["document_baseline"] = {
+                "document_type": baseline_analysis.document_type,
+                "is_specialized": baseline_analysis.is_specialized,
+                "pattern_count": baseline_analysis.pattern_count,
+                "patterns_by_category": baseline_analysis.patterns_by_category,
+                "score_adjustment": baseline_analysis.ai_score_adjustment,
+                "confidence_penalty": baseline_analysis.confidence_penalty,
+                "conventions": baseline_analysis.detected_conventions
             }
+            result["detected_document_type"] = detected_document_type
         
         if domain_warnings:
             result["domain_warnings"] = domain_warnings
             
-        # v8.3.3: Add detection spread metric
+        # v8.3.4: Add detection spread metric
         result["detection_spread"] = round(score_spread, 3)
         
         return result
