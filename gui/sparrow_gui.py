@@ -39,6 +39,7 @@ sys.path.insert(0, str(SPOT_NEWS_DIR))
 try:
     from certificate_generator import CertificateGenerator
     from ai_disclosure_generator import AIDisclosureGenerator
+    from ai_usage_explainer import AIUsageExplainer  # NEW v8.3.3: Detailed AI usage reports
     from data_lineage_source_mapper import DataLineageSourceMapper
     from citation_quality_scorer import CitationQualityScorer
     from deep_analyzer import DeepAnalyzer
@@ -281,6 +282,13 @@ def analyze_document(
                     disclosure_files = add_ai_disclosure(results, output_name)
                     if disclosure_files:
                         output_files.extend(disclosure_files)
+                
+                # v8.3.3: Generate AI usage explanation (requires deep_analysis data)
+                if deep_analysis and generate_ai_disclosure:
+                    progress(0.72, desc="Generating AI usage explanation...")
+                    explanation_file = add_ai_usage_explanation(results, output_name)
+                    if explanation_file:
+                        output_files.append(explanation_file)
                 
                 if trace_data_sources:
                     progress(0.75, desc="Tracing data sources...")
@@ -752,6 +760,50 @@ def add_ai_disclosure(results, output_name):
     files = generator.generate_all_formats(output_prefix=disclosure_prefix)
     
     return files
+
+
+def add_ai_usage_explanation(results, output_name):
+    """
+    Generate detailed AI usage explanation report.
+    
+    NEW in v8.3.3: Creates comprehensive plain-language explanation of:
+    - How AI was used in document creation
+    - Which sections have AI involvement
+    - Model attribution with confidence levels
+    - Transparency assessment and recommendations
+    
+    Args:
+        results: Full analysis results dict
+        output_name: Output file prefix
+        
+    Returns:
+        str: Path to generated explanation file
+    """
+    try:
+        explainer = AIUsageExplainer()
+        
+        document_title = results.get('document_title', 'Document')
+        
+        # Handle test_articles path to go to root directory
+        if output_name.startswith('test_articles/'):
+            output_file = f"../{output_name}_ai_usage_explanation.txt"
+        else:
+            output_file = f"{output_name}_ai_usage_explanation.txt"
+        
+        # Create directory if needed
+        os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
+        
+        # Generate the detailed report
+        explainer.generate_ai_usage_report(
+            analysis_data=results,
+            document_title=document_title,
+            output_file=output_file
+        )
+        
+        return output_file
+    except Exception as e:
+        print(f"⚠️  AI usage explanation failed: {e}")
+        return None
 
 
 def add_data_lineage(results, text, output_name):
