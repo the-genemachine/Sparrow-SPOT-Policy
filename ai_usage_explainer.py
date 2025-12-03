@@ -134,41 +134,64 @@ class AIUsageExplainer:
         primary_model = model_info.get('model', 'Unknown')
         model_confidence = model_info.get('confidence', 0) * 100
         
-        # Determine AI usage level
+        # v8.3.3: Get detection spread if available
+        detection_spread = ai_detection.get('detection_spread', 0) * 100
+        domain_warnings = ai_detection.get('domain_warnings', [])
+        
+        # Determine AI usage level - v8.3.3: Use cautious language
         if ai_percentage < 15:
             usage_level = "Minimal"
-            usage_description = "appears to be primarily human-authored with minimal AI assistance"
+            usage_description = "shows patterns consistent with primarily human authorship"
         elif ai_percentage < 35:
             usage_level = "Low"
-            usage_description = "contains some AI-assisted content, likely for drafting or formatting"
+            usage_description = "shows some patterns associated with AI-assisted content"
         elif ai_percentage < 55:
             usage_level = "Moderate"
-            usage_description = "contains substantial AI-generated content mixed with human writing"
+            usage_description = "shows patterns that MAY indicate AI-generated content mixed with human writing"
         elif ai_percentage < 75:
             usage_level = "High"
-            usage_description = "appears to be primarily AI-generated with human editing"
+            usage_description = "shows strong patterns associated with AI generation (requires verification)"
         else:
             usage_level = "Very High"
-            usage_description = "appears to be almost entirely AI-generated"
+            usage_description = "shows patterns strongly consistent with AI generation (requires verification)"
         
-        # Document type context
+        # Document type context - v8.3.3: Add domain warning for legislation
         if document_type == 'legislation':
-            doc_context = "As legislation, AI involvement in drafting raises transparency considerations for parliamentary process."
+            doc_context = (
+                "⚠️ **IMPORTANT**: Legislative text uses formulaic drafting conventions "
+                "(enumerated lists, legal terminology, standardized phrases) that may "
+                "trigger false positives in AI detection. Results should be interpreted "
+                "with caution and verified against official sources."
+            )
         elif document_type == 'budget':
-            doc_context = "As a budget document, AI involvement in fiscal projections or explanatory text should be noted for accountability."
+            doc_context = (
+                "As a budget document, AI involvement in fiscal projections or explanatory "
+                "text should be noted for accountability if confirmed."
+            )
         else:
-            doc_context = "AI involvement in policy documents should be disclosed for public trust."
+            doc_context = "AI involvement in policy documents should be disclosed for public trust if confirmed."
         
         flagged_count = len(ai_detection.get('flagged_sections', []))
+        
+        # v8.3.3: Add detection disagreement warning
+        disagreement_warning = ""
+        if detection_spread > 40:
+            disagreement_warning = f"""
+### ⚠️ Detection Method Disagreement
+
+Detection methods disagree by **{detection_spread:.0f} percentage points**. This indicates 
+significant uncertainty in the AI content estimate. The {ai_percentage:.1f}% figure is an 
+average that obscures substantial disagreement between methods. **Interpret with caution.**
+"""
         
         return f"""## EXECUTIVE SUMMARY
 
 **Document:** {document_title}
 **Document Type:** {document_type.replace('_', ' ').title()}
-**AI Content Level:** {usage_level} ({ai_percentage:.1f}%)
-**Primary AI Model Detected:** {primary_model} ({model_confidence:.0f}% confidence)
-**Flagged Sections:** {flagged_count} sections require attention
-
+**Detected AI Patterns:** {usage_level} ({ai_percentage:.1f}%) — *estimate, not verified*
+**Primary Model Signature:** {primary_model} ({model_confidence:.0f}% pattern match)
+**Flagged Sections:** {flagged_count} sections for review
+{disagreement_warning}
 ### Key Finding
 
 This document {usage_description}.
@@ -557,16 +580,45 @@ humans typically do.
         ai_percentage = ai_detection.get('ai_detection_score', 0) * 100
         at_score = criteria.get('AT', {}).get('score', 0)
         
-        # Determine disclosure status
-        # In a real implementation, this would check for explicit AI disclosure statements
-        disclosure_found = at_score > 80  # High AT score suggests good disclosure
+        # v8.3.3 FIX: Do NOT claim document "acknowledges AI" based on our detection
+        # This is circular reasoning - we detect patterns, claim it's AI, then claim document
+        # acknowledges AI based on our own claim
         
-        if disclosure_found:
-            disclosure_status = "✓ Document appears to acknowledge AI involvement"
-            disclosure_recommendation = "Continue current transparency practices."
-        else:
-            disclosure_status = "⚠️ No explicit AI disclosure detected"
-            disclosure_recommendation = "Consider adding AI disclosure statement per transparency best practices."
+        # Check for actual explicit AI disclosure in text (simplified - real implementation 
+        # would search for actual disclosure statements)
+        explicit_disclosure_terms = [
+            'generated by ai', 'ai-assisted', 'artificial intelligence was used',
+            'drafted with ai', 'machine learning assisted', 'llm generated',
+            'chatgpt', 'claude', 'copilot', 'ai drafting tool'
+        ]
+        
+        # We don't have the raw text here, so we note this limitation
+        disclosure_status = (
+            "⚠️ DISCLOSURE STATUS UNKNOWN: This analysis cannot verify whether explicit "
+            "AI disclosure statements exist in the document. Detection of AI patterns "
+            "does not constitute acknowledgment of AI use by the document authors."
+        )
+        
+        disclosure_recommendation = (
+            "If AI tools were used in drafting, consider adding an explicit disclosure "
+            "statement specifying which tools, for what purposes, and what human "
+            "oversight occurred."
+        )
+        
+        # v8.3.3: Add warning about detection limitations
+        detection_warning = """
+### ⚠️ IMPORTANT: Detection Limitations
+
+This AI detection system identifies patterns that are **statistically associated** with 
+AI-generated text. It CANNOT definitively prove AI was used because:
+
+1. **No Ground Truth**: We have no official confirmation of AI use
+2. **Domain Conventions**: Legal/legislative writing uses patterns that mimic AI
+3. **Detection Disagreement**: Different methods produce divergent results
+4. **Pattern ≠ Proof**: Matching AI patterns doesn't prove AI authorship
+
+**The detection score is a probabilistic estimate, not a verified fact.**
+"""
         
         # Document type specific requirements
         if document_type == 'legislation':
@@ -592,13 +644,12 @@ humans typically do.
 - Regulatory frameworks increasingly require AI disclosure"""
         
         return f"""## TRANSPARENCY ASSESSMENT
-
+{detection_warning}
 ### Current Disclosure Status
 
 {disclosure_status}
 
-**AI Transparency Score:** {at_score}/100
-**Detected AI Content:** {ai_percentage:.1f}%
+**Detected AI Patterns:** {ai_percentage:.1f}% (estimate, not verified)
 
 ### Recommendation
 
@@ -608,7 +659,7 @@ humans typically do.
 
 ### Best Practice AI Disclosure Elements
 
-A complete AI disclosure should include:
+If AI was used, a complete disclosure should include:
 
 1. **Acknowledgment** - Statement that AI tools were used
 2. **Scope** - What parts of the document involved AI
@@ -616,11 +667,11 @@ A complete AI disclosure should include:
 4. **Oversight** - Confirmation of human review and approval
 5. **Model** - Optionally, which AI system(s) were used
 
-### Sample Disclosure Statement
+### Sample Disclosure Statement (if applicable)
 
-> "This document was prepared with AI drafting assistance. Approximately {ai_percentage:.0f}% 
-> of content shows AI-generated patterns. All content has been reviewed by [appropriate 
-> authority] who takes full responsibility for accuracy and policy intent."
+> "This document was prepared with AI drafting assistance. All content has been 
+> reviewed by [appropriate authority] who takes full responsibility for accuracy 
+> and policy intent. AI tools were used for [specific purposes]."
 """
     
     def _generate_recommendations(

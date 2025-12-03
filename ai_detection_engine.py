@@ -1,5 +1,5 @@
 """
-AI Detection Engine for SPOT-Policy™ v8.1
+AI Detection Engine for SPOT-Policy™ v8.3.3
 
 Detects AI-generated content in policy documents using multi-model consensus.
 Implements Pillar 1: INPUT TRANSPARENCY
@@ -22,16 +22,29 @@ v8.1 Enhancement: Model-Specific AI Detection Patterns
 - Improved accuracy through expanded heuristics
 - Detailed model confidence scores
 
-Author: SPOT-Policy™ v8.1 Ethical Framework
-Date: November 23, 2025
+v8.3.3 Enhancement: Legislative Baseline Calibration
+- Recognizes standard legislative drafting conventions
+- Applies score adjustments for legal text (reduces false positives)
+- Adds confidence penalties when methods disagree significantly
+- Detects encoding corruption that can skew results
+
+Author: SPOT-Policy™ v8.3.3 Ethical Framework
+Date: December 2, 2025
 """
 
 import json
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import re
+
+# v8.3.3: Import legislative baseline detector
+try:
+    from legislative_baseline import LegislativePatternDetector, analyze_for_legislative_baseline
+    LEGISLATIVE_BASELINE_AVAILABLE = True
+except ImportError:
+    LEGISLATIVE_BASELINE_AVAILABLE = False
 
 
 class AIDetectionEngine:
@@ -39,11 +52,15 @@ class AIDetectionEngine:
     Detects AI-generated content in text documents.
     Uses multi-model consensus for improved accuracy.
     
+    v8.3.3: Added legislative baseline calibration to reduce false positives
+    on legal text that uses formulaic drafting conventions.
+    
     Accuracy: 97-99% for unedited AI text, 70-85% for hybrid content
+    Note: Accuracy on legislative/legal text is lower due to domain conventions.
     """
     
     def __init__(self):
-        self.model_name = "ensemble_consensus_v2.1"
+        self.model_name = "ensemble_consensus_v2.2"  # v8.3.3 update
         self.models = [
             "gptzero_simulated", 
             "copyleaks_simulated", 
@@ -54,8 +71,13 @@ class AIDetectionEngine:
             "mistral_detector",
             "cohere_detector"
         ]
+        # v8.3.3: Initialize legislative detector
+        self.legislative_detector = None
+        if LEGISLATIVE_BASELINE_AVAILABLE:
+            self.legislative_detector = LegislativePatternDetector()
         
-    def analyze_document(self, text: str, confidence_threshold: float = 0.95) -> Dict:
+    def analyze_document(self, text: str, confidence_threshold: float = 0.95, 
+                        document_type: Optional[str] = None) -> Dict:
         """
         Analyze document for AI-generated content.
         
@@ -124,6 +146,37 @@ class AIDetectionEngine:
         # Calculate confidence (agreement between models)
         confidence = self._calculate_confidence(scores)
         
+        # v8.3.3: Apply legislative baseline calibration
+        legislative_analysis = None
+        domain_warnings = []
+        
+        if self.legislative_detector and document_type in ['legislation', 'bill', 'act', 'budget', 'legal']:
+            legislative_analysis = self.legislative_detector.analyze(text, document_type)
+            
+            # Apply score adjustment (reduces false positives)
+            if legislative_analysis.ai_score_adjustment < 0:
+                original_score = consensus_score
+                consensus_score = max(0, consensus_score + legislative_analysis.ai_score_adjustment)
+                
+            # Apply confidence penalty (detection less reliable on legal text)
+            if legislative_analysis.confidence_penalty > 0:
+                confidence = confidence * (1 - legislative_analysis.confidence_penalty)
+            
+            # Collect domain warnings
+            domain_warnings = legislative_analysis.warnings
+        
+        # v8.3.3: Check for detection method disagreement
+        score_values = list(scores.values())
+        score_spread = max(score_values) - min(score_values)
+        if score_spread > 0.40:  # More than 40 percentage points spread
+            domain_warnings.append(
+                f"⚠️ DETECTION DISAGREEMENT: Methods disagree by {score_spread*100:.0f} percentage "
+                f"points (range: {min(score_values)*100:.0f}% to {max(score_values)*100:.0f}%). "
+                f"Results should be interpreted with caution. This is NOT consensus."
+            )
+            # Reduce confidence when methods disagree significantly
+            confidence = confidence * (1 - score_spread * 0.5)  # Up to 50% reduction
+        
         # Identify likely AI model (if any)
         likely_model = self._identify_ai_model(scores)
         
@@ -134,7 +187,7 @@ class AIDetectionEngine:
         interpretation = self._interpret_score(consensus_score, confidence)
         recommendation = self._generate_recommendation(consensus_score)
         
-        return {
+        result = {
             "ai_detection_score": round(consensus_score, 3),
             "confidence": round(confidence, 3),
             "detected": consensus_score > 0.5,
@@ -146,6 +199,23 @@ class AIDetectionEngine:
             "model_scores": scores,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
+        
+        # v8.3.3: Add legislative analysis if available
+        if legislative_analysis:
+            result["legislative_baseline"] = {
+                "is_legislative": legislative_analysis.is_legislative,
+                "pattern_count": legislative_analysis.legislative_pattern_count,
+                "score_adjustment": legislative_analysis.ai_score_adjustment,
+                "confidence_penalty": legislative_analysis.confidence_penalty
+            }
+        
+        if domain_warnings:
+            result["domain_warnings"] = domain_warnings
+            
+        # v8.3.3: Add detection spread metric
+        result["detection_spread"] = round(score_spread, 3)
+        
+        return result
     
     def _gptzero_detection(self, text: str) -> float:
         """
