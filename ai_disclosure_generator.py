@@ -272,15 +272,19 @@ def _add_comprehensive_methods():
         
         v8.3.1: Prioritize deep analysis consensus over basic detection for consistency
         with certificate generation.
+        
+        v8.3.4: Track which source is used for transparency.
         """
         # First, check for deep analysis consensus (most accurate, 6-level weighted analysis)
         deep_analysis = self.data.get('deep_analysis', {})
         if deep_analysis:
             consensus = deep_analysis.get('consensus', {})
             if consensus and 'ai_percentage' in consensus:
+                self._ai_score_source = 'consensus'  # Track source
                 return consensus['ai_percentage']
         
         # Fallback to basic ai_detection score
+        self._ai_score_source = 'base'  # Track source
         if not self.ai_detection:
             return 0.0
         # Handle both formats: decimal (0.532) or percentage (53.2)
@@ -288,6 +292,28 @@ def _add_comprehensive_methods():
         if score < 1.0:
             return score * 100
         return score
+    
+    def _get_score_source_note(self) -> str:
+        """v8.3.4: Generate note explaining which AI score is being displayed."""
+        source = getattr(self, '_ai_score_source', 'unknown')
+        
+        if source == 'consensus':
+            # Get base score for comparison
+            base_score = 0
+            if self.ai_detection:
+                base_score = self.ai_detection.get('ai_detection_score', 0)
+                if base_score < 1.0:
+                    base_score *= 100
+            
+            ai_pct = self._get_ai_percentage()
+            if abs(ai_pct - base_score) > 2:  # Only show if scores differ significantly
+                return f"""
+SCORE METHODOLOGY NOTE
+• Displayed score ({ai_pct:.1f}%) is from multi-level consensus analysis
+• Base detection score: {base_score:.1f}%
+• Consensus incorporates 6 analysis levels with weighted averaging
+"""
+        return ""
     
     def _get_model_info(self) -> Dict[str, any]:
         """Extract AI model identification and confidence."""
@@ -375,6 +401,19 @@ def _add_comprehensive_methods():
             confidence = confidence * 100
         confidence = min(confidence, 100)
         
+        # v8.3.4 CRITICAL FIX: Check detection spread from ai_detection
+        # Per Bill C-15 discrepancy report: 85% spread should NOT show "High Confidence"
+        ai_detection = self.data.get('ai_detection', {})
+        detection_spread = ai_detection.get('detection_spread', 0)
+        
+        # If detection methods disagree by more than 50%, confidence cannot be "High"
+        if detection_spread > 0.5:
+            spread_pct = detection_spread * 100
+            if detection_spread > 0.7:
+                return f"LOW Confidence - methods disagree by {spread_pct:.0f}%"
+            else:
+                return f"MODERATE Confidence - {spread_pct:.0f}% method disagreement"
+        
         if level_count >= 5 and confidence >= 80:
             return "High Confidence - multi-method consensus"
         elif level_count >= 3 and confidence >= 60:
@@ -396,6 +435,11 @@ def _add_comprehensive_methods():
         
         doc_line = f"Document: {document_name}\n" if document_name else ""
         
+        # v8.3.4: Add baseline adjustment transparency (per discrepancy report recommendation)
+        baseline_section = self._get_baseline_adjustment_section()
+        uncertainty_section = self._get_uncertainty_section()
+        score_source_note = self._get_score_source_note()  # v8.3.4: Explain score source
+        
         return f"""ARTIFICIAL INTELLIGENCE TRANSPARENCY DISCLOSURE
 {doc_line}Generated: {datetime.now().strftime('%B %d, %Y')}
 Analysis Version: Sparrow SPOT Scale™ {self.metadata['version']}
@@ -405,11 +449,67 @@ AI USAGE SUMMARY
 • Classification: {ai_level}
 • Primary AI Model: {model_info['model']}
 • Detection Confidence: {model_info['confidence']:.1f}%
-
+{baseline_section}{uncertainty_section}{score_source_note}
 This {self.metadata['document_type']} was prepared with artificial intelligence assistance.
 Expert review of AI-generated content is recommended before use.
 
 For complete disclosure and methodology, see full transparency certificate."""
+    
+    def _get_baseline_adjustment_section(self) -> str:
+        """v8.3.4: Generate transparency section about domain adjustments."""
+        ai_detection = self.data.get('ai_detection', {})
+        baseline = ai_detection.get('document_baseline', {})
+        
+        if not baseline or not baseline.get('is_specialized'):
+            return ""
+        
+        doc_type = baseline.get('document_type', 'document')
+        pattern_count = baseline.get('pattern_count', 0)
+        adjustment = baseline.get('score_adjustment', 0)
+        conventions = baseline.get('conventions', [])
+        
+        if abs(adjustment) < 0.01:
+            return ""
+        
+        adjustment_pct = abs(adjustment) * 100
+        direction = "reduced" if adjustment < 0 else "increased"
+        
+        conventions_text = ", ".join(conventions[:2]) if conventions else "standard domain patterns"
+        
+        return f"""
+DOMAIN ADJUSTMENT APPLIED
+• Document Type: {doc_type.replace('_', ' ').title()}
+• Domain Patterns Detected: {pattern_count:,}
+• Score Adjustment: {direction} by {adjustment_pct:.0f}%
+• Reason: {conventions_text}
+• Note: Human drafters in this domain produce these patterns naturally.
+"""
+    
+    def _get_uncertainty_section(self) -> str:
+        """v8.3.4: Generate uncertainty warning when detection methods disagree significantly."""
+        ai_detection = self.data.get('ai_detection', {})
+        detection_spread = ai_detection.get('detection_spread', 0)
+        
+        if detection_spread < 0.5:
+            return ""
+        
+        model_scores = ai_detection.get('model_scores', {})
+        if model_scores:
+            scores = list(model_scores.values())
+            min_score = min(scores) * 100
+            max_score = max(scores) * 100
+        else:
+            min_score = 0
+            max_score = 100
+        
+        spread_pct = detection_spread * 100
+        
+        return f"""
+⚠️ UNCERTAINTY NOTICE
+Detection methods disagree significantly ({spread_pct:.0f}% spread).
+• Detection range: {min_score:.0f}% to {max_score:.0f}%
+• Interpret with caution - true AI content may differ from reported estimate.
+"""
     
     def generate_plain_language(self, document_name: str = None) -> str:
         """Generate plain-language disclosure for public (NEW in v8.3)"""

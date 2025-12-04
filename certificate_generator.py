@@ -482,9 +482,9 @@ class CertificateGenerator:
                         <div style="font-size: 0.85em; color: #666;">NIST AI RMF v1.0 Based</div>
                     </div>
                     <!-- Fairness Assessment -->
-                    <div class="badge" style="padding: 12px; border: 2px solid #27ae60; border-radius: 4px; background: white;">
-                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">Fairness Metrics</div>
-                        <div style="font-size: 1.2em; font-weight: 700; color: #27ae60; margin: 5px 0;">{fairness_score}%</div>
+                    <div class="badge" style="padding: 12px; border: 2px solid {fairness_color}; border-radius: 4px; background: white;">
+                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">Fairness Metrics{fairness_status}</div>
+                        <div style="font-size: 1.2em; font-weight: 700; color: {fairness_color}; margin: 5px 0;">{fairness_score}%</div>
                         <div style="font-size: 0.85em; color: #666;">Demographic Parity & Equalized Odds</div>
                     </div>
                 </div>
@@ -564,6 +564,19 @@ class CertificateGenerator:
         if confidence <= 2:
             confidence = confidence * 100
         confidence = min(confidence, 100)
+        
+        # v8.3.4 CRITICAL FIX: Check detection spread
+        # Per Bill C-15 discrepancy report: High spread = Low confidence, not High
+        ai_detection = report.get('ai_detection', {})
+        detection_spread = ai_detection.get('detection_spread', 0)
+        
+        # If detection methods disagree by more than 50%, confidence cannot be "High"
+        if detection_spread > 0.5:
+            spread_pct = detection_spread * 100
+            if detection_spread > 0.7:
+                return f"LOW Confidence - methods disagree by {spread_pct:.0f}%"
+            else:
+                return f"MODERATE Confidence - {spread_pct:.0f}% method disagreement"
         
         if level_count >= 5 and confidence >= 80:
             return "High Confidence - multi-method consensus"
@@ -706,10 +719,31 @@ class CertificateGenerator:
         bias_audit_data = report.get('bias_audit', {})
         fairness_score = int(bias_audit_data.get('overall_fairness_score', 0)) if bias_audit_data else 0
         
+        # v8.3.4: Dynamic fairness color and warning based on score
+        # Per discrepancy report: 33% is FAILING and should be highlighted as such
+        if fairness_score >= 70:
+            fairness_color = "#27ae60"  # Green - passing
+            fairness_status = ""
+        elif fairness_score >= 50:
+            fairness_color = "#f39c12"  # Orange - marginal
+            fairness_status = " (MARGINAL)"
+        else:
+            fairness_color = "#e74c3c"  # Red - failing
+            fairness_status = " (FAILING)"
+        
         ethical_summary = report.get('ethical_summary', {})
         escalation_required = ethical_summary.get('escalation_required', False)
         escalation_warning = ''
-        if escalation_required:
+        
+        # v8.3.4: Add fairness-specific escalation warning if score is failing
+        if fairness_score < 50:
+            escalation_warning = f"""
+                <div style="background: #ffe6e6; border: 2px solid #e74c3c; padding: 12px; border-radius: 4px; margin-top: 15px;">
+                    <div style="font-weight: 700; color: #e74c3c; margin-bottom: 5px;">⚠️ CRITICAL: Fairness Assessment FAILED ({fairness_score}%)</div>
+                    <div style="font-size: 0.9em; color: #555;">Significant bias detected. Manual bias review REQUIRED before policy implementation. Review individual fairness metrics for affected groups.</div>
+                </div>
+            """
+        elif escalation_required:
             escalation_warning = f"""
                 <div style="background: #ffe6e6; border: 2px solid #e74c3c; padding: 12px; border-radius: 4px; margin-top: 15px;">
                     <div style="font-weight: 700; color: #e74c3c; margin-bottom: 5px;">⚠️ Escalation Required</div>
@@ -919,6 +953,8 @@ class CertificateGenerator:
             ai_confidence=ai_confidence,
             risk_tier=risk_tier,
             fairness_score=fairness_score,
+            fairness_color=fairness_color,
+            fairness_status=fairness_status,
             escalation_warning=escalation_warning,
             adjusted_scores_section=adjusted_scores_section,
             deep_analysis_section=deep_analysis_section
@@ -1022,10 +1058,30 @@ class CertificateGenerator:
         bias_audit_data = report.get('bias_audit', {})
         fairness_score = int(bias_audit_data.get('overall_fairness_score', 0)) if bias_audit_data else 0
         
+        # v8.3.4: Dynamic fairness color and warning based on score
+        if fairness_score >= 70:
+            fairness_color = "#27ae60"  # Green - passing
+            fairness_status = ""
+        elif fairness_score >= 50:
+            fairness_color = "#f39c12"  # Orange - marginal
+            fairness_status = " (MARGINAL)"
+        else:
+            fairness_color = "#e74c3c"  # Red - failing
+            fairness_status = " (FAILING)"
+        
         ethical_summary = report.get('ethical_summary', {})
         escalation_required = ethical_summary.get('escalation_required', False)
         escalation_warning = ''
-        if escalation_required:
+        
+        # v8.3.4: Add fairness-specific escalation warning if score is failing
+        if fairness_score < 50:
+            escalation_warning = f"""
+                <div style="background: #ffe6e6; border: 2px solid #e74c3c; padding: 12px; border-radius: 4px; margin-top: 15px;">
+                    <div style="font-weight: 700; color: #e74c3c; margin-bottom: 5px;">⚠️ CRITICAL: Fairness Assessment FAILED ({fairness_score}%)</div>
+                    <div style="font-size: 0.9em; color: #555;">Significant bias detected. Manual bias review REQUIRED before policy implementation.</div>
+                </div>
+            """
+        elif escalation_required:
             escalation_warning = f"""
                 <div style="background: #ffe6e6; border: 2px solid #e74c3c; padding: 12px; border-radius: 4px; margin-top: 15px;">
                     <div style="font-weight: 700; color: #e74c3c; margin-bottom: 5px;">⚠️ Escalation Required</div>
@@ -1121,6 +1177,8 @@ class CertificateGenerator:
             ai_confidence=ai_confidence,
             risk_tier=risk_tier,
             fairness_score=fairness_score,
+            fairness_color=fairness_color,
+            fairness_status=fairness_status,
             escalation_warning=escalation_warning,
             deep_analysis_section=deep_analysis_section
         )

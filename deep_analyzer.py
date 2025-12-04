@@ -2,14 +2,22 @@
 """
 Deep Analysis Orchestrator
 Runs all detection depth levels (1-6) and generates comprehensive transparency report
+
+Version: 8.3.4
+- Added bilingual PDF extraction corruption detection
+- Pattern analysis skipped when corruption detected
+- Improved text quality validation
 """
 
 import sys
 import json
+import re
+import math
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import pdfplumber
 from datetime import datetime
+from collections import Counter
 
 # Import all analysis levels
 from ai_detection_engine import AIDetectionEngine
@@ -17,6 +25,223 @@ from ai_section_analyzer import AISectionAnalyzer
 from sentence_level_detector import SentenceLevelDetector
 from phrase_fingerprints import PhraseFingerprints
 from statistical_analyzer import StatisticalAnalyzer
+
+
+class TextCorruptionDetector:
+    """
+    Detects text extraction corruption, particularly from bilingual PDFs
+    where English and French columns are interleaved incorrectly.
+    
+    Version: 8.3.4
+    """
+    
+    # Common English words that should appear correctly
+    ENGLISH_WORDS = {'the', 'and', 'of', 'to', 'in', 'is', 'for', 'that', 'this', 'with', 'are', 'be', 'by'}
+    
+    # Common French words that should appear correctly  
+    FRENCH_WORDS = {'le', 'la', 'les', 'de', 'du', 'des', 'et', 'en', 'est', 'pour', 'que', 'dans', 'par', 'sur'}
+    
+    def detect_corruption(self, text: str) -> Dict:
+        """
+        Analyze text for extraction corruption patterns.
+        
+        Returns:
+            Dict with corruption indicators and score
+        """
+        result = {
+            'is_corrupted': False,
+            'corruption_score': 0.0,
+            'corruption_types': [],
+            'sample_corrupted_fragments': [],
+            'warnings': [],
+            'recommendation': 'proceed'
+        }
+        
+        if len(text) < 100:
+            return result
+        
+        # Test 1: Character interleaving detection
+        interleave_score = self._detect_char_interleaving(text)
+        
+        # Test 2: Invalid word fragment detection
+        fragment_score = self._detect_invalid_fragments(text)
+        
+        # Test 3: Mixed language corruption
+        mixed_score = self._detect_mixed_language_corruption(text)
+        
+        # Test 4: Abnormal character distribution
+        char_dist_score = self._detect_abnormal_char_distribution(text)
+        
+        # Calculate overall corruption score
+        corruption_score = (
+            interleave_score * 0.35 +
+            fragment_score * 0.30 +
+            mixed_score * 0.20 +
+            char_dist_score * 0.15
+        )
+        
+        result['corruption_score'] = round(corruption_score, 3)
+        result['component_scores'] = {
+            'interleaving': round(interleave_score, 3),
+            'fragments': round(fragment_score, 3),
+            'mixed_language': round(mixed_score, 3),
+            'char_distribution': round(char_dist_score, 3)
+        }
+        
+        # Determine if corrupted
+        if corruption_score > 0.3:
+            result['is_corrupted'] = True
+            result['warnings'].append(
+                "⚠️ BILINGUAL EXTRACTION CORRUPTION DETECTED: Text appears to have "
+                "English and French content incorrectly interleaved during PDF extraction."
+            )
+            
+            if corruption_score > 0.5:
+                result['recommendation'] = 'skip_pattern_analysis'
+                result['warnings'].append(
+                    "⚠️ HIGH CORRUPTION: Pattern analysis will be skipped as results would be unreliable."
+                )
+            else:
+                result['recommendation'] = 'proceed_with_warning'
+        
+        # Collect sample corrupted fragments
+        result['sample_corrupted_fragments'] = self._find_corrupted_samples(text)[:5]
+        
+        return result
+    
+    def _detect_char_interleaving(self, text: str) -> float:
+        """
+        Detect character-level interleaving from parallel column extraction.
+        
+        Look for patterns like "lme amy ipnaisyt" which result from
+        alternating characters from two columns.
+        """
+        # Pattern: Short lowercase fragments separated by spaces
+        # e.g., "sro mofm Feinsa qnucee" - garbage from interleaving
+        short_fragment_pattern = r'\b[a-z]{2,4}\s+[a-z]{2,4}\s+[A-Z][a-z]{2,4}\s+[a-z]{2,4}\b'
+        matches = re.findall(short_fragment_pattern, text[:50000])
+        
+        # Also check for repeated short sequences
+        repeated_short = r'([a-z]{2,3})\s+\1'
+        repeated_matches = re.findall(repeated_short, text[:50000])
+        
+        # Calculate score based on frequency
+        text_sample_words = len(text[:50000].split())
+        if text_sample_words == 0:
+            return 0.0
+            
+        fragment_ratio = len(matches) / (text_sample_words / 100)
+        repeated_ratio = len(repeated_matches) / (text_sample_words / 100)
+        
+        return min(1.0, (fragment_ratio * 0.1) + (repeated_ratio * 0.2))
+    
+    def _detect_invalid_fragments(self, text: str) -> float:
+        """
+        Detect word fragments that aren't valid in any language.
+        
+        Bilingual corruption produces fragments like "tio-" "n-" appearing
+        in the middle of sentences.
+        """
+        words = text[:100000].split()
+        invalid_count = 0
+        
+        for word in words[:5000]:
+            clean_word = re.sub(r'[^\w]', '', word.lower())
+            if len(clean_word) >= 2:
+                # Check if it looks like a valid word
+                if not self._is_plausible_word(clean_word):
+                    invalid_count += 1
+        
+        return min(1.0, invalid_count / len(words[:5000]) if words else 0)
+    
+    def _is_plausible_word(self, word: str) -> bool:
+        """Check if a word is plausibly valid (basic heuristics)."""
+        # Too many consonants in a row = likely corrupted
+        if re.search(r'[bcdfghjklmnpqrstvwxz]{5,}', word):
+            return False
+        
+        # Alternating single vowels and consonants in unusual patterns
+        if re.search(r'([bcdfghjklmnpqrstvwxz][aeiou]){4,}', word):
+            return False
+        
+        # Known common words
+        if word in self.ENGLISH_WORDS or word in self.FRENCH_WORDS:
+            return True
+        
+        # Words with reasonable structure
+        if re.match(r'^[a-z]+$', word) and len(word) < 20:
+            return True
+            
+        return False
+    
+    def _detect_mixed_language_corruption(self, text: str) -> float:
+        """
+        Detect when English and French are incorrectly mixed at character level.
+        
+        Valid bilingual: "The law / La loi"
+        Corrupted: "tThhe e llaoww / LLaa llooii"
+        """
+        # Look for doubled characters that suggest interleaving
+        # e.g., "tThhee" from "The" + "The" or "The" + "Le"
+        doubled_pattern = r'([a-zA-Z])([a-zA-Z])\1\2'
+        matches = re.findall(doubled_pattern, text[:50000])
+        
+        # Check for adjacent mixed-case without normal transitions
+        odd_case_pattern = r'[a-z][A-Z][a-z][A-Z]'
+        odd_case_matches = re.findall(odd_case_pattern, text[:50000])
+        
+        sample_len = len(text[:50000])
+        if sample_len == 0:
+            return 0.0
+            
+        score = (len(matches) + len(odd_case_matches)) / (sample_len / 1000)
+        return min(1.0, score * 0.1)
+    
+    def _detect_abnormal_char_distribution(self, text: str) -> float:
+        """
+        Detect if character distribution is abnormal for natural text.
+        
+        Corrupted text often has unusual letter frequency patterns.
+        """
+        sample = text[:100000].lower()
+        char_counts = Counter(c for c in sample if c.isalpha())
+        total = sum(char_counts.values())
+        
+        if total == 0:
+            return 0.0
+        
+        # Expected rough frequencies for English/French
+        expected = {'e': 0.12, 't': 0.09, 'a': 0.08, 'o': 0.07, 'n': 0.07, 'i': 0.07, 's': 0.06}
+        
+        deviation = 0
+        for char, expected_freq in expected.items():
+            actual_freq = char_counts.get(char, 0) / total
+            deviation += abs(actual_freq - expected_freq)
+        
+        # Normalize
+        return min(1.0, deviation * 2)
+    
+    def _find_corrupted_samples(self, text: str) -> list:
+        """Find example corrupted text fragments for reporting."""
+        samples = []
+        
+        # Look for obvious corruption patterns
+        patterns = [
+            r'[a-z]{2,3}\s+[A-Z][a-z]{1,2}[A-Z]',  # Mixed case fragments
+            r'\b\d{4}\.\s+[a-z]+\s+[a-z]+\s+[A-Z]',  # Year followed by garbage
+        ]
+        
+        for pattern in patterns:
+            for match in re.finditer(pattern, text[:50000]):
+                context_start = max(0, match.start() - 20)
+                context_end = min(len(text), match.end() + 20)
+                sample = text[context_start:context_end]
+                if len(sample) > 10 and sample not in samples:
+                    samples.append(sample)
+                    if len(samples) >= 5:
+                        return samples
+        
+        return samples
 
 
 class DeepAnalyzer:
@@ -37,6 +262,7 @@ class DeepAnalyzer:
         self.sentence_detector = SentenceLevelDetector()
         self.phrase_scanner = PhraseFingerprints()
         self.stats_analyzer = StatisticalAnalyzer()
+        self.corruption_detector = TextCorruptionDetector()
     
     def analyze_document(self, file_path: str, max_sections: int = 10) -> Dict:
         """
@@ -71,8 +297,22 @@ class DeepAnalyzer:
             }
         }
         
+        # v8.3.4: Check for text corruption BEFORE analysis
+        print("Running Text Quality Check...")
+        corruption_check = self.corruption_detector.detect_corruption(text)
+        results['text_quality'] = corruption_check
+        
+        if corruption_check['is_corrupted']:
+            print(f"  ⚠️ TEXT CORRUPTION DETECTED (score: {corruption_check['corruption_score']:.1%})")
+            for warning in corruption_check['warnings']:
+                print(f"  {warning}")
+        else:
+            print(f"  ✓ Text quality check passed (corruption score: {corruption_check['corruption_score']:.1%})")
+        
+        skip_pattern_analysis = corruption_check['recommendation'] == 'skip_pattern_analysis'
+        
         # LEVEL 1: Document-level detection
-        print("Running Level 1: Document-Level Detection...")
+        print("\nRunning Level 1: Document-Level Detection...")
         level1 = self._run_level1(text)
         results['level1_document'] = level1
         print(f"  ✓ Overall AI: {level1['ai_percentage']:.1f}%")
@@ -87,14 +327,25 @@ class DeepAnalyzer:
             top_ai_section = max(level2['sections'], key=lambda x: x['ai_percentage'])
             print(f"  ✓ Highest AI section: Section {top_ai_section['section_number']} ({top_ai_section['ai_percentage']:.1f}% AI)")
         
-        # LEVEL 3: Pattern detection
-        print("\nRunning Level 3: Pattern Detection...")
-        level3 = self._run_level3(text)
-        results['level3_patterns'] = level3
-        print(f"  ✓ Found {level3['total_patterns']} AI patterns")
-        for model, count in level3['patterns_by_model'].items():
-            if count > 0:
-                print(f"    • {model}: {count} patterns")
+        # LEVEL 3: Pattern detection (skip if corrupted)
+        if skip_pattern_analysis:
+            print("\n⚠️ SKIPPING Level 3: Pattern Detection (text corruption detected)")
+            results['level3_patterns'] = {
+                'skipped': True,
+                'reason': 'Text corruption detected - pattern analysis would produce unreliable results',
+                'total_patterns': 0,
+                'patterns_by_model': {},
+                'pattern_details': {},
+                'detailed_matches': {}
+            }
+        else:
+            print("\nRunning Level 3: Pattern Detection...")
+            level3 = self._run_level3(text)
+            results['level3_patterns'] = level3
+            print(f"  ✓ Found {level3['total_patterns']} AI patterns")
+            for model, count in level3['patterns_by_model'].items():
+                if count > 0:
+                    print(f"    • {model}: {count} patterns")
         
         # LEVEL 4: Sentence-level detection
         print("\nRunning Level 4: Sentence-Level Detection...")

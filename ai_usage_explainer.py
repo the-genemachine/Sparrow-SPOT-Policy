@@ -324,6 +324,18 @@ the content may be difficult to classify or contains mixed authorship.
 **Attribution Confidence:** {primary_confidence:.0f}%
 **Analysis:** {analysis_text}
 
+### ⚠️ Understanding Confidence Metrics
+
+There are TWO distinct confidence measures in this report:
+
+| Metric | Question Answered | This Report |
+|--------|-------------------|-------------|
+| **Detection Confidence** | "How certain are we that AI was used at all?" | See detection spread above |
+| **Attribution Confidence** | "IF AI was used, which model was it likely?" | {primary_confidence:.0f}% |
+
+**Attribution confidence ({primary_confidence:.0f}%)** indicates pattern match to {primary_model} *assuming* AI was used. 
+This does NOT indicate certainty that AI was used - only which model patterns are present IF AI was involved.
+
 ### Model Signature Comparison
 
 | Model | Confidence Bar | Score |
@@ -844,7 +856,25 @@ Detection methods: Multi-method consensus
         level3 = deep_analysis.get('level3_patterns', {})
         total_patterns = level3.get('total_patterns', 0)
         
-        # Generate synthesis section
+        # v8.3.4: Use calibrated language based on actual score
+        if ai_percentage < 15:
+            ai_level = "minimal"
+            role_description = "limited or absent"
+            likely_use = "may have assisted with minor formatting or refinement"
+        elif ai_percentage < 30:
+            ai_level = "moderate" 
+            role_description = "limited"
+            likely_use = "appears to have assisted with some drafting or structuring"
+        elif ai_percentage < 50:
+            ai_level = "significant"
+            role_description = "substantial"
+            likely_use = "likely contributed to drafting portions of the document"
+        else:
+            ai_level = "extensive"
+            role_description = "major"
+            likely_use = "appears to have been used extensively for content generation"
+        
+        # Generate synthesis section with calibrated guidance
         prompt = f"""You are an AI transparency analyst writing for government officials and policy professionals.
 
 Based on this AI detection analysis, write a 200-word synthesis paragraph explaining HOW AI was likely used in creating this {document_type} document:
@@ -855,13 +885,20 @@ KEY DATA:
 - Sections Flagged: {flagged_count}
 - AI Patterns Found: {total_patterns}
 
+CRITICAL GUIDANCE:
+- The AI score of {ai_percentage:.1f}% represents {ai_level.upper()} AI involvement
+- AI role should be described as: {role_description}
+- For a score this level, AI {likely_use}
+- Do NOT describe {ai_percentage:.1f}% as "high" or "significant" if it is below 30%
+- Do NOT say "AI played a significant role" if the score is below 30%
+
 Write a clear, professional synthesis that:
-1. Explains the likely role AI played (drafting, formatting, analysis, etc.)
-2. Identifies which types of content appear AI-generated
-3. Notes any concerns specific to this document type
+1. Accurately reflects the {ai_level} level of AI involvement
+2. Identifies what types of content MIGHT be AI-assisted (use hedging language)
+3. Notes domain-specific context (legislation has formal conventions)
 4. Uses accessible language (no jargon)
 
-Start with: "Based on the analysis, AI appears to have been used..."
+Start with: "Based on the analysis, this document shows {ai_level} AI involvement ({ai_percentage:.1f}%)."
 
 Do NOT include any meta-commentary or instructions - just the synthesis paragraph."""
 
