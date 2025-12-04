@@ -82,7 +82,7 @@ class AnalysisResults:
     - Caching for frequently accessed values
     """
     
-    VERSION = "8.3.3"
+    VERSION = "8.3.5"
     
     def __init__(self, raw_results: Dict):
         """

@@ -1,7 +1,13 @@
 """
-Data Lineage Visualization for Sparrow SPOT Scale™ v8.2
+Data Lineage Visualization for Sparrow SPOT Scale™ v8.3.5
 
 Generates visual flowcharts showing document analysis pipeline and data flow.
+
+Status values:
+- completed: Stage ran successfully
+- skipped: Stage was not enabled (optional feature)
+- pending: Stage not yet run (only during active processing)
+- failed: Stage encountered an error
 """
 
 from typing import Dict, List
@@ -16,14 +22,15 @@ class DataLineageVisualizer:
         self.stages = []
         self.current_stage = None
     
-    def add_stage(self, name: str, description: str, status: str = "pending"):
+    def add_stage(self, name: str, description: str, status: str = "completed"):
         """
         Add a stage to the lineage pipeline.
         
         Args:
             name: Stage name
             description: What happens in this stage
-            status: pending, in-progress, completed, failed
+            status: pending, in-progress, completed, skipped, failed
+                    Default is 'completed' since stages are usually added after completion.
         """
         stage = {
             "name": name,

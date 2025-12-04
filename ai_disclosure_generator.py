@@ -1,5 +1,5 @@
 """
-AI Disclosure Generator Module for v8.3.3
+AI Disclosure Generator Module for v8.3.5
 
 Generates standardized AI Use Statements for public outputs per Recommendation #4:
 "Improve Public-Facing AI Disclosure in Policy Summaries"
@@ -15,6 +15,8 @@ This module creates transparent disclosure language for:
 v8.3 Enhancement: Added comprehensive multi-format generation for full transparency compliance
 v8.3.2 Enhancement: Added confidence level indicators for transparency
 v8.3.3 Enhancement: Fixed confidence indicator key mappings for accurate multi-level detection
+v8.3.4 Enhancement: Added baseline adjustment transparency, uncertainty warnings
+v8.3.5 Enhancement: Fixed method binding, added score source notes
 """
 
 import os
@@ -654,10 +656,13 @@ LINKEDIN: {self.generate_social_media(document_name).get('linkedin', 'N/A')}</pr
     
     # Add methods to class
     AIDisclosureGenerator._get_ai_percentage = _get_ai_percentage
+    AIDisclosureGenerator._get_score_source_note = _get_score_source_note  # v8.3.4
     AIDisclosureGenerator._get_model_info = _get_model_info
     AIDisclosureGenerator._get_flagged_sections = _get_flagged_sections
     AIDisclosureGenerator._get_ai_level = _get_ai_level
     AIDisclosureGenerator._get_confidence_indicator = _get_confidence_indicator  # v8.3.2
+    AIDisclosureGenerator._get_baseline_adjustment_section = _get_baseline_adjustment_section  # v8.3.4
+    AIDisclosureGenerator._get_uncertainty_section = _get_uncertainty_section  # v8.3.4
     AIDisclosureGenerator.generate_government_formal = generate_government_formal
     AIDisclosureGenerator.generate_plain_language = generate_plain_language
     AIDisclosureGenerator.generate_social_media = generate_social_media

@@ -802,6 +802,29 @@ class CertificateGenerator:
             level5 = deep_analysis.get('level5_fingerprints', {})
             level6 = deep_analysis.get('level6_statistics', {})
             
+            # v8.3.5: Calculate detection spread for warning box
+            model_scores = report.get('ai_detection', {}).get('model_scores', {})
+            detection_spread = 0
+            detection_warning_html = ''
+            if model_scores:
+                score_values = [v * 100 for v in model_scores.values() if isinstance(v, (int, float))]
+                if len(score_values) >= 2:
+                    min_score = min(score_values)
+                    max_score = max(score_values)
+                    detection_spread = max_score - min_score
+                    
+                    if detection_spread > 50:
+                        detection_warning_html = f'''
+                <div style="background: #fff3cd; border: 2px solid #ffc107; padding: 12px; border-radius: 4px; margin-bottom: 15px;">
+                    <div style="font-weight: 700; color: #856404; margin-bottom: 5px;">⚠️ DETECTION UNCERTAINTY - Results Inconclusive</div>
+                    <div style="font-size: 0.9em; color: #856404;">
+                        Detection methods disagree by <strong>{detection_spread:.0f} percentage points</strong> (range: {min_score:.0f}%-{max_score:.0f}%).
+                        The reported AI percentage is an average that obscures significant disagreement. 
+                        Manual expert review is required for definitive assessment.
+                    </div>
+                </div>
+                '''
+            
             # Extract pattern counts (correct structure)
             total_patterns = level3.get('total_patterns', 0) if level3 else 0
             
@@ -878,7 +901,8 @@ class CertificateGenerator:
             
             deep_analysis_section = f"""
             <div class="deep-analysis" style="background: #f0f9ff; padding: 25px; margin: 25px 0; border-left: 5px solid #0ea5e9; border-radius: 4px;">
-                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v8.3.1)</h3>
+                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v8.3.5)</h3>
+                {detection_warning_html}
                 <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div style="text-align: center;">
@@ -888,7 +912,7 @@ class CertificateGenerator:
                         <div style="text-align: center;">
                             <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">Primary Model</div>
                             <div style="font-size: 1.3em; font-weight: 700; color: #0369a1;">{ai_model}</div>
-                            <div style="font-size: 0.75em; color: #888;">{ai_model_confidence}% confidence</div>
+                            <div style="font-size: 0.75em; color: #888;" title="Attribution confidence: IF AI was used, this is the likelihood it was this model. Does NOT indicate certainty of AI use.">{ai_model_confidence}% attribution*</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">Transparency</div>
@@ -916,6 +940,9 @@ class CertificateGenerator:
                         <div><strong>Burstiness:</strong> {burstiness:.3f}</div>
                         <div><strong>Lexical Diversity:</strong> {lexical_diversity:.3f}</div>
                     </div>
+                </div>
+                <div style="font-size: 0.75em; color: #888; margin-top: 10px; font-style: italic;">
+                    * Attribution confidence indicates pattern match IF AI was used. It does not measure certainty of AI use.
                 </div>
             </div>
             """
@@ -1120,7 +1147,7 @@ class CertificateGenerator:
                         <div style="text-align: center;">
                             <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">Primary Model</div>
                             <div style="font-size: 1.3em; font-weight: 700; color: #0369a1;">{ai_model}</div>
-                            <div style="font-size: 0.75em; color: #888;">{ai_model_confidence}% confidence</div>
+                            <div style="font-size: 0.75em; color: #888;" title="Attribution confidence: IF AI was used, this is the likelihood it was this model. Does NOT indicate certainty of AI use.">{ai_model_confidence}% attribution*</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">Transparency</div>
@@ -1146,6 +1173,9 @@ class CertificateGenerator:
                         <div><strong>Burstiness:</strong> {burstiness:.3f}</div>
                         <div><strong>Lexical Diversity:</strong> {lexical_diversity:.3f}</div>
                     </div>
+                </div>
+                <div style="font-size: 0.75em; color: #888; margin-top: 10px; font-style: italic;">
+                    * Attribution confidence indicates pattern match IF AI was used. It does not measure certainty of AI use.
                 </div>
             </div>
             """

@@ -29,7 +29,7 @@ class AIUsageExplainer:
         self.ollama_url = ollama_url
         self.model = "granite4:tiny-h"  # Primary model for explanations
         self.fallback_model = "qwen2.5:7b"
-        self.version = "8.3.4"
+        self.version = "8.3.5"
     
     def _call_ollama(self, prompt: str, model: Optional[str] = None, max_tokens: int = 2000) -> Optional[str]:
         """Call Ollama API for text generation."""
@@ -258,6 +258,25 @@ This document {usage_description}.
             avg_score = 0
             consensus = "No detection data available"
         
+        # v8.3.5: Calculate and note authoritative score
+        deep_consensus = deep_analysis.get('consensus', {}).get('ai_percentage', None)
+        level1_score = deep_analysis.get('level1_document', {}).get('ai_percentage', None) if deep_analysis else None
+        
+        # Note about score discrepancy if present
+        score_note = ""
+        if deep_consensus and abs(deep_consensus - avg_score) > 5:
+            score_note = f"""
+### ⚠️ Score Discrepancy Note
+
+- **Reported AI Score in Executive Summary**: {deep_consensus:.1f}% (deep analysis consensus)
+- **Average of Individual Methods**: {avg_score:.1f}% (simple average)
+
+The Executive Summary uses the **deep analysis consensus score** which applies weighted 
+averaging across 6 analysis levels. This is the **authoritative figure**. The method-by-method 
+average shown above is for transparency about individual detection methods, but is less accurate 
+because it doesn't account for method reliability or domain context.
+"""
+        
         return f"""## DETECTION METHODOLOGY
 
 ### How AI Content Was Detected
@@ -275,7 +294,7 @@ This analysis employed {len(methods)} detection methods to identify AI-generated
 - Average AI Score: {avg_score:.1f}%
 - Score Range: {min_score:.1f}% - {max_score:.1f}%
 - Spread: {spread:.1f} percentage points
-
+{score_note}
 ### Interpretation
 
 Multiple detection methods provide cross-validation. High agreement between methods 
@@ -852,30 +871,76 @@ Detection methods: Multi-method consensus
         primary_model = model_info.get('model', 'Unknown')
         flagged_count = len(ai_detection.get('flagged_sections', []))
         
+        # v8.3.5: Get detection spread for uncertainty assessment
+        detection_spread = ai_detection.get('detection_spread', 0) * 100
+        model_scores = ai_detection.get('model_scores', {})
+        if model_scores:
+            score_values = [v * 100 for v in model_scores.values() if isinstance(v, (int, float))]
+            if score_values:
+                min_score = min(score_values)
+                max_score = max(score_values)
+                detection_spread = max_score - min_score
+        
         deep_analysis = analysis_data.get('deep_analysis', {})
         level3 = deep_analysis.get('level3_patterns', {})
         total_patterns = level3.get('total_patterns', 0)
         
-        # v8.3.4: Use calibrated language based on actual score
-        if ai_percentage < 15:
-            ai_level = "minimal"
-            role_description = "limited or absent"
-            likely_use = "may have assisted with minor formatting or refinement"
-        elif ai_percentage < 30:
-            ai_level = "moderate" 
-            role_description = "limited"
-            likely_use = "appears to have assisted with some drafting or structuring"
-        elif ai_percentage < 50:
-            ai_level = "significant"
-            role_description = "substantial"
-            likely_use = "likely contributed to drafting portions of the document"
+        # v8.3.5: Check detection spread FIRST - high spread means high uncertainty
+        high_uncertainty = detection_spread > 50
+        
+        if high_uncertainty:
+            # v8.3.5: When detection spread is high, use uncertainty-focused language
+            ai_level = "UNCERTAIN"
+            role_description = "CANNOT be reliably determined"
+            likely_use = "cannot be determined due to conflicting detection results"
+            uncertainty_context = f"""
+CRITICAL: Detection methods DISAGREE by {detection_spread:.0f} percentage points (range: {min_score:.0f}%-{max_score:.0f}%).
+This means different analysis methods produced wildly different results.
+The {ai_percentage:.1f}% average OBSCURES this disagreement and should NOT be treated as reliable.
+When detection spread exceeds 50%, the analysis is INCONCLUSIVE."""
         else:
-            ai_level = "extensive"
-            role_description = "major"
-            likely_use = "appears to have been used extensively for content generation"
+            uncertainty_context = ""
+            # v8.3.4: Use calibrated language based on actual score (only when certain)
+            if ai_percentage < 15:
+                ai_level = "minimal"
+                role_description = "limited or absent"
+                likely_use = "may have assisted with minor formatting or refinement"
+            elif ai_percentage < 30:
+                ai_level = "moderate" 
+                role_description = "limited"
+                likely_use = "appears to have assisted with some drafting or structuring"
+            elif ai_percentage < 50:
+                ai_level = "significant"
+                role_description = "substantial"
+                likely_use = "likely contributed to drafting portions of the document"
+            else:
+                ai_level = "extensive"
+                role_description = "major"
+                likely_use = "appears to have been used extensively for content generation"
         
         # Generate synthesis section with calibrated guidance
-        prompt = f"""You are an AI transparency analyst writing for government officials and policy professionals.
+        if high_uncertainty:
+            prompt = f"""You are an AI transparency analyst writing for government officials and policy professionals.
+
+CRITICAL SITUATION: The AI detection results for this {document_type} are INCONCLUSIVE.
+{uncertainty_context}
+
+Write a 200-word synthesis that:
+1. CLEARLY states that AI involvement CANNOT be reliably determined
+2. Explains that detection methods produced conflicting results (range: {min_score:.0f}%-{max_score:.0f}%)
+3. Notes that the average of {ai_percentage:.1f}% should NOT be interpreted as a reliable estimate
+4. Suggests manual expert review is required to make any determination
+5. Mentions that {document_type} documents use conventions that may trigger false positives
+
+Do NOT claim AI was or wasn't used - the data is inconclusive.
+Do NOT treat the average score as if it were reliable.
+Do NOT overstate confidence in any direction.
+
+Start with: "Based on the analysis, AI involvement in this document CANNOT be reliably determined."
+
+Write only the synthesis paragraph, no meta-commentary."""
+        else:
+            prompt = f"""You are an AI transparency analyst writing for government officials and policy professionals.
 
 Based on this AI detection analysis, write a 200-word synthesis paragraph explaining HOW AI was likely used in creating this {document_type} document:
 

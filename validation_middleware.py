@@ -95,7 +95,7 @@ class ValidationMiddleware:
     """
     
     def __init__(self):
-        self.version = "8.3.3"
+        self.version = "8.3.5"
         
         # Required top-level fields
         self.required_fields = [
