@@ -1,7 +1,7 @@
 # Sparrow SPOT Scale™ v8.3: Technical Architecture Report
 
-**Report Date:** November 30, 2025 (Updated)  
-**System Version:** v8.3.1 (Enhanced Transparency + GUI + Accuracy Fix)  
+**Report Date:** December 3, 2025 (Updated)  
+**System Version:** v8.3.4 (Document Type Calibration + AI Usage Explainer)  
 **Repository:** Sparrow-SPOT-Policy  
 **Classification:** Technical Documentation
 
@@ -10,6 +10,23 @@
 ## Executive Summary
 
 This report provides a comprehensive technical overview of the Sparrow SPOT Scale™ v8.3 system architecture, including all files, modules, classes, functions, and analytical models used in the framework. The system combines journalism evaluation (SPARROW Scale™) with government policy analysis (SPOT-Policy™) through a dual-variant architecture supported by an ethical AI framework, narrative generation engine, and enhanced transparency features.
+
+**Version 8.3.4 Enhancement (December 3, 2025):**
+- **Document Type Calibration System:** Comprehensive baselines for ALL document types to reduce AI detection false positives
+- **Supported Types:** legislation, budget, legal_judgment, policy_brief, research_report, news_article, analysis, report
+- **New Module:** `document_type_baselines.py` (~1000 lines) - Pattern detection for domain-specific conventions
+- **AI Detection Engine v8.3.4:** Integrates document type detection with automatic calibration
+- **Score Adjustments:** Up to -30% adjustment for legislative text, -25% for budgets, etc.
+- **Confidence Penalties:** Applied when detection methods disagree or specialized text detected
+- **Reference:** Based on Driedger's "Manual of Instructions for Legislative and Legal Writing" (1982)
+- **Critical Fix:** Addresses "The AI Detection Paradox" critique - standard drafting conventions no longer flagged as AI
+
+**Version 8.3.3 Enhancement (December 2, 2025):**
+- **AI Usage Explanation Generator:** New module `ai_usage_explainer.py` (~900 lines) synthesizing detection data into detailed reports
+- **Legislative Baseline:** `legislative_baseline.py` recognizes standard legislative drafting conventions
+- **Detection Disagreement Warnings:** System now warns when methods disagree by >40 percentage points
+- **Cautious Language:** Removed circular reasoning, all AI estimates now explicitly marked as unverified
+- **GUI Integration:** AI Usage Explanation auto-generated when Deep Analysis + AI Disclosure enabled
 
 **Version 8.3.1 Critical Fix (November 30, 2025):**
 - **Certificate Generator Accuracy Fix:** Corrected AI detection display to prioritize deep analysis consensus (6-level weighted) over basic detection
@@ -29,10 +46,15 @@ This report provides a comprehensive technical overview of the Sparrow SPOT Scal
 
 **System Scope:**
 - **Primary Script:** `sparrow_grader_v8.py` (2,670 lines)
-- **Supporting Modules:** 22+ specialized Python modules
-- **Analysis Models:** Multi-model consensus detection, NIST AI Risk Framework, bias auditing, data source validation
-- **Output Formats:** 18+ file types per analysis (JSON, TXT, narratives, certificates, insights, QA reports, transparency reports, AI disclosures, data lineage)
+- **Supporting Modules:** 25+ specialized Python modules (v8.3.4: +3 new modules)
+- **Analysis Models:** Multi-model consensus detection (8 models), NIST AI Risk Framework, bias auditing, data source validation, document type calibration
+- **Output Formats:** 20+ file types per analysis (JSON, TXT, narratives, certificates, insights, QA reports, transparency reports, AI disclosures, data lineage, AI usage explanations)
 - **User Interfaces:** CLI (15+ flags) + Web GUI (Gradio, 5-tab interface)
+
+**New Modules in v8.3.3-8.3.4:**
+- `document_type_baselines.py` - Comprehensive document type calibration (~1000 lines)
+- `ai_usage_explainer.py` - AI usage explanation generator (~900 lines)
+- `legislative_baseline.py` - Legislative pattern detection (~400 lines)
 
 ---
 
@@ -159,26 +181,59 @@ from data_lineage_source_mapper import DataLineageSourceMapper
 #### **ai_detection_engine.py**
 
 **Purpose:** Detect AI-generated content in policy documents (Pillar 1: INPUT_TRANSPARENCY)  
-**Size:** 530 lines  
-**Accuracy:** 97-99% for unedited AI text, 70-85% for hybrid content
+**Size:** ~1,400 lines (v8.3.4)  
+**Version:** 8.3.4 with Document Type Calibration  
+**Accuracy:** 97-99% for unedited AI text, 70-85% for hybrid content  
+**Note:** Accuracy on specialized documents (legislation, budgets) is lower; system now applies calibration baselines
+
+**v8.3.4 Enhancements:**
+- Integrated `DocumentTypeDetector` for comprehensive document type calibration
+- Auto-detects document type from content when not specified
+- Applies type-specific score adjustments to reduce false positives
+- Adds confidence penalties when detection methods disagree significantly
+- Generates domain-specific warnings explaining detection limitations
 
 **Classes:**
 
 ##### `AIDetectionEngine`
-- **Purpose:** Multi-model consensus AI detection
-- **Models Simulated:** GPTZero, Copyleaks, Turnitin
+- **Purpose:** Multi-model consensus AI detection with document type calibration
+- **Models Simulated:** GPTZero, Copyleaks, Turnitin, Ollama, Gemini, Claude, Mistral, Cohere
+- **Version:** ensemble_consensus_v2.3
 - **Methods:**
-  - `analyze_document(text, confidence_threshold)`: Main detection function
-    - Returns: AI detection score (0.0-1.0), confidence level, flagged sections
-  - `_detect_stylistic_markers()`: Analyze writing patterns
-  - `_detect_structural_patterns()`: Identify AI-typical structures
-  - `_calculate_consensus()`: Combine model outputs
+  - `analyze_document(text, confidence_threshold, document_type)`: Main detection function
+    - **v8.3.4:** Now accepts optional `document_type` parameter
+    - Returns: AI detection score (0.0-1.0), confidence level, flagged sections, document baseline
+  - `_gptzero_detection()`: Burstiness analysis (sentence length variance)
+  - `_copyleaks_detection()`: Linguistic pattern analysis
+  - `_turnitin_detection()`: Academic pattern detection
+  - `_ollama_detection()`: Markdown, hedging, structure patterns
+  - `_gemini_detection()`: Emoji, conversational, table patterns
+  - `_claude_detection()`: Thoughtful, ethical, bracket patterns
+  - `_mistral_detection()`: Technical, concise, European patterns
+  - `_cohere_detection()`: Business, RAG, citation patterns
+  - `_calculate_confidence()`: Agreement between models
+  - `_identify_ai_model()`: Determine likely source AI model
+
+**v8.3.4 Document Type Integration:**
+```python
+# Document type calibration applied automatically
+if self.document_type_detector:
+    baseline_analysis = self.document_type_detector.analyze(text, document_type)
+    
+    if baseline_analysis.is_specialized:
+        # Apply score adjustment (reduces false positives)
+        consensus_score = max(0, consensus_score + baseline_analysis.ai_score_adjustment)
+        # Apply confidence penalty
+        confidence = confidence * (1 - baseline_analysis.confidence_penalty)
+```
 
 **Detection Features:**
 - Stylistic markers: Formal tone, complex sentences, hedging language
 - Structural patterns: Consistent formatting, logical flow
 - Vocabulary analysis: Technical term density, readability metrics
 - Sentence complexity: Average length, variety, conjunction usage
+- **v8.3.4:** Document type pattern recognition
+- **v8.3.4:** Detection spread calculation and disagreement warnings
 
 ##### `ProvenanceAnalyzer`
 - **Purpose:** Extract document metadata and provenance
@@ -194,19 +249,184 @@ from data_lineage_source_mapper import DataLineageSourceMapper
   - `detect_anthropic_watermark()`: Anthropic-specific detection
   - `_analyze_token_distribution()`: Statistical analysis of token patterns
 
-**Output Schema:**
+**Output Schema (v8.3.4):**
 ```json
 {
-  "ai_detection_score": 0.41,
-  "confidence": 0.95,
-  "detected": true,
+  "ai_detection_score": 0.12,
+  "confidence": 0.41,
+  "detected": false,
+  "likely_ai_model": {"model": "Unknown", "confidence": 0.65},
   "flagged_sections": [...],
-  "interpretation": "High likelihood of AI assistance",
-  "recommendation": "Request disclosure",
-  "methods": ["stylistic", "structural", "vocabulary"],
-  "timestamp": "2025-11-22T00:00:00Z"
+  "interpretation": "Low likelihood of AI content",
+  "recommendation": "No immediate action required",
+  "methods": ["gptzero", "copyleaks", "turnitin", "ollama", "gemini", "claude", "mistral", "cohere"],
+  "model_scores": {...},
+  "detection_spread": 0.78,
+  "detected_document_type": "legislation",
+  "document_baseline": {
+    "document_type": "legislation",
+    "is_specialized": true,
+    "pattern_count": 12970,
+    "patterns_by_category": {"enumeration": 7536, "section_structure": 4240, ...},
+    "score_adjustment": -0.30,
+    "confidence_penalty": 0.40,
+    "conventions": ["Parliamentary/statutory drafting format"]
+  },
+  "domain_warnings": [
+    "📋 LEGISLATIVE TEXT: Uses standard drafting conventions...",
+    "⚠️ DETECTION DISAGREEMENT: Methods disagree by 78 percentage points..."
+  ],
+  "timestamp": "2025-12-03T00:00:00Z"
 }
 ```
+
+---
+
+### 2.1.1 Document Type Baselines (NEW in v8.3.4)
+
+#### **document_type_baselines.py**
+
+**Purpose:** Reduce AI detection false positives through domain-specific pattern recognition  
+**Size:** ~1,000 lines  
+**Version:** 8.3.4  
+**Reference:** Driedger's "Manual of Instructions for Legislative and Legal Writing" (1982)
+
+**Problem Solved:**
+Traditional AI detection methods flag standard document conventions as AI content:
+- Enumerated lists (a), (b), (c) in legislation
+- Legal terminology ("notwithstanding", "subject to")
+- Structured fiscal language in budgets
+- Citation patterns in legal judgments
+
+**Supported Document Types:**
+
+| Type | Max Score Adjustment | Max Confidence Penalty |
+|------|---------------------|----------------------|
+| `legislation` | -30% | 40% |
+| `budget` | -25% | 35% |
+| `legal_judgment` | -25% | 35% |
+| `policy_brief` | -20% | 30% |
+| `research_report` | -20% | 30% |
+| `news_article` | -15% | 25% |
+| `analysis` | -15% | 25% |
+| `report` | -10% | 20% |
+
+**Classes:**
+
+##### `DocumentType` (Enum)
+- Enumerates all supported document types
+
+##### `BaselineResult` (Dataclass)
+- Contains: document_type, is_specialized, pattern_count, patterns_by_category, ai_score_adjustment, confidence_penalty, warnings, detected_conventions
+
+##### `DocumentTypeBaseline` (Base Class)
+- **Methods:**
+  - `_compile_patterns()`: Compile regex patterns for efficiency
+  - `count_patterns(text)`: Count pattern matches by category
+  - `analyze(text)`: Abstract method for subclasses
+
+##### `LegislationBaseline`
+- **Patterns:** enumeration, section_structure, legislative_phrases, obligation_words, definition_patterns, amendment_phrases, common_law_terms, bilingual_patterns
+- **Thresholds:** 50 patterns = specialized, up to 500 for max adjustment
+
+##### `BudgetBaseline`
+- **Patterns:** fiscal_terms, budget_structure, percentage_phrases, table_indicators, fiscal_phrases, accountability_terms
+
+##### `LegalJudgmentBaseline`
+- **Patterns:** paragraph_citations, case_citations, legal_reasoning, latin_terms, court_structure, judgment_phrases
+
+##### `PolicyBriefBaseline`
+- **Patterns:** executive_summary, recommendation_format, policy_language, impact_assessment, structure_markers
+
+##### `ResearchReportBaseline`
+- **Patterns:** academic_structure, citation_markers, statistical_language, hedging_language, limitation_phrases
+
+##### `NewsArticleBaseline`
+- **Patterns:** dateline_format, attribution_patterns, quote_patterns, journalistic_style
+
+##### `DocumentTypeDetector`
+- **Purpose:** Unified interface for document type detection and calibration
+- **Methods:**
+  - `detect_document_type(text, hint)`: Auto-detect document type from content
+  - `analyze(text, document_type)`: Run appropriate baseline analysis
+  - `get_calibration(text, document_type)`: Get JSON-serializable calibration data
+
+**Usage Example:**
+```python
+from document_type_baselines import DocumentTypeDetector
+
+detector = DocumentTypeDetector()
+result = detector.get_calibration(text, 'legislation')
+
+# Result: 12,970 patterns detected, -30% score adjustment, 40% confidence penalty
+```
+
+---
+
+### 2.1.2 AI Usage Explainer (NEW in v8.3.3)
+
+#### **ai_usage_explainer.py**
+
+**Purpose:** Generate detailed, plain-language explanations of AI usage in analyzed documents  
+**Size:** ~900 lines  
+**Version:** 8.3.4  
+**LLM:** Ollama (granite4:tiny-h primary, qwen2.5:7b fallback)
+
+**Features:**
+- Synthesizes detection data into actionable insights
+- Generates comprehensive reports with multiple sections
+- Uses cautious language (estimates, not verified facts)
+- Integrates document type baseline context
+
+**Class:**
+
+##### `AIUsageExplainer`
+- **Purpose:** Generate detailed AI usage explanation reports
+- **Methods:**
+  - `generate_ai_usage_report(analysis_data, document_title, output_file)`: Main report generator
+  - `_generate_executive_summary()`: Overview with key metrics
+  - `_generate_detection_overview()`: Methodology breakdown
+  - `_generate_model_attribution()`: Which AI models detected
+  - `_generate_critical_sections()`: Sections requiring review
+  - `_generate_pattern_analysis()`: Pattern breakdown
+  - `_generate_fingerprint_analysis()`: Unique signature patterns
+  - `_generate_transparency_assessment()`: Compliance evaluation
+  - `_generate_recommendations()`: Actionable next steps
+  - `_generate_detection_limitations()`: Honest disclosure of limitations
+
+**Report Sections:**
+1. Executive Summary
+2. Detection Methodology
+3. Model Attribution
+4. Critical Sections Analysis
+5. Pattern Analysis
+6. Fingerprint Detection
+7. Transparency Assessment
+8. Recommendations
+9. Detection Limitations
+
+**v8.3.4 Document Baseline Integration:**
+```markdown
+⚠️ **SPECIALIZED DOCUMENT**: This legislation uses standard domain 
+conventions (Parliamentary/statutory drafting format) that may trigger 
+false positives. Detected 12,970 standard patterns. Score adjusted by 
+-30% to reduce false positives.
+```
+
+---
+
+### 2.1.3 Legislative Baseline (Legacy, v8.3.3)
+
+#### **legislative_baseline.py**
+
+**Purpose:** Recognize standard legislative drafting conventions (superseded by document_type_baselines.py)  
+**Size:** ~400 lines  
+**Version:** 8.3.3  
+**Reference:** Driedger's "Manual of Instructions for Legislative and Legal Writing" (1982)
+
+**Note:** This module is maintained for backward compatibility. New code should use `document_type_baselines.py` which provides comprehensive support for all document types.
+
+---
 
 ### 2.2 Contradiction Detector
 
@@ -2568,6 +2788,26 @@ The Sparrow SPOT Scale™ v8.3 system represents a comprehensive analytical fram
 - Interactive visualizations (HTML flowcharts)
 - **AI transparency disclosures (4 formats: formal, plain-language, social, HTML)**
 - **Data lineage validation (TXT + JSON)**
+- **AI usage explanation reports (v8.3.3)**
+
+**v8.3.4 Enhancement (December 3, 2025):**
+- **Document Type Calibration System:** Addresses "The AI Detection Paradox" critique
+  - **Issue:** Standard drafting conventions (enumeration, legal terms) flagged as AI content
+  - **Root Cause:** AI detectors trained on generic text, not specialized domains
+  - **Resolution:** Created `document_type_baselines.py` with patterns for 8 document types
+  - **Impact:** Bill C-15 AI score reduced from ~42% to ~4-12% with appropriate warnings
+  - **Score Adjustments:** Up to -30% for legislation, -25% for budgets, -20% for policy briefs
+  - **Confidence Penalties:** Applied when methods disagree or specialized text detected
+  - **Reference:** Driedger's "Manual of Instructions for Legislative and Legal Writing" (1982)
+
+**v8.3.3 Enhancement (December 2, 2025):**
+- **AI Usage Explanation Generator:** New module synthesizing detection data into detailed reports
+  - Generates comprehensive reports with 9 sections (executive summary, methodology, attribution, etc.)
+  - Uses cautious language (estimates, not verified facts)
+  - Removes circular reasoning from transparency assessment
+  - Integrates with GUI when Deep Analysis + AI Disclosure enabled
+- **Legislative Baseline:** Pattern recognition for standard legislative conventions
+- **Detection Disagreement Warnings:** Alerts when methods disagree by >40 percentage points
 
 **v8.3.1 Critical Fix (November 30, 2025):**
 - **Certificate AI Detection Accuracy:** Fixed logic to prioritize deep analysis consensus over basic detection
@@ -2590,24 +2830,40 @@ The Sparrow SPOT Scale™ v8.3 system represents a comprehensive analytical fram
 **Validated Effectiveness:**
 - 2025 Budget analysis: 53.2% AI detection (Cohere, 100% confidence)
 - Deep analysis: 1,421 pattern database, 5-model agreement, **27.9% consensus accuracy validated (v8.3.1)**
+- **Bill C-15 analysis: 4-12% AI detection after calibration (v8.3.4)**
 - Citation quality: Source diversity metrics, URL accessibility checks
 - NIST compliance: 97.5/100 (Excellent) - GOVERN/MAP/MEASURE/MANAGE pillars
 - Data lineage: 71.4% claim trace rate, correctly flagged 3.1% GDP as OPTIMISTIC (+35% deviation)
 - AI disclosure: 4 formats auto-generated (formal, plain-language, social, HTML)
+- **Document calibration: 12,970 patterns detected in legislation, score adjusted appropriately (v8.3.4)**
 - Production readiness: All quality checks passing, GUI operational, certificate accuracy verified
 
 This technical architecture enables the framework to serve as **accountability infrastructure** for AI-assisted governance, providing transparent, reproducible, and actionable policy analysis with unprecedented depth of AI transparency, data validation, and user accessibility through both CLI (15+ flags) and GUI (5-tab interface) access methods.
 
 ---
 
+## Future Roadmap: Trained Document Classifiers (v9.0)
+
+A detailed plan for training domain-specific AI detection models has been documented in `docs/DOCUMENT_CLASSIFIER_TRAINING_PLAN.md`. Key points:
+
+- **Problem:** Current heuristic-based detection produces false positives on specialized documents
+- **Solution:** Train 6+ fine-tuned DeBERTa classifiers, one per document type
+- **Training Data:** Pre-2020 human documents + AI-generated equivalents
+- **Expected Accuracy:** >90% per document type with <8% false positive rate
+- **Timeline:** 10 weeks from data collection to deployment
+- **Cost:** ~$2,200 (GPU training + API generation)
+
+This represents the evolution from pattern-matching (v8.3.4) to true machine learning (v9.0).
+
+---
+
 **Report Prepared By:** Gene Machine Research Team  
-**Framework Version:** Sparrow SPOT Scale™ v8.3.1  
-**Report Date:** November 30, 2025 (Updated)  
-**Last Technical Fix:** Certificate accuracy enhancement (v8.3.1)  
+**Framework Version:** Sparrow SPOT Scale™ v8.3.4  
+**Report Date:** December 3, 2025 (Updated)  
+**Last Technical Enhancement:** Document Type Calibration (v8.3.4)  
 **Next Technical Review:** January 31, 2026
 
 This technical architecture enables the framework to serve as **accountability infrastructure** for AI-assisted governance, providing transparent, reproducible, and actionable policy analysis with unprecedented depth of AI transparency and compliance mapping.
-
 ---
 
 **Report Prepared By:** Gene Machine Research Team  
