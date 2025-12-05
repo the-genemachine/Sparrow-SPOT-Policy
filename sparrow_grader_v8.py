@@ -1789,12 +1789,13 @@ class SPOTPolicy:
         # v8.4.0: Fix classification paradox
         # A document cannot be both "Questionable" and "Transformative"
         # Check if high Policy Consequentiality conflicts with low grade
-        pc_score = sparrow_scores.get('PC', {}).get('score', 0)
+        criteria = report.get('criteria', {})
+        pc_score = criteria.get('PC', {}).get('score', 0)
         
         # Count failing categories (score < 60)
         failing_categories = 0
-        for cat in ['SI', 'OI', 'TP', 'AR', 'IU']:
-            if sparrow_scores.get(cat, {}).get('score', 0) < 60:
+        for cat in ['FT', 'SB', 'ER', 'PA', 'AT']:
+            if criteria.get(cat, {}).get('score', 0) < 60:
                 failing_categories += 1
         
         # v8.4.0: Revised classification logic
