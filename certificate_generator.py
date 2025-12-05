@@ -1,7 +1,13 @@
 """
-HTML Certificate Generator for Sparrow SPOT Scale™ v7.0
+HTML Certificate Generator for Sparrow SPOT Scale™ v8.4.0
 
 Generates professional certificates for policy and journalism grading with ethical framework
+
+v8.4.0 Enhancement: Critical Findings at Top
+- Detection uncertainty warning moved to TOP of certificate
+- "Critical Findings" section shows failing scores prominently
+- INCONCLUSIVE detection suppresses misleading attribution confidence
+- "X of Y critical thresholds met" summary box added
 """
 
 import json
@@ -152,6 +158,9 @@ class CertificateGenerator:
                 <div class="doc-type-badge">{doc_type_badge}</div>
                 <div class="seal">★</div>
             </div>
+
+            <!-- v8.4.0: Critical Findings Section (shows at TOP when issues exist) -->
+            {critical_findings_section}
 
             <!-- Article Info -->
             <div class="article-info">
@@ -710,6 +719,22 @@ class CertificateGenerator:
         
         ai_confidence_pct = ai_confidence  # Kept for backward compatibility
         
+        # v8.4.0: Get AI detection data for INCONCLUSIVE check
+        ai_detection_data = report.get('ai_detection', {})
+        detection_inconclusive = ai_detection_data.get('detection_inconclusive', False)
+        detection_spread = ai_detection_data.get('detection_spread', 0)
+        
+        # v8.4.0: Suppress attribution confidence when detection is INCONCLUSIVE
+        if detection_inconclusive or detection_spread > 0.50:
+            ai_model = 'INCONCLUSIVE'
+            ai_model_confidence = 'N/A'
+            # Add confidence interval display if available
+            score_interval = ai_detection_data.get('score_confidence_interval', {})
+            if score_interval:
+                ai_confidence = f"{score_interval.get('display', f'{ai_confidence}% (uncertain)')}"
+            else:
+                ai_confidence = f"{ai_confidence}% ± {detection_spread * 50:.0f}%"
+        
         risk_tier_data = report.get('risk_tier', {})
         risk_tier = risk_tier_data.get('risk_tier', 'UNKNOWN').upper() if risk_tier_data else 'UNKNOWN'
         
@@ -950,10 +975,17 @@ class CertificateGenerator:
         # v8.3.3: Determine document type badge from report data
         doc_type_badge = self._get_document_type_badge(report)
         
+        # v8.4.0: Generate Critical Findings section
+        critical_findings_section = self._generate_critical_findings(
+            report, ai_detection_data if 'ai_detection_data' in dir() else report.get('ai_detection', {}),
+            trust_score, fairness_score, composite, criteria
+        )
+        
         html = self.policy_certificate_template.format(
             title=f"Sparrow SPOT Scale™ - {document_title}",
             document_title=document_title or "Policy Document",
             doc_type_badge=doc_type_badge,
+            critical_findings_section=critical_findings_section,
             ft_score=criteria.get('FT', {}).get('score', 'N/A'),
             sb_score=criteria.get('SB', {}).get('score', 'N/A'),
             er_score=criteria.get('ER', {}).get('score', 'N/A'),
@@ -1465,6 +1497,142 @@ IMPORTANT - Consistency Rules:
 </div>
 """
         return footer_html
+    
+    def _generate_critical_findings(self, report, ai_detection_data, trust_score, fairness_score, composite, criteria):
+        """
+        v8.4.0: Generate Critical Findings section for TOP of certificate.
+        
+        Shows critical issues prominently:
+        - INCONCLUSIVE AI detection (spread >50%)
+        - Failing fairness score (<50%)
+        - Low trust score (<70)
+        - Any failing criteria (<50)
+        
+        Returns:
+            HTML string for critical findings section, or empty string if no critical issues
+        """
+        critical_items = []
+        thresholds_met = 0
+        total_thresholds = 4  # Detection, Trust, Fairness, Composite
+        
+        # Check 1: AI Detection INCONCLUSIVE
+        detection_inconclusive = ai_detection_data.get('detection_inconclusive', False)
+        detection_spread = ai_detection_data.get('detection_spread', 0)
+        
+        if detection_inconclusive or detection_spread > 0.50:
+            model_scores = ai_detection_data.get('model_scores', {})
+            if model_scores:
+                score_values = [v * 100 for v in model_scores.values() if isinstance(v, (int, float))]
+                min_score = min(score_values) if score_values else 0
+                max_score = max(score_values) if score_values else 0
+                spread_pct = max_score - min_score
+            else:
+                spread_pct = detection_spread * 100
+                min_score = 0
+                max_score = spread_pct
+            
+            critical_items.append({
+                'icon': '🔴',
+                'title': 'AI DETECTION INCONCLUSIVE',
+                'message': f'Detection methods disagree by {spread_pct:.0f} percentage points (range: {min_score:.0f}%-{max_score:.0f}%). Manual expert review required.',
+                'severity': 'critical'
+            })
+        else:
+            thresholds_met += 1
+        
+        # Check 2: Trust Score
+        if trust_score < 70:
+            critical_items.append({
+                'icon': '🟠',
+                'title': f'TRUST SCORE: {trust_score:.1f}/100',
+                'message': 'Trust score below 70 threshold. Escalation to human review recommended.',
+                'severity': 'warning' if trust_score >= 50 else 'critical'
+            })
+        else:
+            thresholds_met += 1
+        
+        # Check 3: Fairness Score
+        if fairness_score < 50:
+            critical_items.append({
+                'icon': '🔴',
+                'title': f'FAIRNESS: {fairness_score}% (FAILED)',
+                'message': 'Significant bias detected. Manual bias review REQUIRED before implementation.',
+                'severity': 'critical'
+            })
+        elif fairness_score < 70:
+            critical_items.append({
+                'icon': '🟠',
+                'title': f'FAIRNESS: {fairness_score}% (MARGINAL)',
+                'message': 'Fairness metrics below recommended threshold. Review bias audit details.',
+                'severity': 'warning'
+            })
+            thresholds_met += 1
+        else:
+            thresholds_met += 1
+        
+        # Check 4: Composite Score
+        if composite < 60:
+            critical_items.append({
+                'icon': '🔴',
+                'title': f'COMPOSITE SCORE: {composite:.1f}/100',
+                'message': 'Overall score indicates significant quality concerns across multiple criteria.',
+                'severity': 'critical'
+            })
+        else:
+            thresholds_met += 1
+        
+        # Check individual failing criteria
+        failing_criteria = []
+        for key in ['FT', 'SB', 'ER', 'PA', 'PC']:
+            score = criteria.get(key, {}).get('score', 100)
+            if score < 50:
+                failing_criteria.append(f"{key}: {score}/100")
+        
+        if failing_criteria:
+            critical_items.append({
+                'icon': '⚠️',
+                'title': f'{len(failing_criteria)} FAILING CRITERIA',
+                'message': f'Scores below 50: {", ".join(failing_criteria)}',
+                'severity': 'warning'
+            })
+        
+        # If no critical issues, return empty
+        if not critical_items:
+            return ''
+        
+        # Generate HTML
+        items_html = ''
+        for item in critical_items:
+            bg_color = '#ffebee' if item['severity'] == 'critical' else '#fff3e0'
+            border_color = '#e53935' if item['severity'] == 'critical' else '#ff9800'
+            text_color = '#c62828' if item['severity'] == 'critical' else '#e65100'
+            
+            items_html += f'''
+            <div style="background: {bg_color}; border-left: 4px solid {border_color}; padding: 12px; margin-bottom: 10px; border-radius: 0 4px 4px 0;">
+                <div style="font-weight: 700; color: {text_color}; margin-bottom: 4px;">{item['icon']} {item['title']}</div>
+                <div style="font-size: 0.9em; color: #555;">{item['message']}</div>
+            </div>
+            '''
+        
+        # Threshold summary
+        threshold_color = '#27ae60' if thresholds_met >= 3 else ('#f39c12' if thresholds_met >= 2 else '#e74c3c')
+        
+        section_html = f'''
+        <div class="critical-findings" style="background: #fafafa; border: 2px solid #e74c3c; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #c62828; margin: 0;">🚨 Critical Findings</h3>
+                <div style="background: {threshold_color}; color: white; padding: 6px 12px; border-radius: 4px; font-weight: 700;">
+                    {thresholds_met}/{total_thresholds} Thresholds Met
+                </div>
+            </div>
+            {items_html}
+            <div style="font-size: 0.8em; color: #888; margin-top: 10px; font-style: italic;">
+                These findings require attention before relying on this analysis for decision-making.
+            </div>
+        </div>
+        '''
+        
+        return section_html
     
     def _get_grade_class(self, grade):
         """Get CSS class for grade color."""

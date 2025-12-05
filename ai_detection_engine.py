@@ -1,5 +1,5 @@
 """
-AI Detection Engine for SPOT-Policy™ v8.3.4
+AI Detection Engine for SPOT-Policy™ v8.4.0
 
 Detects AI-generated content in policy documents using multi-model consensus.
 Implements Pillar 1: INPUT TRANSPARENCY
@@ -35,7 +35,14 @@ v8.3.4 Enhancement: Comprehensive Document Type Calibration
 - Type-specific pattern recognition and score adjustments
 - Reference: "The AI Detection Paradox" critique informed calibration approach
 
-Author: SPOT-Policy™ v8.3.4 Ethical Framework
+v8.4.0 Enhancement: INCONCLUSIVE Detection Reporting
+- When detection spread >50%, flag as INCONCLUSIVE instead of averaging
+- Suppress detailed attribution when methods disagree significantly
+- Clear messaging: "Detection methods disagree - manual review required"
+- Confidence intervals added to probabilistic scores
+- Fixes Bill-C15-12 discrepancy report issues
+
+Author: SPOT-Policy™ v8.4.0 Ethical Framework
 Date: December 2, 2025
 """
 
@@ -70,13 +77,21 @@ class AIDetectionEngine:
     on specialized documents (legislation, budgets, legal judgments, etc.).
     Each document type has conventions that may incorrectly trigger AI detection.
     
+    v8.4.0: Added INCONCLUSIVE detection tier when methods disagree by >50%.
+    Instead of averaging conflicting scores, the system now reports uncertainty
+    and recommends manual review. This prevents misleading precision.
+    
     Accuracy: 97-99% for unedited AI text, 70-85% for hybrid content
     Note: Accuracy on specialized documents is lower due to domain conventions.
           The system now applies calibration baselines to account for this.
     """
     
+    # v8.4.0: Detection spread thresholds
+    SPREAD_INCONCLUSIVE_THRESHOLD = 0.50  # >50% spread = INCONCLUSIVE
+    SPREAD_WARNING_THRESHOLD = 0.40  # >40% spread = warning but still report
+    
     def __init__(self):
-        self.model_name = "ensemble_consensus_v2.3"  # v8.3.4 update
+        self.model_name = "ensemble_consensus_v2.4"  # v8.4.0 update
         self.models = [
             "gptzero_simulated", 
             "copyleaks_simulated", 
@@ -208,7 +223,25 @@ class AIDetectionEngine:
         # v8.3.3: Check for detection method disagreement
         score_values = list(scores.values())
         score_spread = max(score_values) - min(score_values)
-        if score_spread > 0.40:  # More than 40 percentage points spread
+        
+        # v8.4.0: INCONCLUSIVE detection when spread >50%
+        detection_inconclusive = False
+        inconclusive_reason = None
+        
+        if score_spread > self.SPREAD_INCONCLUSIVE_THRESHOLD:
+            detection_inconclusive = True
+            inconclusive_reason = (
+                f"Detection methods disagree by {score_spread*100:.0f} percentage points "
+                f"(range: {min(score_values)*100:.0f}% to {max(score_values)*100:.0f}%). "
+                f"Unable to provide reliable AI content estimate. Manual review required."
+            )
+            domain_warnings.append(
+                f"🔴 DETECTION INCONCLUSIVE: {inconclusive_reason}"
+            )
+            # Set confidence to very low when inconclusive
+            confidence = confidence * 0.3  # 70% reduction
+            
+        elif score_spread > self.SPREAD_WARNING_THRESHOLD:
             domain_warnings.append(
                 f"⚠️ DETECTION DISAGREEMENT: Methods disagree by {score_spread*100:.0f} percentage "
                 f"points (range: {min(score_values)*100:.0f}% to {max(score_values)*100:.0f}%). "
@@ -223,9 +256,22 @@ class AIDetectionEngine:
         # Detect flagged sections (suspicious patterns)
         flagged_sections = self._identify_flagged_sections(text, consensus_score)
         
-        # Interpretation
-        interpretation = self._interpret_score(consensus_score, confidence)
-        recommendation = self._generate_recommendation(consensus_score)
+        # v8.4.0: Interpretation and recommendation with INCONCLUSIVE support
+        if detection_inconclusive:
+            interpretation = (
+                f"INCONCLUSIVE: Detection methods disagree significantly "
+                f"(range: {min(score_values)*100:.0f}% to {max(score_values)*100:.0f}%). "
+                f"Cannot provide reliable AI content estimate."
+            )
+            recommendation = (
+                "❌ MANUAL REVIEW REQUIRED: AI detection results are unreliable for this document. "
+                "Do not rely on automated detection scores. Consider expert human review."
+            )
+            # Suppress detailed section flagging when inconclusive
+            flagged_sections = []
+        else:
+            interpretation = self._interpret_score(consensus_score, confidence)
+            recommendation = self._generate_recommendation(consensus_score)
         
         result = {
             "ai_detection_score": round(consensus_score, 3),
@@ -237,7 +283,16 @@ class AIDetectionEngine:
             "recommendation": recommendation,
             "methods": list(scores.keys()),
             "model_scores": scores,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            # v8.4.0: INCONCLUSIVE detection support
+            "detection_inconclusive": detection_inconclusive,
+            "inconclusive_reason": inconclusive_reason,
+            # v8.4.0: Confidence interval for score
+            "score_confidence_interval": {
+                "low": round(min(score_values), 3),
+                "high": round(max(score_values), 3),
+                "display": f"{consensus_score*100:.1f}% ± {score_spread*50:.1f}%"
+            }
         }
         
         # v8.3.4: Add document type baseline analysis if available

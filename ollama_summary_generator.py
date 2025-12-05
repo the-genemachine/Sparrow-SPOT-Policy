@@ -1,6 +1,11 @@
 """
-Ollama-Based Summary Generator for Sparrow SPOT Scale™ Certificates
+Ollama-Based Summary Generator for Sparrow SPOT Scale™ Certificates v8.4.0
 Generates plain-language summaries for policy and journalism grading reports
+
+v8.4.0 Enhancements:
+- INCONCLUSIVE detection awareness in AI Transparency sections
+- Standardized narrative voice guidelines across document types
+- Consistent messaging when detection spread >50%
 """
 
 import json
@@ -8,6 +13,22 @@ import requests
 from typing import Optional, Dict, Any
 from datetime import datetime
 import time
+
+VERSION = "8.4.0"
+
+# v8.4.0: Standardized narrative voice guidelines
+NARRATIVE_VOICE_GUIDELINES = """
+CRITICAL NARRATIVE VOICE RULES:
+1. NEVER claim certainty about AI detection - use "appears to", "may indicate", "patterns suggest"
+2. When detection_spread > 50% or detection_inconclusive=True:
+   - Do NOT cite AI percentage as fact
+   - Say "AI detection was INCONCLUSIVE due to conflicting method results"
+   - Do NOT name any AI model as likely source
+3. When fairness_score < 50, explicitly note "FAILING" fairness status
+4. When trust_score < 70, note limitations in governance assessment
+5. Always use accessible language (Grade 8-10 reading level)
+6. Start summaries with the document's grade, not AI analysis
+"""
 
 
 class OllamaSummaryGenerator:
@@ -61,21 +82,50 @@ class OllamaSummaryGenerator:
         ])
         
         # v8.3.3: Include AI Transparency dimension if available
+        # v8.4.0: Handle INCONCLUSIVE detection
         ai_transparency_text = ""
+        ai_detection = report.get('ai_detection', {})
+        detection_inconclusive = ai_detection.get('detection_inconclusive', False)
+        detection_spread = ai_detection.get('detection_spread', 0)
+        
         deep_analysis = report.get('deep_analysis', {})
         if deep_analysis:
             consensus = deep_analysis.get('consensus', {})
             ai_percentage = consensus.get('ai_percentage', 0)
             transparency_score = consensus.get('transparency_score', 0)
             primary_model = consensus.get('primary_model', 'Unknown')
-            if transparency_score > 0:
+            
+            # v8.4.0: INCONCLUSIVE detection handling
+            if detection_inconclusive or detection_spread > 0.50:
                 ai_transparency_text = f"""
 
 AI Transparency (AT):
-- AI Content Detected: {ai_percentage:.1f}%
+⚠️ AI DETECTION IS INCONCLUSIVE
+- Detection methods disagreed by {detection_spread*100:.0f}% (exceeds 50% threshold)
+- AI Content: CANNOT BE RELIABLY DETERMINED
+- Model Attribution: SUPPRESSED (inconclusive data)
+- Note: Professional manual review is recommended"""
+                scores_text += f"\n- AT (AI Transparency): INCONCLUSIVE"
+            elif transparency_score > 0:
+                ai_transparency_text = f"""
+
+AI Transparency (AT):
+- AI Content Detected: {ai_percentage:.1f}% (estimate, not verified)
 - Likely AI Model: {primary_model}
-- Transparency Score: {transparency_score}/100"""
+- Transparency Score: {transparency_score}/100
+- Note: AI detection is probabilistic, not definitive"""
                 scores_text += f"\n- AT (AI Transparency): {transparency_score}/100"
+        
+        # v8.4.0: Build INCONCLUSIVE-aware prompt
+        if detection_inconclusive or detection_spread > 0.50:
+            ai_guidance = """
+IMPORTANT: AI detection is INCONCLUSIVE for this document. Do NOT claim any specific
+AI percentage as fact. Say "AI detection was inconclusive" and recommend manual review.
+Do NOT name any AI model as the likely source."""
+        else:
+            ai_guidance = """
+If AI content was detected, briefly explain what this means for transparency.
+Use hedging language: "appears to", "may contain", "patterns suggest"."""
         
         prompt = f"""You are a policy analyst writing for the general public (reading level: Grade 8).
 
@@ -86,12 +136,13 @@ Classification: {classification}
 Criteria Scores:
 {scores_text}
 {ai_transparency_text}
+{ai_guidance}
 
 Write a 400-500 word plain-language summary that:
 1. Explains what the SPOT grading means in simple terms
 2. Highlights the strongest area
 3. Identifies the weakest area
-4. If AI content was detected, briefly explain what this means for transparency
+4. Addresses AI transparency as noted above
 5. Suggests what this means for the public
 6. Is written in accessible language (no jargon)
 

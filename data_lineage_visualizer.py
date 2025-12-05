@@ -1,5 +1,5 @@
 """
-Data Lineage Visualization for Sparrow SPOT Scale™ v8.3.5
+Data Lineage Visualization for Sparrow SPOT Scale™ v8.4.0
 
 Generates visual flowcharts showing document analysis pipeline and data flow.
 
@@ -8,10 +8,13 @@ Status values:
 - skipped: Stage was not enabled (optional feature)
 - pending: Stage not yet run (only during active processing)
 - failed: Stage encountered an error
+- not_applicable: Stage does not apply to this document type (v8.4.0)
 """
 
 from typing import Dict, List
 from datetime import datetime
+
+VERSION = "8.4.0"
 
 
 class DataLineageVisualizer:
@@ -53,18 +56,20 @@ class DataLineageVisualizer:
         """Generate ASCII art flowchart of analysis pipeline."""
         lines = []
         lines.append("=" * 80)
-        lines.append("  SPARROW SPOT SCALE™ v8.3.2 - DATA LINEAGE FLOWCHART")
+        lines.append(f"  SPARROW SPOT SCALE™ v{VERSION} - DATA LINEAGE FLOWCHART")
         lines.append("=" * 80)
         lines.append("")
         
         for i, stage in enumerate(self.stages):
-            # Status indicator
+            # Status indicator - v8.4.0: Added skipped and not_applicable
             status_icon = {
                 "pending": "⏳",
                 "in-progress": "🔄",
                 "completed": "✅",
-                "failed": "❌"
-            }.get(stage["status"], "")
+                "failed": "❌",
+                "skipped": "⏭️",
+                "not_applicable": "➖"
+            }.get(stage["status"], "❓")
             
             # Stage box
             lines.append(f"┌─ STAGE {i+1}: {stage['name'].upper()}")
@@ -141,6 +146,15 @@ class DataLineageVisualizer:
             border-left-color: #f39c12;
             background: #fff3e0;
         }
+        .stage.skipped {
+            border-left-color: #95a5a6;
+            background: #f5f5f5;
+        }
+        .stage.not_applicable {
+            border-left-color: #bdc3c7;
+            background: #fafafa;
+            opacity: 0.7;
+        }
         .stage-header {
             font-size: 1.2em;
             font-weight: bold;
@@ -159,6 +173,8 @@ class DataLineageVisualizer:
         .status-failed { background: #e74c3c; color: white; }
         .status-in-progress { background: #f39c12; color: white; }
         .status-pending { background: #95a5a6; color: white; }
+        .status-skipped { background: #7f8c8d; color: white; }
+        .status-not_applicable { background: #bdc3c7; color: #333; }
         .stage-description {
             color: #666;
             margin: 10px 0;
@@ -192,7 +208,7 @@ class DataLineageVisualizer:
 <body>
     <div class="container">
         <h1>🔬 Data Lineage Flowchart</h1>
-        <p style="text-align: center; color: #666;">Sparrow SPOT Scale™ v8.3.2 Analysis Pipeline</p>
+        <p style="text-align: center; color: #666;">Sparrow SPOT Scale™ v{VERSION} Analysis Pipeline</p>
 """
         
         for i, stage in enumerate(self.stages):
@@ -225,6 +241,7 @@ class DataLineageVisualizer:
             <p><strong>Total Stages:</strong> {len(self.stages)}</p>
             <p><strong>Completed:</strong> {sum(1 for s in self.stages if s['status'] == 'completed')}</p>
             <p><strong>Failed:</strong> {sum(1 for s in self.stages if s['status'] == 'failed')}</p>
+            <p><strong>Skipped:</strong> {sum(1 for s in self.stages if s['status'] == 'skipped')}</p>
             <p><strong>Generated:</strong> {datetime.now().strftime('%B %d, %Y at %H:%M:%S')}</p>
         </div>
     </div>
@@ -232,16 +249,20 @@ class DataLineageVisualizer:
 </html>
 """
         
+        # Replace version placeholder with actual version
+        html = html.replace('{VERSION}', VERSION)
+        
         return html
     
     def generate_json_lineage(self) -> Dict:
         """Generate JSON representation of lineage for programmatic use."""
         return {
-            "pipeline": "Sparrow SPOT Scale v8.3.2",
+            "pipeline": f"Sparrow SPOT Scale v{VERSION}",
             "timestamp": datetime.now().isoformat(),
             "total_stages": len(self.stages),
             "completed_stages": sum(1 for s in self.stages if s["status"] == "completed"),
             "failed_stages": sum(1 for s in self.stages if s["status"] == "failed"),
+            "skipped_stages": sum(1 for s in self.stages if s["status"] == "skipped"),
             "stages": self.stages
         }
     

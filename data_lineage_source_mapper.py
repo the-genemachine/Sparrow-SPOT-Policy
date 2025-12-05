@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
 Data Lineage Source Mapper
-Sparrow SPOT Scale™ v8.3
+Sparrow SPOT Scale™ v8.4.0
 
 Automatically traces quantitative claims in policy documents back to authoritative
 data sources (Statistics Canada, IMF, OECD, World Bank, etc.) and validates accuracy.
+
+v8.4.0 Enhancement: Legislative Operative Language Exclusion
+- Distinguishes "empirical claims" from "legislative provisions"
+- Legislative dollar amounts, percentages, section references are provisions being
+  enacted, not claims needing source verification
+- Prevents misleading "0% sourcing" for legislative documents
+- Fixes Bill-C15-12 discrepancy: legislative provisions != unsourced claims
 
 Usage:
     python data_lineage_source_mapper.py --input analysis.json --output lineage_report
@@ -119,6 +126,71 @@ class DataLineageSourceMapper:
                 'description': 'Federal debt as % of GDP'
             }
         }
+        
+        # v8.4.0: Legislative operative language patterns
+        # These indicate legislative provisions being enacted, NOT empirical claims
+        # Legislative provisions don't require source verification because they ARE the source
+        self.legislative_operative_patterns = [
+            # Amendment language
+            r'is\s+(hereby\s+)?amended',
+            r'is\s+(hereby\s+)?replaced\s+by',
+            r'is\s+(hereby\s+)?repealed',
+            r'is\s+(hereby\s+)?enacted',
+            r'comes?\s+into\s+force',
+            r'shall\s+come\s+into\s+force',
+            
+            # Appropriation/allocation language
+            r'(is|are)\s+(hereby\s+)?(appropriated|allocated)',
+            r'(there\s+is|there\s+are)\s+(hereby\s+)?appropriated',
+            r'sum\s+of\s+\$[\d,]+.*?is\s+(hereby\s+)?',
+            r'out\s+of\s+the\s+Consolidated\s+Revenue\s+Fund',
+            
+            # Section/subsection references
+            r'section\s+\d+(\.\d+)*\s+(of\s+the\s+Act\s+)?is',
+            r'subsection\s+\d+\(\d+\)',
+            r'paragraph\s+\d+\(\d+\)\([a-z]\)',
+            r'schedule\s+[IVX]+\s+to',
+            
+            # Definitions and interpretation
+            r'for\s+the\s+purposes?\s+of\s+this\s+(Act|section)',
+            r'has\s+the\s+meaning\s+assigned',
+            r'"[^"]+"\s+means',
+            
+            # Canadian bilingual patterns
+            r'est\s+(modifié|remplacé|abrogé)',  # French legislative language
+            r'entre\s+en\s+vigueur',
+            r'est\s+(ainsi\s+)?édicté',
+        ]
+        
+        # Compile for efficiency
+        self.legislative_pattern_compiled = re.compile(
+            '|'.join(self.legislative_operative_patterns),
+            re.IGNORECASE
+        )
+    
+    def _is_legislative_provision(self, sentence: str) -> Tuple[bool, Optional[str]]:
+        """
+        Determine if a sentence is a legislative provision rather than an empirical claim.
+        
+        v8.4.0: Legislative provisions are legal enactments, not empirical claims.
+        A sentence like "$53 billion is hereby appropriated" is the law itself,
+        not a claim about external data that needs source verification.
+        
+        Args:
+            sentence: Full sentence containing a quantitative element
+            
+        Returns:
+            Tuple of (is_legislative, reason_if_excluded)
+        """
+        if not sentence:
+            return False, None
+        
+        match = self.legislative_pattern_compiled.search(sentence)
+        if match:
+            matched_pattern = match.group()
+            return True, f"Legislative provision detected: '{matched_pattern}'"
+        
+        return False, None
     
     def _clean_ocr_artifacts(self, text: str) -> str:
         """
@@ -186,17 +258,23 @@ class DataLineageSourceMapper:
         
         return cleaned
     
-    def extract_quantitative_claims(self, text: str) -> List[Dict]:
+    def extract_quantitative_claims(self, text: str, exclude_legislative: bool = True) -> List[Dict]:
         """
         Extract quantitative claims from document text.
         
+        v8.4.0 Enhancement: Distinguishes empirical claims from legislative provisions.
+        Legislative operative language (appropriations, amendments, enactments) represents
+        the law itself - not claims requiring external source verification.
+        
         Args:
             text: Full document text
+            exclude_legislative: If True, exclude legislative provisions from claims
             
         Returns:
-            List of extracted claims with context
+            List of extracted claims with context and legislative classification
         """
         claims = []
+        legislative_provisions = []  # Track excluded provisions for transparency
         
         # Extract percentage-based claims
         percentage_pattern = r'([^.!?]{0,100})(\d+\.?\d*)%([^.!?]{0,100}[.!?])'
@@ -205,13 +283,25 @@ class DataLineageSourceMapper:
             value = float(match.group(2))
             context_after = match.group(3).strip()
             
-            claims.append({
+            full_sentence = (context_before + str(value) + '%' + context_after).strip()
+            
+            # v8.4.0: Check if this is legislative operative language
+            is_legislative, reason = self._is_legislative_provision(full_sentence)
+            
+            claim_data = {
                 'type': 'percentage',
                 'value': value,
                 'context_before': context_before[-100:] if len(context_before) > 100 else context_before,
                 'context_after': context_after[:100] if len(context_after) > 100 else context_after,
-                'full_sentence': (context_before + str(value) + '%' + context_after).strip()
-            })
+                'full_sentence': full_sentence,
+                'is_legislative_provision': is_legislative,
+                'legislative_reason': reason
+            }
+            
+            if is_legislative and exclude_legislative:
+                legislative_provisions.append(claim_data)
+            else:
+                claims.append(claim_data)
         
         # Extract dollar amounts (billions/millions)
         dollar_pattern = r'([^.!?]{0,100})\$(\d+\.?\d*)\s*(billion|million|trillion)([^.!?]{0,100}[.!?])'
@@ -229,15 +319,30 @@ class DataLineageSourceMapper:
             else:
                 normalized_value = value
             
-            claims.append({
+            full_sentence = (context_before + '$' + str(value) + ' ' + magnitude + context_after).strip()
+            
+            # v8.4.0: Check if this is legislative operative language
+            is_legislative, reason = self._is_legislative_provision(full_sentence)
+            
+            claim_data = {
                 'type': 'dollar_amount',
                 'value': normalized_value,
                 'original_value': value,
                 'magnitude': magnitude,
                 'context_before': context_before[-100:],
                 'context_after': context_after[:100],
-                'full_sentence': (context_before + '$' + str(value) + ' ' + magnitude + context_after).strip()
-            })
+                'full_sentence': full_sentence,
+                'is_legislative_provision': is_legislative,
+                'legislative_reason': reason
+            }
+            
+            if is_legislative and exclude_legislative:
+                legislative_provisions.append(claim_data)
+            else:
+                claims.append(claim_data)
+        
+        # Store legislative provisions count for reporting
+        self._last_legislative_provisions = legislative_provisions
         
         return claims
     
@@ -318,21 +423,34 @@ class DataLineageSourceMapper:
             else:
                 return f"Claim deviates {abs((claimed-historical)/historical*100):.0f}% from historical data. Requires citation."
     
-    def trace_sources(self, document_text: str) -> Dict:
+    def trace_sources(self, document_text: str, document_type: str = 'policy') -> Dict:
         """
         Main method: Extract claims, categorize, validate, and trace to sources.
         
+        v8.4.0 Enhancement: Properly handles legislative documents by:
+        - Distinguishing legislative provisions (the law itself) from empirical claims
+        - Not penalizing legislative documents for "untraced" appropriations
+        - Providing transparent accounting of all extracted quantitative elements
+        
         Args:
             document_text: Full text of policy document
+            document_type: 'policy', 'legislation', 'report', etc.
             
         Returns:
-            Comprehensive lineage report
+            Comprehensive lineage report with legislative provision accounting
         """
         # Fix #4: Clean OCR artifacts from text before processing
         cleaned_text = self._clean_ocr_artifacts(document_text)
         
-        # Extract all quantitative claims
-        all_claims = self.extract_quantitative_claims(cleaned_text)
+        # Determine if we should exclude legislative provisions
+        # For legislation/budget bills, most dollar amounts ARE the law, not claims
+        is_legislative_doc = document_type.lower() in ['legislation', 'bill', 'act', 'budget_implementation']
+        
+        # Extract all quantitative claims (excluding legislative provisions for legislative docs)
+        all_claims = self.extract_quantitative_claims(cleaned_text, exclude_legislative=is_legislative_doc)
+        
+        # Get the legislative provisions that were excluded
+        legislative_provisions = getattr(self, '_last_legislative_provisions', [])
         
         # Categorize and validate
         traced_claims = []
@@ -359,7 +477,8 @@ class DataLineageSourceMapper:
         plausible = sum(1 for t in traced_claims if t['validation']['assessment'] == 'PLAUSIBLE')
         optimistic = sum(1 for t in traced_claims if t['validation']['assessment'] in ['OPTIMISTIC', 'QUESTIONABLE'])
         
-        return {
+        # v8.4.0: Build comprehensive response with legislative accounting
+        result = {
             'timestamp': datetime.now().isoformat(),
             'summary': {
                 'total_quantitative_claims': total_claims,
@@ -378,6 +497,32 @@ class DataLineageSourceMapper:
                 'validation_method': 'Historical deviation analysis (20-year average)'
             }
         }
+        
+        # v8.4.0: Add legislative provision accounting for transparency
+        if is_legislative_doc or legislative_provisions:
+            result['legislative_provisions'] = {
+                'count': len(legislative_provisions),
+                'explanation': (
+                    'Legislative provisions are dollar amounts and percentages that ARE the law itself '
+                    '(appropriations, amendments, allocations). These are not empirical claims requiring '
+                    'external source verification. The legislation IS the primary source.'
+                ),
+                'examples': [p['full_sentence'][:150] + '...' if len(p['full_sentence']) > 150 
+                            else p['full_sentence'] for p in legislative_provisions[:5]],
+                'reasons': [p['legislative_reason'] for p in legislative_provisions[:5]]
+            }
+            result['summary']['legislative_provisions_excluded'] = len(legislative_provisions)
+            result['summary']['total_quantitative_elements'] = total_claims + len(legislative_provisions)
+            
+            # Recalculate effective trace rate excluding legislative provisions
+            if total_claims > 0:
+                result['summary']['note'] = (
+                    f"Of {total_claims + len(legislative_provisions)} total quantitative elements, "
+                    f"{len(legislative_provisions)} are legislative provisions (not claims), "
+                    f"leaving {total_claims} empirical claims for source tracing."
+                )
+        
+        return result
     
     def generate_report(self, lineage_data: Dict, format: str = 'text') -> str:
         """

@@ -1,5 +1,5 @@
 """
-NIST AI RMF Compliance Checker for Sparrow SPOT Scale™ v8.3.2
+NIST AI RMF Compliance Checker for Sparrow SPOT Scale™ v8.4.0
 
 Maps existing features to NIST AI Risk Management Framework pillars.
 
@@ -12,6 +12,12 @@ NOT the analyzed document's compliance. The distinction is critical:
 
 This is a self-assessment of the AI analysis tool's governance practices,
 not an assessment of the target document's NIST compliance.
+
+v8.4.0 Enhancement: Cross-Module Score Dependencies
+- NIST GOVERN score now capped at 75 if trust_score < 70
+- NIST MEASURE score now capped at 60 if fairness_score < 40
+- Compliance level adjusted when any pillar score < 70
+- Fixes Bill-C15-12 discrepancy: Trust 53% cannot coexist with NIST 96%
 """
 
 from typing import Dict, List
@@ -27,6 +33,11 @@ class NISTComplianceChecker:
     principles in its design and operation. It does NOT assess whether the
     document being analyzed is NIST compliant.
     
+    v8.4.0 Enhancement: Score Dependency Rules
+    - Cross-module validation ensures NIST scores are consistent with other metrics
+    - Low trust or fairness scores cap corresponding NIST pillar scores
+    - Prevents misleading "Excellent Compliance" when critical failures exist
+    
     Example:
     - "GOVERN pillar: PASS" = Sparrow tool has governance structures
     - NOT = "The analyzed budget document has governance structures"
@@ -39,13 +50,25 @@ class NISTComplianceChecker:
         "MANAGE": "Risk mitigation and monitoring"
     }
     
+    # v8.4.0: Score dependency thresholds
+    TRUST_THRESHOLD_FOR_GOVERN = 70  # If trust < 70, cap GOVERN at 75
+    FAIRNESS_THRESHOLD_FOR_MEASURE = 40  # If fairness < 40, cap MEASURE at 60
+    GOVERN_CAP_WHEN_LOW_TRUST = 75
+    MEASURE_CAP_WHEN_LOW_FAIRNESS = 60
+    PILLAR_THRESHOLD_FOR_EXCELLENT = 70  # No pillar can be "excellent" if any < 70
+    
     def __init__(self):
         """Initialize compliance checker."""
         self.checks = []
+        # v8.4.0: Track dependency adjustments
+        self.dependency_adjustments = []
     
     def check_compliance(self, report: Dict) -> Dict:
         """
         Check NIST AI RMF compliance based on v8.2 features.
+        
+        v8.4.0: Now applies cross-module dependency rules to ensure
+        consistency between NIST scores and other metrics.
         
         Args:
             report: Sparrow grading report JSON
@@ -53,12 +76,21 @@ class NISTComplianceChecker:
         Returns:
             Compliance assessment dictionary
         """
+        # v8.4.0: Reset dependency adjustments
+        self.dependency_adjustments = []
+        
+        # v8.4.0: Extract cross-module scores for dependency checks
+        trust_score = report.get("trust_score", {}).get("trust_score", 100)
+        fairness_score = report.get("bias_audit", {}).get("overall_fairness_score", 100)
+        
         compliance = {
             "framework": "NIST AI RMF v1.0",
             "assessment_date": datetime.now().isoformat(),
             "pillars": {},
             "overall_compliance_score": 0.0,
-            "compliance_level": ""
+            "compliance_level": "",
+            # v8.4.0: Track dependency-based adjustments
+            "dependency_adjustments": []
         }
         
         # Check each pillar
@@ -67,10 +99,59 @@ class NISTComplianceChecker:
         compliance["pillars"]["MEASURE"] = self._check_measure(report)
         compliance["pillars"]["MANAGE"] = self._check_manage(report)
         
-        # Calculate overall score
+        # v8.4.0: Apply cross-module dependency rules
+        
+        # Rule 1: If trust_score < 70, cap GOVERN at 75
+        if trust_score < self.TRUST_THRESHOLD_FOR_GOVERN:
+            original_score = compliance["pillars"]["GOVERN"]["score"]
+            if original_score > self.GOVERN_CAP_WHEN_LOW_TRUST:
+                compliance["pillars"]["GOVERN"]["score"] = self.GOVERN_CAP_WHEN_LOW_TRUST
+                adjustment = {
+                    "pillar": "GOVERN",
+                    "original_score": original_score,
+                    "adjusted_score": self.GOVERN_CAP_WHEN_LOW_TRUST,
+                    "reason": f"Trust score ({trust_score:.1f}) below threshold ({self.TRUST_THRESHOLD_FOR_GOVERN})",
+                    "rule": "TRUST_DEPENDENCY"
+                }
+                self.dependency_adjustments.append(adjustment)
+                compliance["pillars"]["GOVERN"]["dependency_adjustment"] = adjustment
+        
+        # Rule 2: If fairness_score < 40, cap MEASURE at 60
+        if fairness_score < self.FAIRNESS_THRESHOLD_FOR_MEASURE:
+            original_score = compliance["pillars"]["MEASURE"]["score"]
+            if original_score > self.MEASURE_CAP_WHEN_LOW_FAIRNESS:
+                compliance["pillars"]["MEASURE"]["score"] = self.MEASURE_CAP_WHEN_LOW_FAIRNESS
+                adjustment = {
+                    "pillar": "MEASURE",
+                    "original_score": original_score,
+                    "adjusted_score": self.MEASURE_CAP_WHEN_LOW_FAIRNESS,
+                    "reason": f"Fairness score ({fairness_score:.1f}%) below threshold ({self.FAIRNESS_THRESHOLD_FOR_MEASURE}%)",
+                    "rule": "FAIRNESS_DEPENDENCY"
+                }
+                self.dependency_adjustments.append(adjustment)
+                compliance["pillars"]["MEASURE"]["dependency_adjustment"] = adjustment
+        
+        # Calculate overall score (after adjustments)
         pillar_scores = [p["score"] for p in compliance["pillars"].values()]
         compliance["overall_compliance_score"] = round(sum(pillar_scores) / len(pillar_scores), 1)
-        compliance["compliance_level"] = self._get_compliance_level(compliance["overall_compliance_score"])
+        
+        # v8.4.0: Rule 3: Adjust compliance level if any pillar < 70
+        min_pillar_score = min(pillar_scores)
+        if min_pillar_score < self.PILLAR_THRESHOLD_FOR_EXCELLENT and compliance["overall_compliance_score"] >= 90:
+            # Cannot be "Excellent" if any pillar fails threshold
+            compliance["compliance_level"] = "Good Compliance (Limited by weakest pillar)"
+            self.dependency_adjustments.append({
+                "adjustment": "compliance_level",
+                "original": "Excellent Compliance",
+                "adjusted": "Good Compliance (Limited by weakest pillar)",
+                "reason": f"Lowest pillar score ({min_pillar_score:.1f}) below threshold ({self.PILLAR_THRESHOLD_FOR_EXCELLENT})",
+                "rule": "PILLAR_MINIMUM"
+            })
+        else:
+            compliance["compliance_level"] = self._get_compliance_level(compliance["overall_compliance_score"])
+        
+        # v8.4.0: Include all adjustments in output
+        compliance["dependency_adjustments"] = self.dependency_adjustments
         
         return compliance
     
@@ -406,9 +487,30 @@ class NISTComplianceChecker:
         lines.append(f"Compliance Level: {compliance['compliance_level']}")
         lines.append("")
         
+        # v8.4.0: Show dependency adjustments if any
+        if compliance.get("dependency_adjustments"):
+            lines.append("┌" + "─" * 78 + "┐")
+            lines.append("│ ⚠️  CROSS-MODULE DEPENDENCY ADJUSTMENTS APPLIED                          │")
+            lines.append("├" + "─" * 78 + "┤")
+            for adj in compliance["dependency_adjustments"]:
+                if "pillar" in adj:
+                    lines.append(f"│ • {adj['pillar']}: {adj['original_score']:.0f} → {adj['adjusted_score']:.0f}")
+                    lines.append(f"│   Reason: {adj['reason']}")
+                else:
+                    lines.append(f"│ • {adj['adjustment']}: {adj['original']} → {adj['adjusted']}")
+                    lines.append(f"│   Reason: {adj['reason']}")
+            lines.append("└" + "─" * 78 + "┘")
+            lines.append("")
+        
         for pillar_name, pillar_data in compliance["pillars"].items():
             lines.append(f"┌─ {pillar_name} PILLAR: {pillar_data['description']}")
-            lines.append(f"│  Score: {pillar_data['score']}/100")
+            # v8.4.0: Show if score was adjusted
+            if "dependency_adjustment" in pillar_data:
+                adj = pillar_data["dependency_adjustment"]
+                lines.append(f"│  Score: {pillar_data['score']}/100 (adjusted from {adj['original_score']:.0f})")
+                lines.append(f"│  ⚠️ {adj['reason']}")
+            else:
+                lines.append(f"│  Score: {pillar_data['score']}/100")
             lines.append(f"│  Summary: {pillar_data['summary']}")
             lines.append("│")
             

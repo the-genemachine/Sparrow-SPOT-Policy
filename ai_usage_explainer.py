@@ -1,5 +1,5 @@
 """
-AI Usage Explanation Generator for Sparrow SPOT Scale™ v8.3.4
+AI Usage Explanation Generator for Sparrow SPOT Scale™ v8.4.0
 
 Generates detailed, plain-language explanations of how AI was used in analyzed documents.
 This module synthesizes detection data into actionable insights about:
@@ -12,6 +12,8 @@ This module synthesizes detection data into actionable insights about:
 NEW in v8.3.3: Addresses the need for detailed AI usage reports beyond raw detection data.
 v8.3.4: Integrates comprehensive document type baselines to recognize domain conventions
         and provide accurate context in reports.
+v8.4.0: INCONCLUSIVE detection handling - when detection spread >50%, AI attribution
+        is suppressed and replaced with uncertainty messaging.
 """
 
 import json
@@ -29,7 +31,7 @@ class AIUsageExplainer:
         self.ollama_url = ollama_url
         self.model = "granite4:tiny-h"  # Primary model for explanations
         self.fallback_model = "qwen2.5:7b"
-        self.version = "8.3.5"
+        self.version = "8.4.0"
     
     def _call_ollama(self, prompt: str, model: Optional[str] = None, max_tokens: int = 2000) -> Optional[str]:
         """Call Ollama API for text generation."""
@@ -148,8 +150,19 @@ class AIUsageExplainer:
         detection_spread = ai_detection.get('detection_spread', 0) * 100
         domain_warnings = ai_detection.get('domain_warnings', [])
         
+        # v8.4.0: Check for INCONCLUSIVE detection
+        detection_inconclusive = ai_detection.get('detection_inconclusive', False)
+        inconclusive_reason = ai_detection.get('inconclusive_reason', '')
+        
+        # v8.4.0: Override usage level if INCONCLUSIVE
+        if detection_inconclusive or detection_spread > 50:
+            usage_level = "⚠️ INCONCLUSIVE"
+            usage_description = (
+                "CANNOT be reliably assessed. Detection methods produced conflicting results "
+                f"(spread: {detection_spread:.0f}%). Professional manual review is required."
+            )
         # Determine AI usage level - v8.3.3: Use cautious language
-        if ai_percentage < 15:
+        elif ai_percentage < 15:
             usage_level = "Minimal"
             usage_description = "shows patterns consistent with primarily human authorship"
         elif ai_percentage < 35:
@@ -191,9 +204,21 @@ class AIUsageExplainer:
         
         flagged_count = len(ai_detection.get('flagged_sections', []))
         
-        # v8.3.3: Add detection disagreement warning
+        # v8.4.0: Add INCONCLUSIVE warning when detection spread is too high
         disagreement_warning = ""
-        if detection_spread > 40:
+        if detection_inconclusive or detection_spread > 50:
+            disagreement_warning = f"""
+### 🚨 DETECTION INCONCLUSIVE
+
+Detection methods disagree by **{detection_spread:.0f} percentage points**. This exceeds the 
+50% threshold for reliable detection. **AI involvement CANNOT be reliably determined.**
+
+{inconclusive_reason if inconclusive_reason else 'Results should be treated as inconclusive.'}
+
+**Recommendation:** Manual expert review required. The {ai_percentage:.1f}% figure should NOT 
+be cited as a reliable estimate.
+"""
+        elif detection_spread > 40:
             disagreement_warning = f"""
 ### ⚠️ Detection Method Disagreement
 
@@ -202,12 +227,20 @@ significant uncertainty in the AI content estimate. The {ai_percentage:.1f}% fig
 average that obscures substantial disagreement between methods. **Interpret with caution.**
 """
         
+        # v8.4.0: Suppress model attribution when INCONCLUSIVE
+        if detection_inconclusive or detection_spread > 50:
+            model_display = "N/A (Detection Inconclusive)"
+            model_confidence_display = "N/A"
+        else:
+            model_display = primary_model
+            model_confidence_display = f"{model_confidence:.0f}%"
+        
         return f"""## EXECUTIVE SUMMARY
 
 **Document:** {document_title}
 **Document Type:** {document_type.replace('_', ' ').title()}
 **Detected AI Patterns:** {usage_level} ({ai_percentage:.1f}%) — *estimate, not verified*
-**Primary Model Signature:** {primary_model} ({model_confidence:.0f}% pattern match)
+**Primary Model Signature:** {model_display} ({model_confidence_display} pattern match)
 **Flagged Sections:** {flagged_count} sections for review
 {disagreement_warning}
 ### Key Finding
@@ -221,7 +254,7 @@ This document {usage_description}.
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
 | Overall AI Content | {ai_percentage:.1f}% | {usage_level} AI involvement |
-| Model Attribution | {primary_model} | {model_confidence:.0f}% confidence |
+| Model Attribution | {model_display} | {model_confidence_display} confidence |
 | Sections Flagged | {flagged_count} | Require professional review |
 | Detection Methods | {len(ai_detection.get('methods', []))} | Multi-method consensus |
 """
@@ -304,6 +337,43 @@ the content may be difficult to classify or contains mixed authorship.
     
     def _generate_model_attribution(self, ai_detection: Dict, deep_analysis: Dict) -> str:
         """Generate model attribution analysis."""
+        
+        # v8.4.0: Check for INCONCLUSIVE detection
+        detection_spread = ai_detection.get('detection_spread', 0) * 100
+        detection_inconclusive = ai_detection.get('detection_inconclusive', False)
+        
+        # v8.4.0: If INCONCLUSIVE, suppress model attribution entirely
+        if detection_inconclusive or detection_spread > 50:
+            return f"""## MODEL ATTRIBUTION ANALYSIS
+
+### 🚨 ATTRIBUTION SUPPRESSED - Detection Inconclusive
+
+Model attribution is **not available** because AI detection results are inconclusive.
+
+**Detection Spread:** {detection_spread:.0f}% (threshold: 50%)
+
+When detection methods disagree by more than 50 percentage points, it is not possible 
+to reliably determine:
+1. Whether AI was used at all
+2. Which AI model (if any) was involved
+
+**Recommendation:** Do not cite any AI model as likely source. Manual expert review 
+is required to make any determination about AI involvement.
+
+### Why This Matters
+
+Claiming "90% confidence in {ai_detection.get('likely_ai_model', {}).get('model', 'ModelX')}" when detection methods 
+disagree by {detection_spread:.0f}% would be misleading. The model attribution algorithms can 
+only provide useful information when there is consensus that AI content is present.
+
+High detection spread indicates one of:
+- The document contains mixed human/AI content
+- Domain-specific writing patterns are triggering false positives
+- Detection algorithms are not well-suited for this content type
+- The underlying analysis data is unreliable
+
+**No model attribution should be cited from this analysis.**
+"""
         
         model_info = ai_detection.get('likely_ai_model', {})
         model_scores = model_info.get('model_scores', {})

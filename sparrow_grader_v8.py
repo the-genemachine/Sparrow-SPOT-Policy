@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sparrow SPOT Scale™ v8.0 - Dual Variant System with Ethical Framework & AI Transparency
+Sparrow SPOT Scale™ v8.4.0 - Dual Variant System with Ethical Framework & AI Transparency
 Combines:
   - SPARROW Scale™ (Journalism evaluation) from v3
   - SPOT-Policy™ (Government policy evaluation) enhanced with Ethical AI Toolkit in v7
@@ -16,6 +16,12 @@ v8 Enhancement: Added AI Transparency & Detection (AT) criterion
 - Funding allocation transparency
 - Deployment specificity analysis  
 - External validation tracking
+
+v8.4.0 Enhancement: Classification Logic Fix (Bill-C15-12 Discrepancy Resolution)
+- Fixed paradox where "Questionable Policy" coexists with "Transformative" PC score
+- Classification now considers composite score AND failing category count
+- High PC (>=90) with composite >=70 cannot be "Questionable"
+- Added classification_metadata for transparency
 """
 
 import json
@@ -1780,7 +1786,58 @@ class SPOTPolicy:
             'F': 'Unacceptable Policy',
         }
         
-        report['classification'] = classifications.get(report['composite_grade'], 'Unclassified')
+        # v8.4.0: Fix classification paradox
+        # A document cannot be both "Questionable" and "Transformative"
+        # Check if high Policy Consequentiality conflicts with low grade
+        pc_score = sparrow_scores.get('PC', {}).get('score', 0)
+        
+        # Count failing categories (score < 60)
+        failing_categories = 0
+        for cat in ['SI', 'OI', 'TP', 'AR', 'IU']:
+            if sparrow_scores.get(cat, {}).get('score', 0) < 60:
+                failing_categories += 1
+        
+        # v8.4.0: Revised classification logic
+        # "Questionable" requires: composite < 60 OR 3+ failing categories
+        # If PC >= 90 and composite >= 70, use "Transformative Policy (with limitations)"
+        base_classification = classifications.get(report['composite_grade'], 'Unclassified')
+        
+        if base_classification == 'Questionable Policy':
+            # Check if this should be upgraded
+            if composite >= 70 and pc_score >= 90:
+                # High consequentiality with decent composite = not "Questionable"
+                report['classification'] = 'Transformative Policy (with limitations)'
+                report['classification_note'] = (
+                    f"Upgraded from 'Questionable' due to high Policy Consequentiality ({pc_score:.1f}%) "
+                    f"and composite score above 70 ({composite:.1f})"
+                )
+            elif failing_categories < 3 and composite >= 60:
+                # Not enough failures for "Questionable"
+                report['classification'] = 'Moderate Policy (review recommended)'
+                report['classification_note'] = (
+                    f"Adjusted from 'Questionable' - only {failing_categories} categories below threshold"
+                )
+            else:
+                # Keep Questionable - truly problematic
+                report['classification'] = base_classification
+        elif pc_score >= 90 and composite >= 80:
+            # v8.4.0: Add "Transformative" suffix for high PC documents
+            if base_classification not in ['Exemplary Policy', 'Excellent Policy']:
+                report['classification'] = f"{base_classification} (Transformative Impact)"
+                report['classification_note'] = f"High Policy Consequentiality ({pc_score:.1f}%)"
+            else:
+                report['classification'] = base_classification
+        else:
+            report['classification'] = base_classification
+        
+        # v8.4.0: Add classification metadata
+        report['classification_metadata'] = {
+            'base_classification': base_classification,
+            'pc_score': pc_score,
+            'composite_score': composite,
+            'failing_categories': failing_categories,
+            'adjustment_applied': report.get('classification_note') is not None
+        }
         
         # ============================================================
         # PILLAR 2 PART 3: TRUST SCORE CALCULATION
