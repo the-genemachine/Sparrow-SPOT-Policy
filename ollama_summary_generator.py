@@ -146,8 +146,18 @@ Write a 400-500 word plain-language summary that:
 5. Suggests what this means for the public
 6. Is written in accessible language (no jargon)
 
+CRITICAL WRITING STYLE RULES (v8.4.1):
+- Use SHORT, DIRECT sentences (under 20 words)
+- AVOID: "stakeholders are advised to", "it is important to note", "given the complexity"
+- PREFER: "Consult experts", "Note that", "This is complex"
+- AVOID: "it should be noted that the provisions require careful consideration"
+- PREFER: "Review these provisions carefully"
+- Write at Grade 8 reading level (age 13-14)
+- Use active voice: "The bill does X" not "X is done by the bill"
+- No hedge words: "may", "could potentially", "it appears that"
+
 Start with: "This policy document received a grade of {grade}..."
-Focus on clarity over technical accuracy."""
+Focus on clarity and directness."""
 
         print("📝 Generating plain-language summary (Ollama)...")
         print(f"   Model: {self.model}")

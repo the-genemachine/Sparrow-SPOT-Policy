@@ -729,11 +729,12 @@ class CertificateGenerator:
             ai_model = 'INCONCLUSIVE'
             ai_model_confidence = 'N/A'
             # Add confidence interval display if available
+            # Note: Template adds trailing %, so we omit it here to avoid double %%
             score_interval = ai_detection_data.get('score_confidence_interval', {})
             if score_interval:
-                ai_confidence = f"{score_interval.get('display', f'{ai_confidence}% (uncertain)')}"
+                ai_confidence = f"{score_interval.get('display', f'{ai_confidence} (uncertain)')}"
             else:
-                ai_confidence = f"{ai_confidence}% ± {detection_spread * 50:.0f}%"
+                ai_confidence = f"{ai_confidence} ± {detection_spread * 50:.0f}"
         
         risk_tier_data = report.get('risk_tier', {})
         risk_tier = risk_tier_data.get('risk_tier', 'UNKNOWN').upper() if risk_tier_data else 'UNKNOWN'

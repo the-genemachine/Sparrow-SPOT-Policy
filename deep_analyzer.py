@@ -480,29 +480,40 @@ class DeepAnalyzer:
         """
         Calculate final consensus from all analysis levels.
         Weighted by reliability and consistency.
+        
+        v8.4.1: Added explicit breakdown for transparency.
         """
         scores = []
         models = {}
         
+        # v8.4.1: Define weights explicitly for documentation
+        level_weights = {
+            'level1': 0.30,  # Document-level (most reliable)
+            'level2': 0.25,  # Section-level
+            'level4': 0.20,  # Sentence-level
+            'level6': 0.15,  # Statistical analysis
+            'level5': 0.10,  # Fingerprint (model confirmation)
+        }
+        
         # Level 1 weight: 30% (most reliable)
         if 'level1_document' in results:
-            scores.append(('level1', results['level1_document']['ai_percentage'], 0.30))
+            scores.append(('level1', results['level1_document']['ai_percentage'], level_weights['level1']))
             model = results['level1_document']['primary_model']
             models[model] = models.get(model, 0) + results['level1_document']['model_confidence']
         
         # Level 2 weight: 25%
         if 'level2_sections' in results and results['level2_sections']['sections']:
             avg = results['level2_sections']['average_ai_percentage']
-            scores.append(('level2', avg, 0.25))
+            scores.append(('level2', avg, level_weights['level2']))
         
         # Level 4 weight: 20%
         if 'level4_sentences' in results:
-            scores.append(('level4', results['level4_sentences']['overall_ai_percentage'], 0.20))
+            scores.append(('level4', results['level4_sentences']['overall_ai_percentage'], level_weights['level4']))
         
         # Level 6 weight: 15%
         if 'level6_statistics' in results and 'ai_probability' in results['level6_statistics']:
             stat_percentage = results['level6_statistics']['ai_probability'] * 100
-            scores.append(('level6', stat_percentage, 0.15))
+            scores.append(('level6', stat_percentage, level_weights['level6']))
         
         # Level 5 weight: 10% (adds model confirmation)
         if 'level5_fingerprints' in results:
@@ -523,13 +534,35 @@ class DeepAnalyzer:
         variance = self._calculate_variance([s for _, s, _ in scores])
         transparency_score = max(0, 100 - (variance * 2))  # Lower variance = higher transparency
         
+        # v8.4.1: Build detailed breakdown for display
+        level_names = {
+            'level1': 'Document Analysis',
+            'level2': 'Section Analysis',
+            'level4': 'Sentence Analysis',
+            'level6': 'Statistical Analysis',
+        }
+        
+        breakdown = []
+        for level, score, weight in scores:
+            contribution = score * weight / total_weight if total_weight > 0 else 0
+            breakdown.append({
+                'level': level,
+                'name': level_names.get(level, level),
+                'score': round(score, 1),
+                'weight': weight,
+                'contribution': round(contribution, 2),
+            })
+        
         return {
             'ai_percentage': round(final_percentage, 1),
             'primary_model': primary_model,
             'confidence': round(model_confidence, 1),
             'transparency_score': round(transparency_score, 1),
             'level_scores': {level: round(score, 1) for level, score, _ in scores},
+            'level_weights': {level: weight for level, _, weight in scores},
+            'breakdown': breakdown,  # v8.4.1: Explicit breakdown for display
             'variance': round(variance, 2),
+            'formula': f"Consensus = Σ(level_score × weight) / Σ(weight)",  # v8.4.1: Show formula
         }
     
     def _calculate_variance(self, scores: list) -> float:

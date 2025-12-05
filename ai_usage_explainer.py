@@ -310,6 +310,39 @@ average shown above is for transparency about individual detection methods, but 
 because it doesn't account for method reliability or domain context.
 """
         
+        # v8.4.1: Add consensus breakdown if available
+        consensus_breakdown = ""
+        consensus_data = deep_analysis.get('consensus', {})
+        breakdown = consensus_data.get('breakdown', [])
+        if breakdown:
+            breakdown_lines = []
+            for item in breakdown:
+                level_name = item.get('name', item.get('level', 'Unknown'))
+                score = item.get('score', 0)
+                weight = item.get('weight', 0) * 100
+                contribution = item.get('contribution', 0)
+                breakdown_lines.append(f"| {level_name} | {score:.1f}% | {weight:.0f}% | {contribution:.2f}% |")
+            
+            breakdown_table = "\n".join(breakdown_lines)
+            formula = consensus_data.get('formula', 'Weighted average of levels')
+            
+            consensus_breakdown = f"""
+### 📊 Consensus Breakdown (v8.4.1)
+
+How the {deep_consensus:.1f}% consensus score was calculated:
+
+| Analysis Level | AI Score | Weight | Contribution |
+|----------------|----------|--------|--------------|
+{breakdown_table}
+| **Total** | | | **{deep_consensus:.1f}%** |
+
+**Formula:** {formula}
+
+**Note:** Different levels have different weights based on reliability. Document-level 
+analysis (30%) is weighted highest because it considers overall patterns. Statistical 
+analysis (15%) is weighted lower as it can be affected by writing style.
+"""
+        
         return f"""## DETECTION METHODOLOGY
 
 ### How AI Content Was Detected
@@ -327,7 +360,7 @@ This analysis employed {len(methods)} detection methods to identify AI-generated
 - Average AI Score: {avg_score:.1f}%
 - Score Range: {min_score:.1f}% - {max_score:.1f}%
 - Spread: {spread:.1f} percentage points
-{score_note}
+{score_note}{consensus_breakdown}
 ### Interpretation
 
 Multiple detection methods provide cross-validation. High agreement between methods 

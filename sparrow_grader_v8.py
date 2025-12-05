@@ -1803,20 +1803,41 @@ class SPOTPolicy:
         # If PC >= 90 and composite >= 70, use "Transformative Policy (with limitations)"
         base_classification = classifications.get(report['composite_grade'], 'Unclassified')
         
+        # v8.4.1: Identify specific failing areas for qualifier
+        failing_areas = []
+        for cat, label in [('FT', 'fiscal'), ('SB', 'stakeholder'), ('ER', 'economic'), 
+                           ('PA', 'accessibility'), ('AT', 'transparency')]:
+            cat_score = criteria.get(cat, {}).get('score', 100)
+            if cat_score < 60:
+                failing_areas.append(label)
+        
+        # Generate specific qualifier based on failing areas
+        if failing_areas:
+            if len(failing_areas) == 1:
+                specific_qualifier = f"{failing_areas[0]} concerns"
+            elif len(failing_areas) == 2:
+                specific_qualifier = f"{failing_areas[0]} and {failing_areas[1]} concerns"
+            else:
+                specific_qualifier = f"multiple concerns: {', '.join(failing_areas[:3])}"
+        else:
+            specific_qualifier = "minor concerns"
+        
         if base_classification == 'Questionable Policy':
             # Check if this should be upgraded
             if composite >= 70 and pc_score >= 90:
                 # High consequentiality with decent composite = not "Questionable"
-                report['classification'] = 'Transformative Policy (with limitations)'
+                report['classification'] = f'Transformative Policy ({specific_qualifier})'
                 report['classification_note'] = (
                     f"Upgraded from 'Questionable' due to high Policy Consequentiality ({pc_score:.1f}%) "
-                    f"and composite score above 70 ({composite:.1f})"
+                    f"and composite score above 70 ({composite:.1f}). "
+                    f"Areas needing attention: {', '.join(failing_areas) if failing_areas else 'none critical'}"
                 )
             elif failing_categories < 3 and composite >= 60:
                 # Not enough failures for "Questionable"
-                report['classification'] = 'Moderate Policy (review recommended)'
+                report['classification'] = f'Moderate Policy ({specific_qualifier})'
                 report['classification_note'] = (
-                    f"Adjusted from 'Questionable' - only {failing_categories} categories below threshold"
+                    f"Adjusted from 'Questionable' - only {failing_categories} categories below threshold. "
+                    f"Areas needing attention: {', '.join(failing_areas) if failing_areas else 'none critical'}"
                 )
             else:
                 # Keep Questionable - truly problematic
@@ -1837,6 +1858,8 @@ class SPOTPolicy:
             'pc_score': pc_score,
             'composite_score': composite,
             'failing_categories': failing_categories,
+            'failing_areas': failing_areas,  # v8.4.1: List of specific failing areas
+            'specific_qualifier': specific_qualifier,  # v8.4.1: Generated qualifier text
             'adjustment_applied': report.get('classification_note') is not None
         }
         
