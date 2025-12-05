@@ -159,9 +159,6 @@ class CertificateGenerator:
                 <div class="seal">★</div>
             </div>
 
-            <!-- v8.4.0: Critical Findings Section (shows at TOP when issues exist) -->
-            {critical_findings_section}
-
             <!-- Article Info -->
             <div class="article-info">
                 <h3>Document Information</h3>
@@ -258,6 +255,9 @@ class CertificateGenerator:
 
             <!-- Deep Analysis Section (v8.2) -->
             {deep_analysis_section}
+
+            <!-- v8.4.1: Critical Findings Section (moved after Deep AI Transparency) -->
+            {critical_findings_section}
 
             <!-- Methodology -->
             <div class="methodology">
@@ -502,6 +502,9 @@ class CertificateGenerator:
 
             <!-- Deep Analysis Section (v8.2) -->
             {deep_analysis_section}
+
+            <!-- v8.4.1: Critical Findings Section (moved after Deep AI Transparency) -->
+            {critical_findings_section}
 
             <!-- Methodology -->
             <div class="methodology">
@@ -863,66 +866,41 @@ class CertificateGenerator:
             burstiness = metrics.get('burstiness', 0)
             lexical_diversity = metrics.get('lexical_diversity', 0)
             
-            # v8.3.1: Generate pattern details section with locations
+            # v8.3.1: Generate pattern details section - v8.4.1: Simplified, no dropdown
             pattern_details_html = ''
             detailed_patterns = level3.get('detailed_matches', {})
             if detailed_patterns:
-                pattern_items = []
-                for category, data in list(detailed_patterns.items())[:5]:
+                # v8.4.1: Just show top 3 categories inline, no dropdown
+                top_categories = []
+                for category, data in list(detailed_patterns.items())[:3]:
                     category_name = category.replace('_', ' ').title()
                     count = data.get('count', 0)
-                    samples = data.get('samples', [])[:3]
-                    
-                    sample_html = ''
-                    for sample in samples:
-                        line = sample.get('line_number', '?')
-                        text = sample.get('matched_text', '')[:50]
-                        sample_html += f'<div style="font-size: 0.8em; color: #666; margin-left: 15px; margin-bottom: 3px;"><em>Line {line}:</em> "{text}"</div>'
-                    
-                    pattern_items.append(f'''
-                        <div style="margin-bottom: 8px;">
-                            <strong>{category_name}:</strong> {count} occurrences
-                            {sample_html}
-                        </div>
-                    ''')
+                    top_categories.append(f"{category_name}: {count}")
                 
-                if pattern_items:
+                if top_categories:
                     pattern_details_html = f'''
-                    <details style="margin-top: 10px;">
-                        <summary style="cursor: pointer; font-weight: 600; color: #0369a1;">📍 Pattern Locations (click to expand)</summary>
-                        <div style="padding: 10px; background: white; border-radius: 4px; margin-top: 5px;">
-                            {''.join(pattern_items)}
-                        </div>
-                    </details>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                        {" | ".join(top_categories)}
+                    </div>
                     '''
             
-            # v8.3.1: Generate fingerprint details section with locations
+            # v8.3.1: Generate fingerprint details section - v8.4.1: Simplified, no dropdown
             fingerprint_details_html = ''
-            all_samples = level5.get('all_detailed_samples', [])
-            if all_samples:
-                fp_items = []
-                for sample in all_samples[:8]:
-                    model = sample.get('model', 'Unknown')
-                    category = sample.get('category', '').replace('_', ' ').title()
-                    phrase = sample.get('phrase', '')
-                    line = sample.get('line_number', '?')
-                    
-                    fp_items.append(f'''
-                        <div style="margin-bottom: 6px; font-size: 0.85em;">
-                            <span style="background: #e0f2fe; padding: 2px 6px; border-radius: 3px; font-weight: 600;">{model}</span>
-                            <span style="color: #555;">({category})</span>
-                            <em>Line {line}:</em> "<strong>{phrase}</strong>"
-                        </div>
-                    ''')
+            fingerprints = level5.get('fingerprints', {})
+            if fingerprints:
+                # v8.4.1: Just show model counts inline, no dropdown
+                model_counts = []
+                for model, data in list(fingerprints.items())[:3]:
+                    if isinstance(data, dict):
+                        count = data.get('count', 0)
+                        if count > 0:
+                            model_counts.append(f"{model}: {count}")
                 
-                if fp_items:
+                if model_counts:
                     fingerprint_details_html = f'''
-                    <details style="margin-top: 10px;">
-                        <summary style="cursor: pointer; font-weight: 600; color: #0369a1;">🔍 Fingerprint Locations (click to expand)</summary>
-                        <div style="padding: 10px; background: white; border-radius: 4px; margin-top: 5px;">
-                            {''.join(fp_items)}
-                        </div>
-                    </details>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                        {" | ".join(model_counts)}
+                    </div>
                     '''
             
             deep_analysis_section = f"""
