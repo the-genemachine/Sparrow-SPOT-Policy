@@ -99,6 +99,36 @@ try:
 except ImportError:
     ETHICAL_BIAS_AUDITOR_AVAILABLE = False
 
+# v8.4.2: Pipeline logging class
+class PipelineLogger:
+    """Simple logger that writes to both stdout and a log file."""
+    def __init__(self, log_file_path):
+        self.log_file = log_file_path
+        self.original_stdout = sys.stdout
+        # Create log file with header
+        with open(self.log_file, 'w', encoding='utf-8') as f:
+            f.write(f"Sparrow SPOT Scale™ Pipeline Log\n")
+            f.write(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 70 + "\n\n")
+    
+    def write(self, text):
+        """Write to both stdout and log file."""
+        self.original_stdout.write(text)
+        self.original_stdout.flush()
+        with open(self.log_file, 'a', encoding='utf-8') as f:
+            f.write(text)
+    
+    def flush(self):
+        """Flush stdout."""
+        self.original_stdout.flush()
+    
+    def close(self):
+        """Write footer and restore stdout."""
+        with open(self.log_file, 'a', encoding='utf-8') as f:
+            f.write("\n" + "=" * 70 + "\n")
+            f.write(f"Completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        sys.stdout = self.original_stdout
+
 try:
     from trust_score_calculator import TrustScoreCalculator
     ETHICAL_TRUST_AVAILABLE = True
@@ -2127,6 +2157,16 @@ def main():
     if args.narrative_style and args.variant != 'policy':
         parser.error("--narrative-style requires --variant policy")
     
+    # v8.4.2: Set up pipeline logging
+    log_file_path = f"{args.output}_pipeline.log"
+    pipeline_logger = None
+    try:
+        pipeline_logger = PipelineLogger(log_file_path)
+        sys.stdout = pipeline_logger
+    except Exception as e:
+        print(f"⚠️ Could not initialize pipeline logging: {e}")
+        pipeline_logger = None
+    
     print(f"\n🎯 Sparrow SPOT Scale™ v8.2 - Starting grading process (with Deep Analysis)...")
     print(f"   Variant: {args.variant}")
     
@@ -2327,6 +2367,12 @@ def main():
         print(f"   ❌ ERROR during grading: {str(e)}")
         import traceback
         traceback.print_exc()
+        # v8.4.2: Close pipeline logger even on error
+        if pipeline_logger:
+            try:
+                pipeline_logger.close()
+            except:
+                pass
         sys.exit(1)
     
     # Save outputs
@@ -2956,6 +3002,11 @@ def main():
             print(f"   🧹 Cleaned up temporary PDF: {temp_pdf_path}")
         except Exception as e:
             print(f"   ⚠️  Failed to cleanup temp file: {str(e)}")
+    
+    # v8.4.2: Close pipeline logger before final message
+    if pipeline_logger:
+        pipeline_logger.close()
+        print(f"\n📝 Pipeline log saved: {log_file_path}")
     
     print(f"\n✅ Grading complete!\n")
 
