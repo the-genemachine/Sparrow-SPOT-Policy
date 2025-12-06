@@ -46,6 +46,7 @@ class OllamaSummaryGenerator:
         # v8.4.1: AI Contribution tracking for provenance
         self.ai_calls: List[Dict[str, Any]] = []
         self._call_counter = 0
+        self._models_used: set = set()  # Track which models were actually called
         
     def get_ai_calls_log(self) -> List[Dict[str, Any]]:
         """Return log of all AI calls made during this session."""
@@ -55,6 +56,51 @@ class OllamaSummaryGenerator:
         """Clear the AI calls log (call before new document analysis)."""
         self.ai_calls = []
         self._call_counter = 0
+        self._models_used.clear()
+    
+    def unload_model(self, model: Optional[str] = None) -> bool:
+        """
+        Explicitly unload model from Ollama to free GPU memory.
+        
+        v8.4.1: Prevents memory conflicts when running multiple Ollama sessions.
+        
+        Args:
+            model: Model name to unload. If None, unloads the default model.
+            
+        Returns:
+            True if successful, False otherwise.
+        """
+        model = model or self.model
+        try:
+            # Ollama keeps models in memory with keep_alive
+            # Setting keep_alive to 0 unloads immediately
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={
+                    "model": model,
+                    "prompt": "",
+                    "keep_alive": 0  # Unload immediately
+                },
+                timeout=10
+            )
+            if response.status_code == 200:
+                print(f"🧹 Model {model} unloaded from memory")
+                return True
+        except Exception as e:
+            print(f"⚠️  Could not unload model {model}: {e}")
+        return False
+    
+    def cleanup(self) -> None:
+        """
+        Full cleanup: clear logs and unload only models that were used.
+        
+        v8.4.1: Call this after analysis to free GPU memory.
+        """
+        # Only unload models that were actually used this session
+        for model in self._models_used:
+            self.unload_model(model)
+        
+        self.clear_ai_calls_log()
         
     def _call_ollama(self, prompt: str, model: Optional[str] = None, purpose: str = "generation") -> str:
         """Call Ollama API for text generation with provenance tracking."""
@@ -62,6 +108,9 @@ class OllamaSummaryGenerator:
         self._call_counter += 1
         call_id = self._call_counter
         start_time = datetime.now()
+        
+        # v8.4.1: Track which models are used for cleanup
+        self._models_used.add(model)
         
         # v8.4.1: Prepare call log entry
         call_log = {

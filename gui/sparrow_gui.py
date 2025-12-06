@@ -21,6 +21,9 @@ import shutil
 import io
 from contextlib import redirect_stdout
 from datetime import datetime
+import gc
+import signal
+import atexit
 
 # Add SPOT_News directory to path (gui/ is subdirectory of SPOT_News/)
 # This file is at: SPOT_News/gui/sparrow_gui.py
@@ -52,6 +55,156 @@ try:
 except ImportError as e:
     SPARROW_AVAILABLE = False
     print(f"⚠️  Sparrow grader not available - running in demo mode: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MEMORY MANAGEMENT & CLEANUP (v8.4.1)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Global reference to track active analyzers for cleanup
+_active_analyzers = []
+_active_ollama_generators = []
+_cleanup_registered = False
+
+
+def cleanup_after_analysis():
+    """
+    Release memory after analysis completes.
+    
+    v8.4.1: Prevents system lockups when running Ollama models
+    by explicitly cleaning up large objects and forcing garbage collection.
+    """
+    global _active_analyzers, _active_ollama_generators
+    
+    # Clear any cached analyzers
+    for analyzer in _active_analyzers:
+        try:
+            if hasattr(analyzer, 'clear_cache'):
+                analyzer.clear_cache()
+            if hasattr(analyzer, 'clear_ai_calls_log'):
+                analyzer.clear_ai_calls_log()
+        except:
+            pass
+    
+    _active_analyzers.clear()
+    
+    # Cleanup Ollama generators and unload models
+    for generator in _active_ollama_generators:
+        try:
+            if hasattr(generator, 'cleanup'):
+                generator.cleanup()
+        except:
+            pass
+    
+    _active_ollama_generators.clear()
+    
+    # Force garbage collection
+    gc.collect()
+    
+    # Additional cleanup for PyTorch/CUDA if available
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    except ImportError:
+        pass  # PyTorch not installed, skip
+    
+    print("🧹 Memory cleanup completed")
+
+
+def manual_cleanup_button():
+    """
+    Manual cleanup triggered by GUI button.
+    
+    v8.4.1: Unloads ALL Ollama models and frees memory.
+    """
+    import requests
+    import ctypes
+    
+    messages = []
+    
+    try:
+        # Get list of loaded models
+        resp = requests.get("http://localhost:11434/api/ps", timeout=5)
+        if resp.status_code == 200:
+            models = resp.json().get('models', [])
+            unloaded = []
+            for model in models:
+                model_name = model.get('name', '')
+                if model_name:
+                    # Unload each model
+                    requests.post(
+                        "http://localhost:11434/api/generate",
+                        json={"model": model_name, "prompt": "", "keep_alive": 0},
+                        timeout=10
+                    )
+                    unloaded.append(model_name)
+            
+            if unloaded:
+                messages.append(f"🧹 Unloaded {len(unloaded)} Ollama model(s): {', '.join(unloaded)}")
+            else:
+                messages.append("✅ No Ollama models were loaded")
+        else:
+            messages.append("⚠️ Could not connect to Ollama")
+    except Exception as e:
+        messages.append(f"⚠️ Ollama cleanup: {e}")
+    
+    # Clear global caches
+    global _active_analyzers, _active_ollama_generators
+    _active_analyzers.clear()
+    _active_ollama_generators.clear()
+    
+    # Aggressive garbage collection
+    gc.collect(0)  # Collect youngest generation
+    gc.collect(1)  # Collect middle generation
+    gc.collect(2)  # Collect oldest generation (full collection)
+    
+    # Try to release memory back to OS (Linux-specific)
+    try:
+        libc = ctypes.CDLL("libc.so.6")
+        libc.malloc_trim(0)
+        messages.append("🧹 Released memory back to OS (malloc_trim)")
+    except:
+        pass  # Not available on all systems
+    
+    # Clear PyTorch CUDA cache if available
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            messages.append("🧹 Cleared CUDA cache")
+    except ImportError:
+        pass
+    
+    messages.append("✅ Memory cleanup completed. RAM usage should decrease.")
+    
+    return "\n".join(messages)
+
+
+def graceful_shutdown(signum=None, frame=None):
+    """Handle graceful shutdown on SIGINT/SIGTERM."""
+    print("\n🛑 Shutting down Sparrow GUI...")
+    cleanup_after_analysis()
+    print("✅ Cleanup complete. Goodbye!")
+    sys.exit(0)
+
+
+def register_cleanup_handlers():
+    """Register signal handlers and atexit for cleanup."""
+    global _cleanup_registered
+    
+    if not _cleanup_registered:
+        # Register signal handlers
+        signal.signal(signal.SIGINT, graceful_shutdown)
+        signal.signal(signal.SIGTERM, graceful_shutdown)
+        
+        # Register atexit handler
+        atexit.register(cleanup_after_analysis)
+        
+        _cleanup_registered = True
+        print("🔧 Cleanup handlers registered")
 
 
 def browse_output_location():
@@ -149,6 +302,9 @@ def analyze_document(
     nist_compliance,
     lineage_chart_format,
     
+    # Memory management
+    low_memory_mode,  # v8.4.1: Run in subprocess to free RAM
+    
     # Progress callback
     progress=gr.Progress()
 ):
@@ -169,6 +325,17 @@ def analyze_document(
         return "❌ Error: Please provide either a file OR URL, not both", None
     
     progress(0.1, desc="Initializing analysis...")
+    
+    # v8.4.1: Low Memory Mode - run in subprocess to free RAM after completion
+    if low_memory_mode:
+        progress(0.15, desc="Running in Low Memory Mode (subprocess)...")
+        input_for_subprocess = pdf_file.name if pdf_file else url_input
+        return run_via_subprocess(
+            input_for_subprocess, variant, document_type, output_name, narrative_style, narrative_length,
+            ollama_model, deep_analysis, citation_check, check_urls,
+            enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
+            nist_compliance, lineage_chart_format, progress
+        )
     
     # Track temporary files
     temp_files = []
@@ -361,6 +528,8 @@ def analyze_document(
                         # v8.4.1: Capture AI calls from summary generator
                         if hasattr(cert_gen, 'summary_generator') and cert_gen.summary_generator:
                             ai_calls_log.extend(cert_gen.summary_generator.get_ai_calls_log())
+                            # Track for cleanup
+                            _active_ollama_generators.append(cert_gen.summary_generator)
                     except Exception as e:
                         print(f"⚠️ Ollama summary failed: {e}")
                         # Continue without failing the entire analysis
@@ -480,6 +649,9 @@ def analyze_document(
                     os.remove(temp_file)
             except:
                 pass
+        
+        # v8.4.1: Release memory after analysis to prevent lockups
+        cleanup_after_analysis()
 
 
 def run_via_subprocess(url, variant, document_type, output_name, narrative_style, narrative_length,
@@ -1111,7 +1283,7 @@ def update_settings_summary(pdf_file, url_input, variant, document_type, output_
                            narrative_style, narrative_length, ollama_model, ollama_custom_query,
                            deep_analysis, citation_check, check_urls, enhanced_provenance,
                            provenance_report, generate_ai_disclosure, trace_data_sources, 
-                           nist_compliance, lineage_chart_format):
+                           nist_compliance, lineage_chart_format, low_memory_mode):
     """Generate a summary of current settings."""
     
     # Input source
@@ -1173,6 +1345,7 @@ def update_settings_summary(pdf_file, url_input, variant, document_type, output_
 - Data Source Tracing: {'✅ Enabled' if trace_data_sources else '❌ Disabled'}
 - NIST Compliance Check: {'✅ Enabled' if nist_compliance else '❌ Disabled'}
 - Lineage Flowchart: {lineage_chart_format if lineage_chart_format != 'None' else 'Disabled'}
+- 🧠 Low Memory Mode: {'✅ Enabled (subprocess)' if low_memory_mode else '❌ Standard'}
 
 ---
 
@@ -1532,6 +1705,14 @@ def create_interface():
                     label="Data Lineage Flowchart",
                     info="Visualize analysis pipeline stages"
                 )
+                
+                gr.Markdown("### Memory Management")
+                
+                low_memory_mode = gr.Checkbox(
+                    label="🧠 Low Memory Mode (recommended for large documents)",
+                    value=False,
+                    info="Runs analysis in subprocess - frees all RAM when complete. Best for 100+ page PDFs."
+                )
             
             # ========== TAB 5: OUTPUT & EXECUTION ==========
             with gr.Tab("▶️ Run Analysis"):
@@ -1544,11 +1725,17 @@ def create_interface():
                         elem_id="settings-summary"
                     )
                 
-                analyze_btn = gr.Button(
-                    "🎯 Analyze Document",
-                    variant="primary",
-                    size="lg"
-                )
+                with gr.Row():
+                    analyze_btn = gr.Button(
+                        "🎯 Analyze Document",
+                        variant="primary",
+                        size="lg"
+                    )
+                    cleanup_btn = gr.Button(
+                        "🧹 Free Memory",
+                        variant="secondary",
+                        size="lg"
+                    )
                 
                 gr.Markdown("---")
                 
@@ -1594,7 +1781,7 @@ def create_interface():
             narrative_style, narrative_length, ollama_model, ollama_custom_query,
             deep_analysis, citation_check, check_urls,
             enhanced_provenance, provenance_report, generate_ai_disclosure,
-            trace_data_sources, nist_compliance, lineage_chart_format
+            trace_data_sources, nist_compliance, lineage_chart_format, low_memory_mode
         ]
         
         for input_component in all_inputs:
@@ -1636,6 +1823,9 @@ def create_interface():
                 trace_data_sources,
                 nist_compliance,
                 lineage_chart_format,
+                
+                # Memory management
+                low_memory_mode,  # v8.4.1: Run in subprocess
             ],
             outputs=[output_status, command_output]
         )
@@ -1645,6 +1835,13 @@ def create_interface():
             fn=browse_output_location,
             inputs=[],
             outputs=output_name
+        )
+        
+        # Connect the cleanup button (v8.4.1)
+        cleanup_btn.click(
+            fn=manual_cleanup_button,
+            inputs=[],
+            outputs=output_status
         )
         
         # Connect quick paths dropdown
@@ -1658,17 +1855,22 @@ def create_interface():
 
 
 if __name__ == "__main__":
+    # v8.4.1: Register cleanup handlers to prevent memory issues
+    register_cleanup_handlers()
+    
     # Create and launch the interface
     interface = create_interface()
     
     print("""
     ╔══════════════════════════════════════════════════════════╗
-    ║         Sparrow SPOT Scale™ v8.3.2 - Web Interface        ║
+    ║         Sparrow SPOT Scale™ v8.4.1 - Web Interface        ║
     ╚══════════════════════════════════════════════════════════╝
     
     🚀 Starting Gradio server...
     📱 Interface will open in your browser automatically
     🌐 Access at: http://localhost:7861
+    
+    🧹 Memory cleanup: ENABLED (prevents Ollama conflicts)
     
     Press Ctrl+C to stop the server
     """)
