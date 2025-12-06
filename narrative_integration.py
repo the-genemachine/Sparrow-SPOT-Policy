@@ -1,6 +1,8 @@
 """
-Narrative Integration Module for v8
+Narrative Integration Module for v8.4.1
 Orchestrates all 6 narrative modules into a unified pipeline
+
+v8.4.1: Added AI contribution tracking for provenance reports
 
 This module:
 - Loads v7 analysis JSON
@@ -10,10 +12,12 @@ This module:
 - Extracts insights (insight_extractor)
 - Renders multi-format output (format_renderer)
 - Validates quality (narrative_qa)
+- Tracks AI contributions for transparency (NEW v8.4.1)
 """
 
 import json
 from typing import Dict, Optional, List
+from datetime import datetime
 from pathlib import Path
 
 from narrative_engine import NarrativeEngine, create_narrative_engine
@@ -58,6 +62,38 @@ class NarrativeGenerationPipeline:
         # Auto-load default critiques if requested
         if ingest_critiques:
             self.critique_module.load_budget_2025_critiques()
+    
+    def get_ai_contribution_log(self) -> Dict:
+        """
+        v8.4.1: Get log of all AI contributions for provenance reporting.
+        
+        Returns:
+            Dict with contribution log, overall AI %, and component breakdown
+        """
+        return {
+            'overall_ai_percentage': self.contribution_tracker.get_overall_ai_percentage(),
+            'contributions': [
+                {
+                    'component': c.component,
+                    'model': c.model_used,
+                    'model_version': c.model_version,
+                    'type': c.contribution_type,
+                    'timestamp': c.timestamp,
+                    'confidence': c.confidence_level,
+                    'requires_review': c.requires_human_review,
+                    'reviewed': c.human_reviewed
+                }
+                for c in self.contribution_tracker.contributions
+            ],
+            'components': {
+                name: {
+                    'ai_percentage': meta.ai_percentage,
+                    'primary_model': meta.primary_model,
+                    'requires_disclosure': meta.requires_disclosure
+                }
+                for name, meta in self.contribution_tracker.component_metadata.items()
+            }
+        }
     
     def generate_complete_narrative(
         self,
@@ -560,6 +596,9 @@ TASK: Expand this narrative to approximately {target_words} words while:
 
 Write the expanded narrative now. Do not include any meta-commentary - just the narrative text:"""
 
+        # v8.4.1: Track AI contribution
+        start_time = datetime.now()
+        
         try:
             response = requests.post(
                 "http://localhost:11434/api/generate",
@@ -575,6 +614,19 @@ Write the expanded narrative now. Do not include any meta-commentary - just the 
             response.raise_for_status()
             
             expanded = response.json().get("response", "")
+            
+            # v8.4.1: Log successful AI contribution
+            end_time = datetime.now()
+            self.contribution_tracker.record_contribution(
+                component="narrative_expansion",
+                model_used=ollama_model,
+                model_version="local",
+                prompt_details=f"Expanded narrative from {current_words} to target {target_words} words",
+                contribution_type="generation",
+                confidence_level=0.85,
+                requires_review=True
+            )
+            
             if expanded and len(expanded.split()) > current_words:
                 # v8.3.2 Fix: Remove meta-commentary before returning
                 expanded = self._strip_meta_commentary(expanded)

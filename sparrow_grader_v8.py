@@ -2106,6 +2106,8 @@ def create_arg_parser():
                         help='v8.3: Generate NIST AI RMF compliance report mapping to Gov/Map/Measure/Manage pillars.')
     transparency_group.add_argument('--enhanced-provenance', action='store_true',
                         help='v8.3: Extract comprehensive document metadata (author, creation tool, edit patterns).')
+    transparency_group.add_argument('--provenance-report', action='store_true',
+                        help='v8.4.1: Generate full provenance report (document origin + Sparrow AI usage audit trail).')
     transparency_group.add_argument('--generate-ai-disclosure', action='store_true',
                         help='v8.3: Auto-generate AI transparency disclosure statements (formal, plain-language, technical, social media formats).')
     transparency_group.add_argument('--trace-data-sources', action='store_true',
@@ -2613,6 +2615,56 @@ def main():
                 
             except Exception as e:
                 print(f"   ⚠️  Enhanced provenance skipped: {str(e)}")
+        
+        # v8.4.1: Full Provenance Report (document origin + AI usage audit trail)
+        if args.provenance_report:
+            print("\n📜 Generating full provenance report...")
+            try:
+                from provenance_report_generator import create_provenance_report_generator
+                from ai_detection_engine import ProvenanceAnalyzer
+                
+                prov_report_gen = create_provenance_report_generator()
+                
+                # Get document metadata (use existing if enhanced_provenance was run)
+                if 'provenance' in report and 'enhanced_metadata' in report['provenance']:
+                    doc_metadata = report['provenance']['enhanced_metadata']
+                else:
+                    prov_analyzer = ProvenanceAnalyzer()
+                    doc_metadata = prov_analyzer.extract_metadata(args.input_file)
+                
+                # Get AI calls log from narrative pipeline (if available)
+                ai_calls_log = []
+                contribution_log = None
+                if grader.narrative_pipeline:
+                    try:
+                        contribution_log = grader.narrative_pipeline.get_ai_contribution_log()
+                    except Exception:
+                        pass
+                
+                # Generate the provenance report
+                doc_title = report.get('document_title', report.get('title', 'Unknown Document'))
+                provenance_report = prov_report_gen.generate_report(
+                    document_metadata=doc_metadata,
+                    ai_calls_log=ai_calls_log,
+                    contribution_log=contribution_log,
+                    document_title=doc_title,
+                    analysis_timestamp=report.get('metadata', {}).get('generated_at')
+                )
+                
+                # Save both JSON and markdown versions
+                saved_files = prov_report_gen.save_report(
+                    provenance_report,
+                    args.output,
+                    format="both"
+                )
+                
+                # Add to main report
+                report['provenance_report'] = provenance_report
+                
+            except Exception as e:
+                print(f"   ⚠️  Provenance report generation failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
         
         # Citation Quality Analysis
         if args.citation_check:

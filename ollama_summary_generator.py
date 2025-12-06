@@ -1,6 +1,10 @@
 """
-Ollama-Based Summary Generator for Sparrow SPOT Scale™ Certificates v8.4.0
+Ollama-Based Summary Generator for Sparrow SPOT Scale™ Certificates v8.4.1
 Generates plain-language summaries for policy and journalism grading reports
+
+v8.4.1 Enhancements:
+- AI Contribution Tracking for provenance reports
+- Logs all Ollama API calls with timestamps, prompts, and responses
 
 v8.4.0 Enhancements:
 - INCONCLUSIVE detection awareness in AI Transparency sections
@@ -10,11 +14,11 @@ v8.4.0 Enhancements:
 
 import json
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import time
 
-VERSION = "8.4.0"
+VERSION = "8.4.1"
 
 # v8.4.0: Standardized narrative voice guidelines
 NARRATIVE_VOICE_GUIDELINES = """
@@ -39,10 +43,39 @@ class OllamaSummaryGenerator:
         self.ollama_url = ollama_url
         self.model = "granite4:tiny-h"  # Fast, accurate model
         self.fallback_model = "qwen2.5:7b"  # More capable fallback
+        # v8.4.1: AI Contribution tracking for provenance
+        self.ai_calls: List[Dict[str, Any]] = []
+        self._call_counter = 0
         
-    def _call_ollama(self, prompt: str, model: Optional[str] = None) -> str:
-        """Call Ollama API for text generation."""
+    def get_ai_calls_log(self) -> List[Dict[str, Any]]:
+        """Return log of all AI calls made during this session."""
+        return self.ai_calls.copy()
+    
+    def clear_ai_calls_log(self) -> None:
+        """Clear the AI calls log (call before new document analysis)."""
+        self.ai_calls = []
+        self._call_counter = 0
+        
+    def _call_ollama(self, prompt: str, model: Optional[str] = None, purpose: str = "generation") -> str:
+        """Call Ollama API for text generation with provenance tracking."""
         model = model or self.model
+        self._call_counter += 1
+        call_id = self._call_counter
+        start_time = datetime.now()
+        
+        # v8.4.1: Prepare call log entry
+        call_log = {
+            "call_id": call_id,
+            "timestamp": start_time.isoformat(),
+            "model": model,
+            "purpose": purpose,
+            "prompt_length": len(prompt),
+            "prompt_preview": prompt[:200] + "..." if len(prompt) > 200 else prompt,
+            "status": "pending",
+            "response_length": 0,
+            "duration_ms": 0,
+            "error": None
+        }
         
         try:
             response = requests.post(
@@ -57,8 +90,24 @@ class OllamaSummaryGenerator:
                 timeout=60
             )
             response.raise_for_status()
-            return response.json()["response"]
+            result = response.json()["response"]
+            
+            # v8.4.1: Log successful call
+            end_time = datetime.now()
+            call_log["status"] = "success"
+            call_log["response_length"] = len(result)
+            call_log["duration_ms"] = int((end_time - start_time).total_seconds() * 1000)
+            self.ai_calls.append(call_log)
+            
+            return result
         except requests.exceptions.RequestException as e:
+            # v8.4.1: Log failed call
+            end_time = datetime.now()
+            call_log["status"] = "error"
+            call_log["error"] = str(e)
+            call_log["duration_ms"] = int((end_time - start_time).total_seconds() * 1000)
+            self.ai_calls.append(call_log)
+            
             print(f"⚠️  Ollama error with {model}: {str(e)}")
             return None
     
@@ -163,11 +212,11 @@ Focus on clarity and directness."""
         print(f"   Model: {self.model}")
         print(f"   Document: {document_title}")
         
-        summary = self._call_ollama(prompt)
+        summary = self._call_ollama(prompt, purpose="policy_summary")
         
         if not summary:
             print("⚠️  Primary model failed, trying fallback...")
-            summary = self._call_ollama(prompt, self.fallback_model)
+            summary = self._call_ollama(prompt, self.fallback_model, purpose="policy_summary_fallback")
         
         if not summary:
             print("❌ Summary generation failed")
@@ -254,11 +303,11 @@ Focus on practical guidance for readers."""
         print(f"   Model: {self.model}")
         print(f"   Article: {document_title}")
         
-        summary = self._call_ollama(prompt)
+        summary = self._call_ollama(prompt, purpose="journalism_summary")
         
         if not summary:
             print("⚠️  Primary model failed, trying fallback...")
-            summary = self._call_ollama(prompt, self.fallback_model)
+            summary = self._call_ollama(prompt, self.fallback_model, purpose="journalism_summary_fallback")
         
         if not summary:
             print("❌ Summary generation failed")
@@ -418,11 +467,11 @@ Focus on helping citizens understand the law's structure and implications."""
         print(f"   Document: {document_title}")
         print(f"   Type: LEGISLATION")
         
-        summary = self._call_ollama(prompt)
+        summary = self._call_ollama(prompt, purpose="legislative_summary")
         
         if not summary:
             print("⚠️  Primary model failed, trying fallback...")
-            summary = self._call_ollama(prompt, self.fallback_model)
+            summary = self._call_ollama(prompt, self.fallback_model, purpose="legislative_summary_fallback")
         
         if not summary:
             print("❌ Summary generation failed")
@@ -530,10 +579,10 @@ Focus on fiscal accountability and taxpayer understanding."""
         print(f"   Document: {document_title}")
         print(f"   Type: BUDGET")
         
-        summary = self._call_ollama(prompt)
+        summary = self._call_ollama(prompt, purpose="budget_summary")
         
         if not summary:
-            summary = self._call_ollama(prompt, self.fallback_model)
+            summary = self._call_ollama(prompt, self.fallback_model, purpose="budget_summary_fallback")
         
         if not summary:
             return None

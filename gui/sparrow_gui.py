@@ -143,6 +143,7 @@ def analyze_document(
     
     # Transparency flags
     enhanced_provenance,
+    provenance_report,  # v8.4.1: Full provenance audit trail
     generate_ai_disclosure,
     trace_data_sources,
     nist_compliance,
@@ -200,9 +201,9 @@ def analyze_document(
         else:
             # Handle URL - use subprocess for now
             return run_via_subprocess(
-                url_input, variant, output_name, narrative_style, narrative_length,
+                url_input, variant, document_type, output_name, narrative_style, narrative_length,
                 ollama_model, deep_analysis, citation_check, check_urls,
-                enhanced_provenance, generate_ai_disclosure, trace_data_sources,
+                enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                 nist_compliance, lineage_chart_format, progress
             )
         
@@ -248,7 +249,9 @@ def analyze_document(
             # Capture stdout from all analysis modules
             with redirect_stdout(output_buffer):
                 policy = SPOTPolicy()
-                results = policy.grade(text, pdf_path=input_path if is_pdf else None)
+                # v8.4.1: Pass document_type if user selected (not 'auto')
+                doc_type_param = document_type if document_type and document_type != 'auto' else 'policy'
+                results = policy.grade(text, document_type=doc_type_param, pdf_path=input_path if is_pdf else None)
                 
                 # Add document title to results
                 if document_title:
@@ -414,6 +417,8 @@ def analyze_document(
             cmd_parts.append("--check-urls")
         if enhanced_provenance:
             cmd_parts.append("--enhanced-provenance")
+        if provenance_report:
+            cmd_parts.append("--provenance-report")
         if generate_ai_disclosure:
             cmd_parts.append("--generate-ai-disclosure")
         if trace_data_sources:
@@ -451,9 +456,9 @@ def analyze_document(
                 pass
 
 
-def run_via_subprocess(url, variant, output_name, narrative_style, narrative_length,
+def run_via_subprocess(url, variant, document_type, output_name, narrative_style, narrative_length,
                        ollama_model, deep_analysis, citation_check, check_urls,
-                       enhanced_provenance, generate_ai_disclosure, trace_data_sources,
+                       enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                        nist_compliance, lineage_chart_format, progress):
     """Run analysis via subprocess for URL inputs."""
     import subprocess
@@ -475,6 +480,8 @@ def run_via_subprocess(url, variant, output_name, narrative_style, narrative_len
         cmd.append("--check-urls")
     if enhanced_provenance:
         cmd.append("--enhanced-provenance")
+    if provenance_report:
+        cmd.append("--provenance-report")
     if generate_ai_disclosure:
         cmd.append("--generate-ai-disclosure")
     if trace_data_sources:
@@ -946,9 +953,9 @@ def generate_lineage_chart(results, output_name, format):
 
 def update_settings_summary(pdf_file, url_input, variant, document_type, output_name, document_title,
                            narrative_style, narrative_length, ollama_model, ollama_custom_query,
-                           deep_analysis, citation_check, check_urls, enhanced_provenance, 
-                           generate_ai_disclosure, trace_data_sources, nist_compliance, 
-                           lineage_chart_format):
+                           deep_analysis, citation_check, check_urls, enhanced_provenance,
+                           provenance_report, generate_ai_disclosure, trace_data_sources, 
+                           nist_compliance, lineage_chart_format):
     """Generate a summary of current settings."""
     
     # Input source
@@ -1005,6 +1012,7 @@ def update_settings_summary(pdf_file, url_input, variant, document_type, output_
 
 **Transparency Features:**
 - Enhanced Provenance: {'✅ Enabled' if enhanced_provenance else '❌ Disabled'}
+- Provenance Report: {'✅ Enabled' if provenance_report else '❌ Disabled'}
 - AI Disclosure Statements: {'✅ Enabled' if generate_ai_disclosure else '❌ Disabled'}
 - Data Source Tracing: {'✅ Enabled' if trace_data_sources else '❌ Disabled'}
 - NIST Compliance Check: {'✅ Enabled' if nist_compliance else '❌ Disabled'}
@@ -1338,6 +1346,12 @@ def create_interface():
                     info="Extract comprehensive document metadata (author, creation tool, edit patterns)"
                 )
                 
+                provenance_report = gr.Checkbox(
+                    label="📜 Generate Provenance Report",
+                    value=False,
+                    info="Create full audit trail: document origin + Sparrow's AI usage during analysis (v8.4.1)"
+                )
+                
                 generate_ai_disclosure = gr.Checkbox(
                     label="Generate AI Disclosure Statements",
                     value=True,
@@ -1423,7 +1437,7 @@ def create_interface():
             pdf_file, url_input, variant, document_type, output_name, document_title,
             narrative_style, narrative_length, ollama_model, ollama_custom_query,
             deep_analysis, citation_check, check_urls,
-            enhanced_provenance, generate_ai_disclosure,
+            enhanced_provenance, provenance_report, generate_ai_disclosure,
             trace_data_sources, nist_compliance, lineage_chart_format
         ]
         
@@ -1461,6 +1475,7 @@ def create_interface():
                 
                 # Transparency flags
                 enhanced_provenance,
+                provenance_report,  # v8.4.1: Full provenance audit trail
                 generate_ai_disclosure,
                 trace_data_sources,
                 nist_compliance,
