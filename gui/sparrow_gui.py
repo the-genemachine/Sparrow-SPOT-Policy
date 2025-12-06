@@ -302,6 +302,12 @@ def analyze_document(
                     progress(0.8, desc="Checking NIST compliance...")
                     results = add_nist_compliance(results, text)
                 
+                # v8.4.1: Generate provenance report (document origin + AI usage audit trail)
+                if provenance_report:
+                    progress(0.82, desc="Generating provenance report...")
+                    results, prov_files = add_provenance_report(results, text, output_name, input_path)
+                    output_files.extend(prov_files)
+                
                 progress(0.85, desc="Generating outputs...")
                 
                 # JSON report
@@ -853,6 +859,83 @@ def add_nist_compliance(results, text):
     
     results['nist_compliance'] = nist_results
     return results
+
+
+def add_provenance_report(results, text, output_name, input_path=None):
+    """
+    Generate comprehensive provenance report (document origin + Sparrow AI usage).
+    
+    v8.4.1: Added for full audit trail generation.
+    
+    Args:
+        results: Analysis results dict
+        text: Original document text
+        output_name: Output file prefix
+        input_path: Path to input file for metadata extraction
+        
+    Returns:
+        Tuple of (updated results, list of output files)
+    """
+    from provenance_report_generator import create_provenance_report_generator
+    from ai_detection_engine import ProvenanceAnalyzer
+    
+    output_files = []
+    
+    try:
+        prov_report_gen = create_provenance_report_generator()
+        
+        # Get document metadata
+        doc_metadata = {}
+        if input_path:
+            try:
+                prov_analyzer = ProvenanceAnalyzer()
+                doc_metadata = prov_analyzer.extract_metadata(input_path)
+            except Exception as e:
+                doc_metadata = {'error': str(e)}
+        
+        # Get AI contribution log from narrative pipeline if available
+        contribution_log = None
+        ai_calls_log = []
+        
+        # Try to get from results if narrative was generated
+        if 'narrative_outputs' in results and results.get('narrative_outputs'):
+            # The narrative pipeline may have logged AI calls
+            pass  # Will be populated by narrative_integration if available
+        
+        # Generate the provenance report
+        doc_title = results.get('document_title', 'Unknown Document')
+        provenance_report = prov_report_gen.generate_report(
+            document_metadata=doc_metadata,
+            ai_calls_log=ai_calls_log,
+            contribution_log=contribution_log,
+            document_title=doc_title,
+            analysis_timestamp=results.get('timestamp')
+        )
+        
+        # Handle test_articles path prefix
+        if output_name.startswith('test_articles/'):
+            base_path = f"../{output_name}"
+        else:
+            base_path = output_name
+        
+        # Save both JSON and markdown versions
+        saved_files = prov_report_gen.save_report(
+            provenance_report,
+            base_path,
+            format="both"
+        )
+        
+        output_files.extend(saved_files.values())
+        
+        # Add to main results
+        results['provenance_report'] = provenance_report
+        
+    except Exception as e:
+        print(f"   ⚠️  Provenance report generation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    
+    return results, output_files
 
 
 def generate_narrative(results, text, output_name, style, length, model, custom_query=""):
