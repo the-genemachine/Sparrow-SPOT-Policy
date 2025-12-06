@@ -250,8 +250,17 @@ class AIDetectionEngine:
             # Reduce confidence when methods disagree significantly
             confidence = confidence * (1 - score_spread * 0.5)  # Up to 50% reduction
         
-        # Identify likely AI model (if any)
-        likely_model = self._identify_ai_model(scores)
+        # v8.4.2: Identify likely AI model with document type context
+        # Suppress false positives for specialized documents (legislation, government, etc.)
+        is_specialized_doc = baseline_analysis.is_specialized if baseline_analysis else False
+        specialized_doc_type = baseline_analysis.document_type if baseline_analysis else None
+        likely_model = self._identify_ai_model(
+            scores, 
+            consensus_score=consensus_score,
+            detection_inconclusive=detection_inconclusive,
+            is_specialized_document=is_specialized_doc,
+            document_type=specialized_doc_type
+        )
         
         # Detect flagged sections (suspicious patterns)
         flagged_sections = self._identify_flagged_sections(text, consensus_score)
@@ -982,9 +991,17 @@ class AIDetectionEngine:
         confidence = 1.0 - min(std_dev, 1.0)
         return confidence
     
-    def _identify_ai_model(self, scores: Dict[str, float]) -> Dict:
+    def _identify_ai_model(self, scores: Dict[str, float], 
+                           consensus_score: float = None,
+                           detection_inconclusive: bool = False,
+                           is_specialized_document: bool = False,
+                           document_type: str = None) -> Dict:
         """
         Identify the most likely AI model used to generate content.
+        
+        v8.4.2: Added document type awareness to prevent false positives.
+        Specialized documents (legislation, government, legal) share patterns
+        with AI models trained on formal business/enterprise text.
         
         Returns:
         {
@@ -1001,6 +1018,38 @@ class AIDetectionEngine:
             "Mistral AI": scores.get("mistral", 0.0),
             "Cohere": scores.get("cohere", 0.0)
         }
+        
+        # v8.4.2: Suppress model attribution in cases where it would be misleading
+        suppress_reasons = []
+        
+        # Check if we should suppress model attribution
+        if detection_inconclusive:
+            suppress_reasons.append("detection methods disagree significantly")
+        
+        if consensus_score is not None and consensus_score < 0.2:  # <20% AI
+            suppress_reasons.append(f"low AI content ({consensus_score*100:.0f}%)")
+        
+        # v8.4.2: Specialized documents often trigger false positives
+        # because formal/legislative language shares patterns with AI business writing
+        specialized_types_suppress_model = [
+            'legislation', 'bill', 'act', 'government', 'budget', 
+            'legal_judgment', 'court_filing', 'policy', 'regulatory',
+            'parliamentary', 'treaty', 'statute'
+        ]
+        if is_specialized_document and document_type:
+            doc_type_lower = document_type.lower()
+            if any(t in doc_type_lower for t in specialized_types_suppress_model):
+                suppress_reasons.append(f"specialized document type ({document_type})")
+        
+        if suppress_reasons:
+            return {
+                "model": None,
+                "confidence": 0.0,
+                "analysis": f"Model attribution suppressed: {'; '.join(suppress_reasons)}",
+                "model_scores": model_specific_scores,
+                "suppressed": True,
+                "suppress_reasons": suppress_reasons
+            }
         
         # Find highest scoring model
         max_model = max(model_specific_scores.items(), key=lambda x: x[1])

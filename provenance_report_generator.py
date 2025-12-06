@@ -53,14 +53,17 @@ class ProvenanceReportGenerator:
         if not analysis_timestamp:
             analysis_timestamp = datetime.now().isoformat()
         
+        # Build document origin first to get legislative metadata for citizen summary
+        doc_origin = self._build_document_origin(document_metadata)
+        
         report = {
-            "provenance_version": "1.0",
+            "provenance_version": "1.1",
             "sparrow_version": self.sparrow_version,
             "report_generated": datetime.now().isoformat(),
             "document_title": document_title,
             
             # Part 1: Document Origin
-            "document_origin": self._build_document_origin(document_metadata),
+            "document_origin": doc_origin,
             
             # Part 2: Analysis Provenance  
             "analysis_provenance": self._build_analysis_provenance(
@@ -70,7 +73,13 @@ class ProvenanceReportGenerator:
             ),
             
             # Part 3: Summary
-            "summary": self._build_summary(document_metadata, ai_calls_log, contribution_log)
+            "summary": self._build_summary(document_metadata, ai_calls_log, contribution_log),
+            
+            # Part 4: Human Review Tracking (v8.4.1)
+            "human_review_status": self._build_human_review_status(ai_calls_log, contribution_log),
+            
+            # Part 5: Citizen Summary (v8.4.1) - plain language for non-experts
+            "citizen_summary": self._build_citizen_summary(document_metadata, doc_origin)
         }
         
         return report
@@ -114,10 +123,171 @@ class ProvenanceReportGenerator:
             }
         }
         
+        # v8.4.1: Add legislative metadata if document appears to be legislation
+        legislative_meta = self._extract_legislative_metadata(metadata)
+        if legislative_meta:
+            origin["legislative_metadata"] = legislative_meta
+        
+        # v8.4.1: Add risk summary
+        origin["risk_summary"] = self._generate_risk_summary(metadata, legislative_meta)
+        
         # Remove None values from file_identity
         origin["file_identity"] = {k: v for k, v in origin["file_identity"].items() if v is not None}
         
         return origin
+    
+    def _extract_legislative_metadata(self, metadata: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Extract legislative-specific metadata from document.
+        
+        v8.4.1: Detects bill numbers, session info, and legislative indicators.
+        """
+        pdf_meta = metadata.get('pdf_metadata', {})
+        title = pdf_meta.get('title', '') or metadata.get('file_name', '')
+        author = pdf_meta.get('author', '')
+        page_count = pdf_meta.get('page_count', 0) or 0
+        
+        # Check if this looks like legislation
+        legislative_indicators = [
+            'bill', 'act', 'legislation', 'parliament', 'house of commons',
+            'senate', 'budget', 'royal assent', 'first reading', 'second reading'
+        ]
+        
+        title_lower = title.lower()
+        author_lower = author.lower()
+        is_legislative = any(ind in title_lower or ind in author_lower for ind in legislative_indicators)
+        
+        if not is_legislative:
+            return None
+        
+        # Extract bill number (pattern: C-XX or S-XX)
+        import re
+        bill_match = re.search(r'\b([CS])-(\d+)\b', title, re.IGNORECASE)
+        bill_number = f"{bill_match.group(1).upper()}-{bill_match.group(2)}" if bill_match else None
+        
+        # Extract session number (pattern: 4XX or session numbers)
+        session_match = re.search(r'\b(4\d{2})\b', title)
+        session = session_match.group(1) if session_match else None
+        
+        # Detect bill type
+        bill_type = "Unknown"
+        if 'budget' in title_lower:
+            bill_type = "Budget Implementation Act"
+        elif 'appropriation' in title_lower:
+            bill_type = "Appropriation Act"
+        elif 'amendment' in title_lower:
+            bill_type = "Amendment Act"
+        elif 'act' in title_lower:
+            bill_type = "Act"
+        
+        # Detect omnibus characteristics
+        is_omnibus = page_count > 200 or 'provisions' in title_lower
+        
+        # Detect bilingual
+        is_bilingual = '|' in title or 'projet de loi' in title_lower
+        
+        return {
+            "bill_number": bill_number,
+            "session": session,
+            "bill_type": bill_type,
+            "page_count": page_count,
+            "is_omnibus": is_omnibus,
+            "is_bilingual": is_bilingual,
+            "page_count_risk": "CRITICAL" if page_count > 500 else "HIGH" if page_count > 200 else "MEDIUM" if page_count > 50 else "LOW",
+            "author_verified": bool(author),
+            "author": author,
+            "author_is_official": any(x in author_lower for x in ['house of commons', 'parliament', 'senate', 'government']),
+            "requires_full_threat_scan": page_count > 100 or is_omnibus
+        }
+    
+    def _generate_risk_summary(
+        self, 
+        metadata: Dict[str, Any], 
+        legislative_meta: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Generate risk summary for document provenance.
+        
+        v8.4.1: Provides quick assessment for analysts.
+        """
+        risk_factors = []
+        
+        pdf_meta = metadata.get('pdf_metadata', {})
+        page_count = pdf_meta.get('page_count', 0) or 0
+        
+        # Document size risk
+        if page_count > 500:
+            risk_factors.append({
+                "factor": "Document Size",
+                "level": "CRITICAL",
+                "score": 95,
+                "reason": f"{page_count} pages - very high burial risk"
+            })
+        elif page_count > 200:
+            risk_factors.append({
+                "factor": "Document Size",
+                "level": "HIGH",
+                "score": 75,
+                "reason": f"{page_count} pages - increased burial risk"
+            })
+        elif page_count > 50:
+            risk_factors.append({
+                "factor": "Document Size",
+                "level": "MEDIUM",
+                "score": 40,
+                "reason": f"{page_count} pages - moderate complexity"
+            })
+        
+        # Omnibus bill risk
+        if legislative_meta and legislative_meta.get('is_omnibus'):
+            risk_factors.append({
+                "factor": "Omnibus Bill",
+                "level": "HIGH",
+                "score": 70,
+                "reason": "Budget implementation acts often contain unrelated provisions"
+            })
+        
+        # Temporal anomaly risk
+        edit_patterns = metadata.get('edit_patterns', {})
+        if edit_patterns.get('suspicious_rapid_edit'):
+            time_delta = edit_patterns.get('time_between_create_modify', 0)
+            if time_delta < 0:
+                risk_factors.append({
+                    "factor": "Temporal Anomaly",
+                    "level": "LOW",
+                    "score": 15,
+                    "reason": "Minor metadata clock skew - likely automated generation artifact"
+                })
+            else:
+                risk_factors.append({
+                    "factor": "Rapid Edit Pattern",
+                    "level": "LOW",
+                    "score": 20,
+                    "reason": "Document modified very quickly after creation"
+                })
+        
+        # Determine overall risk
+        if not risk_factors:
+            overall_level = "LOW"
+            recommended_action = "STANDARD_ANALYSIS"
+        else:
+            max_score = max(f['score'] for f in risk_factors)
+            if max_score >= 80:
+                overall_level = "REQUIRES_INVESTIGATION"
+                recommended_action = "FULL_LEGISLATIVE_THREAT_SCAN"
+            elif max_score >= 50:
+                overall_level = "ELEVATED"
+                recommended_action = "ENHANCED_ANALYSIS"
+            else:
+                overall_level = "LOW"
+                recommended_action = "STANDARD_ANALYSIS"
+        
+        return {
+            "overall_risk_level": overall_level,
+            "risk_factors": risk_factors,
+            "recommended_action": recommended_action,
+            "priority_level": "HIGH" if overall_level == "REQUIRES_INVESTIGATION" else "NORMAL"
+        }
     
     def _extract_ai_markers(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -304,20 +474,55 @@ class ProvenanceReportGenerator:
         ai_calls_log: List[Dict[str, Any]],
         contribution_log: Optional[Dict[str, Any]]
     ) -> str:
-        """Generate a human-readable transparency statement."""
-        total_calls = len(ai_calls_log or [])
-        models = set(c.get('model') for c in (ai_calls_log or []) if c.get('model'))
+        """
+        Generate a human-readable transparency statement.
         
-        if total_calls == 0:
-            return "No AI models were used in generating this analysis."
+        CRITICAL: This must accurately reflect ALL AI usage from both
+        ai_calls_log (Ollama summary) AND contribution_log (narrative generation).
+        v8.4.1: Fixed to prevent false "no AI" claims when AI was used.
+        """
+        # Count Ollama API calls
+        ollama_calls = len(ai_calls_log or [])
+        ollama_models = set(c.get('model') for c in (ai_calls_log or []) if c.get('model'))
         
-        models_str = ", ".join(sorted(models))
+        # Count narrative contributions
+        narrative_contributions = []
+        narrative_models = set()
+        if contribution_log:
+            for contrib in contribution_log.get('contributions', []):
+                if contrib.get('model'):
+                    narrative_contributions.append(contrib)
+                    narrative_models.add(contrib.get('model'))
         
-        return (
-            f"This analysis used {total_calls} AI model call(s) via Ollama. "
-            f"Models used: {models_str}. "
-            f"All AI contributions are logged for transparency and audit purposes."
+        # Combine all models
+        all_models = ollama_models | narrative_models
+        total_ai_involvement = ollama_calls + len(narrative_contributions)
+        
+        # Generate accurate statement
+        if total_ai_involvement == 0 and not all_models:
+            return "No AI models were used in generating this analysis. All outputs are from deterministic algorithms."
+        
+        # Build detailed statement
+        parts = []
+        
+        if ollama_calls > 0:
+            parts.append(f"Ollama summary generation: {ollama_calls} call(s)")
+        
+        if narrative_contributions:
+            contrib_types = set(c.get('type', 'generation') for c in narrative_contributions)
+            parts.append(f"Narrative {', '.join(contrib_types)}: {len(narrative_contributions)} contribution(s)")
+        
+        models_str = ", ".join(sorted(all_models)) if all_models else "none"
+        
+        statement = (
+            f"AI models were used in this analysis. "
+            f"Models: {models_str}. "
+            f"Usage: {'; '.join(parts)}. "
+            f"Core metadata extraction, hash calculation, and provenance tracking are AI-free. "
+            f"All AI contributions are logged for transparency."
         )
+        
+        return statement
     
     def _build_summary(
         self, 
@@ -325,27 +530,167 @@ class ProvenanceReportGenerator:
         ai_calls_log: List[Dict[str, Any]],
         contribution_log: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Build the summary section."""
+        """Build the summary section with combined AI usage totals."""
         
         # Document origin status
         doc_status = "verified" if document_metadata and 'error' not in document_metadata else "unavailable"
         
-        # AI usage summary
-        total_ai_calls = len(ai_calls_log or [])
-        successful_calls = len([c for c in (ai_calls_log or []) if c.get('status') == 'success'])
+        # AI usage summary - combine Ollama calls AND narrative contributions
+        ollama_calls = len(ai_calls_log or [])
+        successful_ollama = len([c for c in (ai_calls_log or []) if c.get('status') == 'success'])
+        
+        # Count narrative contributions
+        narrative_contributions = len(contribution_log.get('contributions', [])) if contribution_log else 0
+        
+        # Combine models from both sources
+        ollama_models = set(c.get('model') for c in (ai_calls_log or []) if c.get('model'))
+        narrative_models = set()
+        if contribution_log:
+            for contrib in contribution_log.get('contributions', []):
+                if contrib.get('model'):
+                    narrative_models.add(contrib['model'])
+        all_models = list(ollama_models | narrative_models)
+        
+        # Total AI interactions
+        total_ai_interactions = ollama_calls + narrative_contributions
         
         return {
             "document_origin_status": doc_status,
             "document_hash_available": bool(document_metadata.get('file_hash')) if document_metadata else False,
-            "ai_calls_made": total_ai_calls,
-            "ai_calls_successful": successful_calls,
-            "provenance_complete": doc_status == "verified" and total_ai_calls >= 0,
+            "total_ai_interactions": total_ai_interactions,
+            "ollama_calls": ollama_calls,
+            "ollama_calls_successful": successful_ollama,
+            "narrative_contributions": narrative_contributions,
+            "models_used": all_models,
+            "provenance_complete": doc_status == "verified" and total_ai_interactions >= 0,
             "requires_human_review": any(
                 c.get('requires_review', True) 
                 for c in (contribution_log.get('contributions', []) if contribution_log else [])
-            )
+            ) or narrative_contributions > 0  # Require review if any narrative AI was used
         }
     
+    def _build_human_review_status(
+        self,
+        ai_calls_log: List[Dict[str, Any]],
+        contribution_log: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Build human review tracking section.
+        
+        v8.4.1: Tracks what needs human verification and review status.
+        """
+        # Determine what requires review
+        review_required_for = []
+        
+        # Check AI calls
+        if ai_calls_log:
+            review_required_for.append("AI-generated summary content")
+        
+        # Check narrative contributions
+        if contribution_log:
+            for contrib in contribution_log.get('contributions', []):
+                if contrib.get('requires_review', True):
+                    component = contrib.get('component', 'unknown')
+                    review_required_for.append(f"AI-generated {component}")
+        
+        # Standard items that always need review if AI was used
+        if review_required_for:
+            review_required_for.extend([
+                "Factual accuracy of AI outputs",
+                "Appropriateness of recommendations"
+            ])
+        
+        return {
+            "requires_review": len(review_required_for) > 0,
+            "reviewed": False,  # Default to not reviewed
+            "review_required_for": review_required_for,
+            "review_checklist": {
+                "provenance_accuracy": None,
+                "ai_disclosure_complete": None,
+                "threat_indicators_valid": None,
+                "recommendations_appropriate": None,
+                "factual_accuracy_verified": None
+            },
+            "reviewer": None,
+            "review_timestamp": None,
+            "review_notes": None
+        }
+    
+    def _build_citizen_summary(
+        self,
+        document_metadata: Dict[str, Any],
+        doc_origin: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Build plain-language summary for non-expert readers.
+        
+        v8.4.1: Makes provenance report accessible to journalists and citizens.
+        """
+        pdf_meta = document_metadata.get('pdf_metadata', {}) if document_metadata else {}
+        page_count = pdf_meta.get('page_count', 0) or 0
+        title = pdf_meta.get('title', '') or document_metadata.get('file_name', 'Unknown') if document_metadata else 'Unknown'
+        
+        # Get legislative metadata and risk summary
+        leg_meta = doc_origin.get('legislative_metadata', {})
+        risk_summary = doc_origin.get('risk_summary', {})
+        
+        # Build "what is this" description
+        if leg_meta:
+            bill_num = leg_meta.get('bill_number', '')
+            bill_type = leg_meta.get('bill_type', 'document')
+            what_is_this = f"A {page_count}-page {bill_type}"
+            if bill_num:
+                what_is_this = f"Bill {bill_num}: {what_is_this}"
+        else:
+            what_is_this = f"A {page_count}-page document" if page_count else "A document of unknown length"
+        
+        # Build key concerns
+        key_concerns = []
+        risk_level = risk_summary.get('overall_risk_level', 'LOW')
+        
+        for factor in risk_summary.get('risk_factors', []):
+            if factor.get('score', 0) >= 50:
+                key_concerns.append(f"{factor.get('reason', 'Unknown concern')}")
+        
+        if not key_concerns:
+            key_concerns.append("No significant concerns detected in provenance analysis")
+        
+        # Build "what you should know"
+        if leg_meta and leg_meta.get('is_omnibus'):
+            what_to_know = "This is an omnibus bill containing multiple unrelated provisions. Independent section-by-section analysis is recommended."
+        elif page_count > 200:
+            what_to_know = "This is a large document. Key provisions may be difficult to locate without detailed analysis."
+        else:
+            what_to_know = "Standard document. Review the analysis sections for detailed findings."
+        
+        # Build next steps based on risk level
+        if risk_level == "REQUIRES_INVESTIGATION":
+            next_steps = "Run full legislative threat analysis. Cross-reference with official sources. Consider expert review."
+        elif risk_level == "ELEVATED":
+            next_steps = "Review flagged sections carefully. Verify claims against official sources."
+        else:
+            next_steps = "Review analysis results. Verify any claims of concern against original document."
+        
+        # Build verification instructions
+        file_hash = doc_origin.get('file_identity', {}).get('file_hash_sha256', '')
+        if file_hash:
+            how_to_verify = f"Compare SHA-256 hash ({file_hash[:16]}...) with official source to verify document authenticity."
+        else:
+            how_to_verify = "Download document from official source and compare with this analysis."
+        
+        return {
+            "what_is_this": what_is_this,
+            "key_concerns": key_concerns,
+            "what_you_should_know": what_to_know,
+            "how_to_verify": how_to_verify,
+            "next_steps": next_steps,
+            "risk_level_plain": {
+                "REQUIRES_INVESTIGATION": "⚠️ High priority - requires careful investigation",
+                "ELEVATED": "⚡ Moderate priority - review recommended",
+                "LOW": "✅ Standard priority - routine review"
+            }.get(risk_level, "Unknown")
+        }
+
     def generate_markdown_report(
         self,
         provenance_report: Dict[str, Any],
@@ -447,20 +792,34 @@ class ProvenanceReportGenerator:
             f""
         ])
         
-        # AI Calls Summary
+        # AI Calls Summary - combine ai_calls AND narrative_contributions
         ai_calls = analysis.get('ai_calls', {})
+        narrative = analysis.get('narrative_contributions', {})
+        
+        # Calculate combined totals
+        ollama_calls = ai_calls.get('total_calls', 0)
+        narrative_contributions = narrative.get('total_contributions', 0)
+        total_ai_usage = ollama_calls + narrative_contributions
+        
+        # Combine models from both sources
+        ollama_models = ai_calls.get('models_used', [])
+        narrative_models = []
+        for contrib in narrative.get('contributions_detail', []):
+            if contrib.get('model') and contrib['model'] not in narrative_models:
+                narrative_models.append(contrib['model'])
+        all_models = list(set(ollama_models + narrative_models))
+        
         lines.extend([
             f"### AI Model Usage",
             f"",
             f"| Metric | Value |",
             f"|--------|-------|",
-            f"| **Total AI Calls** | {ai_calls.get('total_calls', 0)} |",
-            f"| **Successful Calls** | {ai_calls.get('successful_calls', 0)} |",
-            f"| **Failed Calls** | {ai_calls.get('failed_calls', 0)} |",
-            f"| **Models Used** | {', '.join(ai_calls.get('models_used', ['None']))} |",
+            f"| **Total AI Interactions** | {total_ai_usage} |",
+            f"| **Ollama API Calls** | {ollama_calls} |",
+            f"| **Narrative Contributions** | {narrative_contributions} |",
+            f"| **Models Used** | {', '.join(all_models) if all_models else 'None'} |",
             f"| **Total Duration** | {ai_calls.get('total_duration_ms', 0):,} ms |",
-            f"| **Prompt Characters** | {ai_calls.get('total_prompt_chars', 0):,} |",
-            f"| **Response Characters** | {ai_calls.get('total_response_chars', 0):,} |",
+            f"| **AI Percentage** | {narrative.get('overall_ai_percentage', 0):.1f}% |",
             f""
         ])
         
@@ -492,7 +851,10 @@ class ProvenanceReportGenerator:
             f""
         ])
         
-        # Part 3: Summary
+        # Part 3: Summary - use combined AI usage from analysis section
+        # Calculate combined totals for summary
+        total_ai_interactions = ollama_calls + narrative_contributions
+        
         lines.extend([
             f"---",
             f"",
@@ -501,8 +863,8 @@ class ProvenanceReportGenerator:
             f"| Check | Status |",
             f"|-------|--------|",
             f"| **Document Origin Verified** | {'✅ Yes' if summary.get('document_hash_available') else '❌ No'} |",
-            f"| **AI Calls Made** | {summary.get('ai_calls_made', 0)} |",
-            f"| **AI Calls Successful** | {summary.get('ai_calls_successful', 0)} |",
+            f"| **Total AI Interactions** | {total_ai_interactions} |",
+            f"| **Models Used** | {', '.join(all_models) if all_models else 'None'} |",
             f"| **Provenance Complete** | {'✅ Yes' if summary.get('provenance_complete') else '⚠️ Partial'} |",
             f"| **Requires Human Review** | {'Yes' if summary.get('requires_human_review') else 'No'} |",
             f"",

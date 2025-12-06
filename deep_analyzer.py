@@ -437,9 +437,26 @@ class DeepAnalyzer:
         }
     
     def _run_level2(self, text: str, max_sections: int) -> Dict:
-        """Level 2: Section-level detection"""
+        """Level 2: Section-level detection
+        
+        v8.4.2: Fixed key mismatch - use 'section_details' not 'sections'
+        v8.4.2: Fixed field mismatch - use 'ai_score' not 'ai_percentage'
+        """
         result = self.section_analyzer.analyze_document_sections(text)
-        sections = result.get('sections', [])[:max_sections]  # Limit to max
+        # v8.4.2: The analyzer returns 'section_details', not 'sections'
+        raw_sections = result.get('section_details', [])[:max_sections]
+        
+        # v8.4.2: Transform to expected format (ai_score -> ai_percentage, add likely_model)
+        sections = []
+        for s in raw_sections:
+            sections.append({
+                'section_number': s.get('section_number', 0),
+                'ai_percentage': s.get('ai_score', 0) * 100,  # Convert 0-1 to percentage
+                'likely_model': s.get('detected_model', 'Unknown'),
+                'model_confidence': s.get('model_confidence', 0) * 100,
+                'text_preview': s.get('preview', '')[:150],
+            })
+        
         return {
             'sections_analyzed': len(sections),
             'sections': sections,
@@ -482,9 +499,12 @@ class DeepAnalyzer:
         Weighted by reliability and consistency.
         
         v8.4.1: Added explicit breakdown for transparency.
+        v8.4.2: Fixed model confidence calculation (average instead of sum, cap at 100%).
+        v8.4.2: Suppress model attribution when AI percentage is very low.
         """
         scores = []
-        models = {}
+        # v8.4.2: Track model confidences as lists for averaging
+        model_confidences = {}  # model -> [confidence1, confidence2, ...]
         
         # v8.4.1: Define weights explicitly for documentation
         level_weights = {
@@ -499,7 +519,11 @@ class DeepAnalyzer:
         if 'level1_document' in results:
             scores.append(('level1', results['level1_document']['ai_percentage'], level_weights['level1']))
             model = results['level1_document']['primary_model']
-            models[model] = models.get(model, 0) + results['level1_document']['model_confidence']
+            conf = results['level1_document']['model_confidence']
+            if model and model != 'Unknown' and conf > 0:
+                if model not in model_confidences:
+                    model_confidences[model] = []
+                model_confidences[model].append(conf)
         
         # Level 2 weight: 25%
         if 'level2_sections' in results and results['level2_sections']['sections']:
@@ -519,16 +543,29 @@ class DeepAnalyzer:
         if 'level5_fingerprints' in results:
             model = results['level5_fingerprints']['primary_model']
             conf = results['level5_fingerprints']['primary_confidence']
-            models[model] = models.get(model, 0) + conf
+            if model and model != 'Unknown' and conf > 0:
+                if model not in model_confidences:
+                    model_confidences[model] = []
+                model_confidences[model].append(conf)
         
         # Calculate weighted average
         total_weight = sum(weight for _, _, weight in scores)
         weighted_sum = sum(score * weight for _, score, weight in scores)
         final_percentage = weighted_sum / total_weight if total_weight > 0 else 0
         
-        # Determine primary model
-        primary_model = max(models.items(), key=lambda x: x[1])[0] if models else 'Unknown'
-        model_confidence = max(models.values()) if models else 0
+        # v8.4.2: Calculate AVERAGE confidence per model (not sum), then find best
+        model_avg_confidences = {}
+        for model, confs in model_confidences.items():
+            model_avg_confidences[model] = sum(confs) / len(confs)
+        
+        # Determine primary model - but ONLY if AI percentage is significant
+        if model_avg_confidences and final_percentage >= 10.0:
+            primary_model = max(model_avg_confidences.items(), key=lambda x: x[1])[0]
+            model_confidence = min(model_avg_confidences[primary_model], 100.0)  # v8.4.2: Cap at 100%
+        else:
+            # v8.4.2: Don't attribute a model if AI content is negligible
+            primary_model = 'None' if final_percentage < 10.0 else 'Unknown'
+            model_confidence = 0.0
         
         # Calculate transparency score (how consistent are the results?)
         variance = self._calculate_variance([s for _, s, _ in scores])

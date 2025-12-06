@@ -654,15 +654,30 @@ def analyze_document(
         cleanup_after_analysis()
 
 
-def run_via_subprocess(url, variant, document_type, output_name, narrative_style, narrative_length,
+def run_via_subprocess(url_or_file, variant, document_type, output_name, narrative_style, narrative_length,
                        ollama_model, deep_analysis, citation_check, check_urls,
                        enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                        nist_compliance, lineage_chart_format, progress):
-    """Run analysis via subprocess for URL inputs."""
+    """
+    Run analysis via subprocess for URL inputs or low memory mode.
+    
+    v8.4.1: Updated to handle both URLs and file paths for low memory mode.
+    """
     import subprocess
+    import os
+    
+    # Get path to sparrow_grader_v8.py in parent directory
+    grader_script = str(SPOT_NEWS_DIR / "sparrow_grader_v8.py")
+    
+    # Determine if input is a URL or file path
+    is_url = url_or_file.startswith('http://') or url_or_file.startswith('https://')
     
     # Use sys.executable to get the current Python interpreter
-    cmd = [sys.executable, "sparrow_grader_v8.py", "--url", url, "--variant", variant, "--output", output_name]
+    if is_url:
+        cmd = [sys.executable, grader_script, "--url", url_or_file, "--variant", variant, "--output", output_name]
+    else:
+        # It's a file path - use it as positional argument
+        cmd = [sys.executable, grader_script, url_or_file, "--variant", variant, "--output", output_name]
     
     if narrative_style != "None":
         cmd.extend(["--narrative-style", narrative_style])

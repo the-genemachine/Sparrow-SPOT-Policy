@@ -112,7 +112,14 @@ class AISectionAnalyzer:
         return results
     
     def _split_into_sections(self, text: str) -> List[Dict]:
-        """Split document into logical sections."""
+        """Split document into logical sections.
+        
+        v8.4.2: Improved section splitting with multiple fallback strategies:
+        1. All caps headers
+        2. Page breaks (--- Page N ---)
+        3. Double newline paragraphs (chunked)
+        4. Fixed-size character chunks as last resort
+        """
         sections = []
         
         # Try to split by headers/titles (common patterns)
@@ -127,19 +134,56 @@ class AISectionAnalyzer:
                         'title': parts[i].strip(),
                         'text': parts[i + 1].strip()
                     })
-        else:
-            # Fallback: split by page breaks or paragraph chunks
+        
+        # If header splitting didn't work, try page breaks
+        if not sections:
             page_pattern = r'--- Page \d+ ---'
             pages = re.split(page_pattern, text)
             
-            # Chunk pages into larger sections
-            chunk_size = 3  # 3 pages per section
-            for i in range(0, len(pages), chunk_size):
-                chunk_pages = pages[i:i + chunk_size]
-                sections.append({
-                    'title': f'Pages {i + 1}-{i + len(chunk_pages)}',
-                    'text': '\n'.join(chunk_pages)
-                })
+            if len(pages) > 1:
+                # Chunk pages into larger sections
+                chunk_size = 3  # 3 pages per section
+                for i in range(0, len(pages), chunk_size):
+                    chunk_pages = pages[i:i + chunk_size]
+                    chunk_text = '\n'.join(chunk_pages).strip()
+                    if chunk_text:
+                        sections.append({
+                            'title': f'Pages {i + 1}-{i + len(chunk_pages)}',
+                            'text': chunk_text
+                        })
+        
+        # v8.4.2: If still no sections, try paragraph-based chunking
+        if not sections:
+            paragraphs = text.split('\n\n')
+            if len(paragraphs) > 5:
+                # Chunk paragraphs into groups of ~10
+                chunk_size = 10
+                for i in range(0, len(paragraphs), chunk_size):
+                    chunk_paragraphs = paragraphs[i:i + chunk_size]
+                    chunk_text = '\n\n'.join(chunk_paragraphs).strip()
+                    if chunk_text and len(chunk_text) >= 200:
+                        sections.append({
+                            'title': f'Paragraphs {i + 1}-{i + len(chunk_paragraphs)}',
+                            'text': chunk_text
+                        })
+        
+        # v8.4.2: Last resort - fixed-size character chunks (for very large, unstructured docs)
+        if not sections and len(text) > 2000:
+            chunk_size = 5000  # ~5000 chars per section
+            for i in range(0, len(text), chunk_size):
+                chunk_text = text[i:i + chunk_size].strip()
+                if chunk_text and len(chunk_text) >= 500:
+                    sections.append({
+                        'title': f'Chunk {i // chunk_size + 1}',
+                        'text': chunk_text
+                    })
+        
+        # v8.4.2: Limit to reasonable number for very large documents
+        max_sections = 50
+        if len(sections) > max_sections:
+            # Sample evenly across the document
+            step = len(sections) // max_sections
+            sections = sections[::step][:max_sections]
         
         return sections
     
