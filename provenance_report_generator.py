@@ -83,32 +83,67 @@ class ProvenanceReportGenerator:
                 "reason": metadata.get('error', 'No metadata provided')
             }
         
+        # Extract PDF metadata for enhanced document info
+        pdf_meta = metadata.get('pdf_metadata', {})
+        
+        # Get date source to indicate if dates are from PDF or filesystem
+        date_source = metadata.get('date_source', 'unknown')
+        
         origin = {
             "file_identity": {
                 "file_name": metadata.get('file_name', 'Unknown'),
+                "document_title": pdf_meta.get('title', '') or metadata.get('file_name', 'Unknown'),
                 "file_size_bytes": metadata.get('file_size', 0),
                 "file_extension": metadata.get('file_extension', ''),
-                "file_hash_sha256": metadata.get('file_hash', 'Unknown')
+                "file_hash_sha256": metadata.get('file_hash', 'Unknown'),
+                "page_count": pdf_meta.get('page_count', 0) if pdf_meta.get('page_count') else None
             },
             "timestamps": {
                 "created": metadata.get('creation_date', 'Unknown'),
                 "modified": metadata.get('modification_date', 'Unknown'),
+                "date_source": date_source,
+                "timestamps_embedded": date_source == 'pdf_embedded',
                 "timestamps_plausible": self._check_timestamps_plausible(metadata)
             },
             "authorship": self._extract_authorship(metadata),
             "creation_tools": self._extract_creation_tools(metadata),
-            "ai_markers": {
-                "ai_tool_markers_found": metadata.get('ai_tool_markers', []),
-                "suspected_ai_tool": metadata.get('document_metadata', {}).get('suspected_ai_tool'),
-                "has_ai_indicators": len(metadata.get('ai_tool_markers', [])) > 0
-            },
+            "ai_markers": self._extract_ai_markers(metadata),
             "integrity": {
                 "hash_verified": bool(metadata.get('file_hash')),
                 "edit_patterns": metadata.get('edit_patterns', {})
             }
         }
         
+        # Remove None values from file_identity
+        origin["file_identity"] = {k: v for k, v in origin["file_identity"].items() if v is not None}
+        
         return origin
+    
+    def _extract_ai_markers(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract AI tool markers from metadata, filtering out error messages.
+        
+        v8.4.1: Added to properly handle metadata extraction errors.
+        """
+        raw_markers = metadata.get('ai_tool_markers', [])
+        
+        # Filter out error messages and invalid markers
+        valid_markers = [
+            m for m in raw_markers 
+            if isinstance(m, str) 
+            and m.lower() not in ('error', 'unknown', 'none')
+            and not m.startswith('Error:')
+            and not m.startswith('error:')
+        ]
+        
+        suspected_ai = metadata.get('document_metadata', {}).get('suspected_ai_tool')
+        
+        return {
+            "ai_tool_markers_found": valid_markers,
+            "suspected_ai_tool": suspected_ai,
+            "has_ai_indicators": len(valid_markers) > 0 or bool(suspected_ai),
+            "marker_extraction_status": "success" if not any(m.lower() == 'error' for m in raw_markers) else "partial_failure"
+        }
     
     def _check_timestamps_plausible(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Check if timestamps are plausible (no paradoxes)."""

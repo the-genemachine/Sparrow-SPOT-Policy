@@ -1163,12 +1163,24 @@ class ProvenanceAnalyzer:
             # Analyze edit patterns
             edit_analysis = self._analyze_edit_patterns(stat)
             
+            # v8.4.1: Use PDF-embedded dates if available, fallback to filesystem
+            creation_date = self._parse_pdf_date(pdf_metadata.get('creation_date')) or datetime.fromtimestamp(stat.st_ctime).isoformat()
+            modification_date = self._parse_pdf_date(pdf_metadata.get('mod_date')) or datetime.fromtimestamp(stat.st_mtime).isoformat()
+            
+            # Track if we used embedded vs filesystem dates
+            date_source = "pdf_embedded" if pdf_metadata.get('creation_date') else "filesystem"
+            
             return {
                 "file_name": path.name,
                 "file_size": stat.st_size,
                 "file_hash": file_hash,
-                "creation_date": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                "modification_date": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "creation_date": creation_date,
+                "modification_date": modification_date,
+                "date_source": date_source,
+                "filesystem_dates": {
+                    "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                },
                 "file_extension": path.suffix,
                 "ai_tool_markers": ai_markers,
                 "pdf_metadata": pdf_metadata,
@@ -1179,6 +1191,50 @@ class ProvenanceAnalyzer:
         
         except Exception as e:
             return {"error": str(e)}
+    
+    def _parse_pdf_date(self, pdf_date_str: str) -> Optional[str]:
+        """
+        Parse PDF date format to ISO format.
+        
+        PDF dates are in format: D:YYYYMMDDHHmmSS+HH'mm' or D:YYYYMMDDHHmmSS-HH'mm'
+        Example: D:20251119005221-05'00' -> 2025-11-19T00:52:21-05:00
+        
+        v8.4.1: Added to extract actual document creation dates from PDF metadata.
+        """
+        if not pdf_date_str or pdf_date_str == 'Unknown':
+            return None
+        
+        try:
+            # Remove 'D:' prefix if present
+            date_str = pdf_date_str
+            if date_str.startswith('D:'):
+                date_str = date_str[2:]
+            
+            # Extract components
+            year = date_str[0:4]
+            month = date_str[4:6]
+            day = date_str[6:8]
+            hour = date_str[8:10] if len(date_str) > 8 else '00'
+            minute = date_str[10:12] if len(date_str) > 10 else '00'
+            second = date_str[12:14] if len(date_str) > 12 else '00'
+            
+            # Handle timezone if present
+            tz_str = ""
+            if len(date_str) > 14:
+                tz_part = date_str[14:]
+                # Convert +05'00' or -05'00' to +05:00 or -05:00
+                tz_part = tz_part.replace("'", ":")
+                if tz_part.endswith(":"):
+                    tz_part = tz_part[:-1]
+                tz_str = tz_part
+            
+            iso_date = f"{year}-{month}-{day}T{hour}:{minute}:{second}"
+            if tz_str:
+                iso_date += tz_str
+            
+            return iso_date
+        except Exception:
+            return None
     
     def _calculate_file_hash(self, file_path: str) -> str:
         """Calculate SHA256 hash of file."""
@@ -1192,14 +1248,14 @@ class ProvenanceAnalyzer:
             return "unknown"
     
     def _detect_ai_tool_markers(self, file_path: str) -> List[str]:
-        """Detect markers indicating use of AI tools."""
+        """Detect markers indicating use of AI tools in content or metadata."""
         markers = []
         
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
             
-            # Check for AI tool signatures in metadata
+            # Check for AI tool signatures in content
             if 'ChatGPT' in content or 'OpenAI' in content:
                 markers.append("OpenAI/ChatGPT")
             if 'Claude' in content:
@@ -1208,10 +1264,29 @@ class ProvenanceAnalyzer:
                 markers.append("Google/Gemini")
             if 'Copilot' in content:
                 markers.append("Microsoft/Copilot")
+            if 'Midjourney' in content:
+                markers.append("Midjourney")
+            if 'DALL-E' in content or 'DALLE' in content:
+                markers.append("OpenAI/DALL-E")
+            if 'Jasper' in content:
+                markers.append("Jasper.ai")
             
-            # Check file metadata (PDF metadata, Word properties, etc.)
+            # Check PDF metadata for AI tool signatures
             if file_path.endswith('.pdf'):
-                markers.extend(self._extract_pdf_metadata(file_path))
+                pdf_meta = self._extract_pdf_metadata(file_path)
+                if isinstance(pdf_meta, dict) and 'error' not in pdf_meta:
+                    # Check creator/producer for AI tool signatures
+                    creator = pdf_meta.get('creator', '').lower()
+                    producer = pdf_meta.get('producer', '').lower()
+                    author = pdf_meta.get('author', '').lower()
+                    
+                    for field_value in [creator, producer, author]:
+                        if 'chatgpt' in field_value or 'openai' in field_value:
+                            markers.append("OpenAI/ChatGPT")
+                        if 'claude' in field_value or 'anthropic' in field_value:
+                            markers.append("Anthropic/Claude")
+                        if 'copilot' in field_value:
+                            markers.append("Microsoft/Copilot")
         
         except:
             pass

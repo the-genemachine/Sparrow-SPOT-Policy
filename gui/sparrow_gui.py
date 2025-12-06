@@ -302,12 +302,6 @@ def analyze_document(
                     progress(0.8, desc="Checking NIST compliance...")
                     results = add_nist_compliance(results, text)
                 
-                # v8.4.1: Generate provenance report (document origin + AI usage audit trail)
-                if provenance_report:
-                    progress(0.82, desc="Generating provenance report...")
-                    results, prov_files = add_provenance_report(results, text, output_name, input_path)
-                    output_files.extend(prov_files)
-                
                 progress(0.85, desc="Generating outputs...")
                 
                 # JSON report
@@ -337,6 +331,10 @@ def analyze_document(
                 cert_path = generate_certificate(results, output_name, variant)
                 output_files.append(cert_path)
                 
+                # v8.4.1: Track AI calls for provenance
+                ai_calls_log = []
+                contribution_log = None
+                
                 # Generate Ollama summary (if model available)
                 if ollama_model:  # Run Ollama for any selected model
                     progress(0.88, desc=f"Generating AI summary with {ollama_model}...")
@@ -359,18 +357,30 @@ def analyze_document(
                         )
                         output_files.append(summary_path)
                         progress(0.89, desc="AI summary complete")
+                        
+                        # v8.4.1: Capture AI calls from summary generator
+                        if hasattr(cert_gen, 'summary_generator') and cert_gen.summary_generator:
+                            ai_calls_log.extend(cert_gen.summary_generator.get_ai_calls_log())
                     except Exception as e:
                         print(f"⚠️ Ollama summary failed: {e}")
                         # Continue without failing the entire analysis
                 
                 # Narrative (if requested)
+                narrative_pipeline = None
                 if narrative_style != "None":
                     progress(0.9, desc=f"Generating {narrative_style} narrative...")
-                    narrative_files = generate_narrative(
+                    narrative_files, narrative_pipeline = generate_narrative_with_tracking(
                         results, text, output_name, narrative_style, 
                         narrative_length, ollama_model, ollama_custom_query
                     )
                     output_files.extend(narrative_files)
+                    
+                    # v8.4.1: Capture AI contribution log from narrative pipeline
+                    if narrative_pipeline:
+                        try:
+                            contribution_log = narrative_pipeline.get_ai_contribution_log()
+                        except Exception:
+                            pass
                 
                 # Lineage chart (if requested)
                 if lineage_chart_format != "None":
@@ -378,6 +388,16 @@ def analyze_document(
                     chart_path = generate_lineage_chart(results, output_name, lineage_chart_format)
                     if chart_path:
                         output_files.append(chart_path)
+                
+                # v8.4.1: Generate provenance report LAST (after all AI operations)
+                if provenance_report:
+                    progress(0.95, desc="Generating provenance report...")
+                    results, prov_files = add_provenance_report(
+                        results, text, output_name, input_path,
+                        ai_calls_log=ai_calls_log,
+                        contribution_log=contribution_log
+                    )
+                    output_files.extend(prov_files)
         
         progress(1.0, desc="Analysis complete!")
         
@@ -861,7 +881,7 @@ def add_nist_compliance(results, text):
     return results
 
 
-def add_provenance_report(results, text, output_name, input_path=None):
+def add_provenance_report(results, text, output_name, input_path=None, ai_calls_log=None, contribution_log=None):
     """
     Generate comprehensive provenance report (document origin + Sparrow AI usage).
     
@@ -872,6 +892,8 @@ def add_provenance_report(results, text, output_name, input_path=None):
         text: Original document text
         output_name: Output file prefix
         input_path: Path to input file for metadata extraction
+        ai_calls_log: List of AI API calls made during analysis
+        contribution_log: Dict of AI contributions from narrative pipeline
         
     Returns:
         Tuple of (updated results, list of output files)
@@ -880,6 +902,12 @@ def add_provenance_report(results, text, output_name, input_path=None):
     from ai_detection_engine import ProvenanceAnalyzer
     
     output_files = []
+    
+    # Use provided logs or empty defaults
+    if ai_calls_log is None:
+        ai_calls_log = []
+    if contribution_log is None:
+        contribution_log = None
     
     try:
         prov_report_gen = create_provenance_report_generator()
@@ -892,15 +920,6 @@ def add_provenance_report(results, text, output_name, input_path=None):
                 doc_metadata = prov_analyzer.extract_metadata(input_path)
             except Exception as e:
                 doc_metadata = {'error': str(e)}
-        
-        # Get AI contribution log from narrative pipeline if available
-        contribution_log = None
-        ai_calls_log = []
-        
-        # Try to get from results if narrative was generated
-        if 'narrative_outputs' in results and results.get('narrative_outputs'):
-            # The narrative pipeline may have logged AI calls
-            pass  # Will be populated by narrative_integration if available
         
         # Generate the provenance report
         doc_title = results.get('document_title', 'Unknown Document')
@@ -983,6 +1002,60 @@ def generate_narrative(results, text, output_name, style, length, model, custom_
     output_files.append(narrative_path)
     
     return output_files
+
+
+def generate_narrative_with_tracking(results, text, output_name, style, length, model, custom_query=""):
+    """
+    Generate narrative outputs and return pipeline for AI tracking.
+    
+    v8.4.1: Added to support provenance report AI usage tracking.
+    
+    Args:
+        results: Analysis results dict
+        text: Original document text
+        output_name: Output file prefix
+        style: Narrative style (journalistic, academic, etc.)
+        length: Target length (concise, standard, detailed, comprehensive)
+        model: Ollama model to use
+        custom_query: Optional custom context/question for the narrative
+        
+    Returns:
+        Tuple of (output_files list, pipeline object for AI tracking)
+    """
+    from narrative_integration import create_pipeline
+    
+    pipeline = create_pipeline()
+    
+    output_files = []
+    
+    # Add custom query to analysis for the pipeline to use
+    if custom_query and custom_query.strip():
+        results['custom_narrative_query'] = custom_query.strip()
+    
+    # Generate complete narrative
+    narrative_result = pipeline.generate_complete_narrative(
+        analysis=results,
+        tone=style,
+        length=length,
+        ollama_model=model,
+        formats=['x_thread', 'linkedin', 'social_badge', 'html_certificate']
+    )
+    
+    # Save narrative text - Handle test_articles path to go to root directory
+    if output_name.startswith('test_articles/'):
+        narrative_path = f"../{output_name}_narrative.txt"
+    else:
+        narrative_path = f"{output_name}_narrative.txt"
+        
+    # Create directory if needed
+    os.makedirs(os.path.dirname(narrative_path), exist_ok=True) if os.path.dirname(narrative_path) else None
+    
+    with open(narrative_path, 'w') as f:
+        f.write(narrative_result.get('narrative_text', ''))
+    output_files.append(narrative_path)
+    
+    # Return both output files AND the pipeline for AI tracking
+    return output_files, pipeline
 
 
 def generate_lineage_chart(results, output_name, format):
