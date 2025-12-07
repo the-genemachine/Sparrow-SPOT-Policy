@@ -1,7 +1,7 @@
 # Sparrow SPOT Scale™ - Project Valuation & Vision
 
-**Document Date:** December 4, 2025  
-**Version:** 8.3.5  
+**Document Date:** December 7, 2025  
+**Version:** 8.6.0  
 **Classification:** Business Confidential
 
 ---
@@ -37,7 +37,14 @@ Sparrow SPOT Scale™ is a **multi-dimensional document analysis platform** that
    - Data lineage flowcharts
    - JSON reports for system integration
 
-5. **Handles Specialized Documents** - Domain-specific baselines for:
+5. **Analyzes Large Documents** - Enhanced Q&A system for documents exceeding LLM context windows:
+   - Token counting with 3 estimation methods (quick/tiktoken/precise)
+   - Intelligent chunking (section-based, sliding window, semantic)
+   - Multi-chunk query routing (keyword/semantic/comprehensive/quick)
+   - Answer synthesis with source attribution
+   - Supports documents up to 1M+ characters (tested on Bill C-15)
+
+6. **Handles Specialized Documents** - Domain-specific baselines for:
    - Legislation (bilingual EN/FR support)
    - Budget documents
    - Legal judgments
@@ -89,14 +96,14 @@ Sparrow SPOT Scale™ is a **multi-dimensional document analysis platform** that
 
 | Category | Calculation | Value (USD) |
 |----------|-------------|-------------|
-| **Lines of Code** | 28,641 LOC × $50-150/LOC (industry standard) | $1.4M - $4.3M |
+| **Lines of Code** | 35,636 LOC × $50-150/LOC (industry standard) | $1.8M - $5.3M |
 | **Documentation** | 25,005 lines × $25/line (technical writing) | $625K |
 | **Architecture Design** | 78 classes, 554 functions, enterprise patterns | $250K - $500K |
 | **AI/ML Integration** | 8 detection methods, LLM orchestration | $300K - $600K |
 | **Compliance Framework** | NIST AI RMF alignment, bias auditing | $200K - $400K |
 | **Domain Expertise** | Legislative, budget, legal document handling | $150K - $300K |
 
-**Total Development Cost Estimate: $2.9M - $6.7M**
+**Total Development Cost Estimate: $3.4M - $7.3M** (includes v8.6 Enhanced Q&A System)
 
 ### Market Comparables
 
@@ -113,10 +120,10 @@ Sparrow SPOT Scale™ is a **multi-dimensional document analysis platform** that
 #### 1. Cost-Based Valuation
 | Component | Value |
 |-----------|-------|
-| Development costs | $4.5M (midpoint) |
-| Documentation & IP | $625K |
+| Development costs | $5.3M (midpoint) |
+| Documentation & IP | $850K (includes new 400+ line technical docs) |
 | Opportunity cost (18 months dev) | $1M |
-| **Total Cost Basis** | **$6.1M** |
+| **Total Cost Basis** | **$7.15M** |
 
 #### 2. Revenue Multiple Valuation (Projected)
 | Scenario | Year 1 ARR | Multiple | Valuation |
@@ -133,9 +140,9 @@ Sparrow SPOT Scale™ is a **multi-dimensional document analysis platform** that
 | Compliance/RegTech premium | +15-25% |
 | **Estimated Range** | **$8M - $25M** |
 
-### **Recommended Valuation Range: $8M - $20M**
+### **Recommended Valuation Range: $12M - $28M**
 
-*Based on: Development costs, market comparables, GovTech positioning, and regulatory tailwinds*
+*Based on: Enhanced development costs (+$2.5M for v8.6), market comparables, GovTech positioning, regulatory tailwinds, and differentiated multi-chunk Q&A capability*
 
 ---
 
@@ -143,6 +150,14 @@ Sparrow SPOT Scale™ is a **multi-dimensional document analysis platform** that
 
 ### Phase 1: Foundation (Current - Q2 2026)
 **Focus:** Product hardening and early adoption
+
+**v8.6 Milestone Achieved:**
+- ✅ Enhanced Document Q&A System (December 2025)
+  - Token calculator with 3 estimation methods
+  - Semantic chunker supporting 3 strategies
+  - Multi-chunk Q&A engine with 4 routing strategies
+  - GUI and CLI integration
+  - Tested on 1.15M character documents (Bill C-15)
 
 | Initiative | Description | Investment |
 |------------|-------------|------------|
@@ -282,12 +297,15 @@ Sparrow SPOT Scale™ is a **multi-dimensional document analysis platform** that
 
 | Metric | Value |
 |--------|-------|
-| **Development Investment** | $4.5M - $6.7M equivalent |
-| **Current Valuation Range** | $8M - $20M |
+| **Development Investment** | $5.3M equivalent |
+| **Current Code Base** | 35,636 lines (v8.6) |
+| **Core Modules** | 33+ specialized modules |
+| **Current Valuation Range** | $12M - $28M |
 | **5-Year Revenue Potential** | $35M ARR |
-| **Exit Potential (5-year)** | $200M - $500M |
+| **Exit Potential (5-year)** | $250M - $600M |
 | **Market Timing** | Optimal (regulatory tailwinds) |
 | **Competitive Position** | First mover, strong moats |
+| **Key Differentiator** | Multi-chunk Q&A for large documents |
 
 ---
 

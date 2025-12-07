@@ -1,36 +1,40 @@
 # Sparrow SPOT Scale™ - Project Metrics Report
 
 **Generated:** December 7, 2025  
-**Version:** 8.5.1  
+**Version:** 8.6.0  
 **Repository:** Sparrow-SPOT-Policy
 
 ---
 
-## 📊 Core Python Modules (46 files)
+## 📊 Core Python Modules (54 files, 35,636 lines)
 
 | Module | Lines | Purpose | Complexity |
 |--------|-------|---------|------------|
-| `sparrow_grader_v8.py` | 3,240 | Main grading engine, CLI, orchestration (v8.5 with --legislative-threat) | ⭐⭐⭐⭐⭐ |
+| `sparrow_grader_v8.py` | 3,394 | Main grading engine, CLI, orchestration (v8.6 with enhanced Q&A) | ⭐⭐⭐⭐⭐ |
+| `gui/sparrow_gui.py` | 2,394 | Gradio web interface (v8.6 with token analysis) | ⭐⭐⭐⭐⭐ |
 | `sparrow_grader_v7.py` | 1,587 | Legacy grader (maintained for compatibility) | ⭐⭐⭐⭐ |
 | `certificate_generator.py` | 1,544 | HTML certificate generation with templates | ⭐⭐⭐⭐ |
 | `ai_detection_engine.py` | 1,390 | Multi-method AI content detection | ⭐⭐⭐⭐⭐ |
-| `discretionary_power_analyzer.py` | 664 | Legislative threat detection, 5 pattern types (NEW v8.5) | ⭐⭐⭐⭐⭐ |
 | `format_renderer.py` | 773 | Multi-format output rendering (updated for consensus) | ⭐⭐⭐ |
 | `ai_usage_explainer.py` | 1,031 | Plain-language AI usage reports | ⭐⭐⭐⭐ |
 | `deep_analyzer.py` | 740 | 6-level transparency analysis | ⭐⭐⭐⭐⭐ |
+| `enhanced_document_qa.py` | 730 | Multi-chunk Q&A with intelligent routing (NEW v8.6) | ⭐⭐⭐⭐⭐ |
 | `narrative_integration.py` | 788 | Narrative layer integration (updated with deep consensus) | ⭐⭐⭐⭐ |
 | `article_analyzer.py` | 732 | Journalism article analysis | ⭐⭐⭐ |
 | `ai_disclosure_generator.py` | 673 | Multi-format AI disclosure statements | ⭐⭐⭐⭐ |
+| `discretionary_power_analyzer.py` | 664 | Legislative threat detection, 5 pattern types (v8.5) | ⭐⭐⭐⭐⭐ |
 | `tone_adaptor.py` | 650 | Audience-appropriate tone generation | ⭐⭐⭐ |
 | `analysis_results.py` | 627 | Data structures & validation | ⭐⭐⭐ |
 | `contradiction_detector.py` | 618 | Policy contradiction detection | ⭐⭐⭐⭐ |
 | `narrative_engine.py` | 608 | LLM-powered narrative generation | ⭐⭐⭐⭐ |
 | `insight_extractor.py` | 599 | Key insight extraction | ⭐⭐⭐ |
+| `semantic_chunker.py` | 595 | Intelligent document chunking (NEW v8.6) | ⭐⭐⭐⭐⭐ |
 | `data_lineage_source_mapper.py` | 575 | Data provenance tracking | ⭐⭐⭐⭐ |
 | `ollama_summary_generator.py` | 544 | Ollama LLM integration | ⭐⭐⭐ |
 | `narrative_qa.py` | 539 | Narrative Q&A interface | ⭐⭐⭐ |
 | `validate_outputs.py` | 523 | Output validation suite | ⭐⭐⭐ |
 | `critique_ingestion_module.py` | 516 | External critique integration | ⭐⭐⭐⭐ |
+| `token_calculator.py` | 505 | Token estimation & model recommendation (NEW v8.6) | ⭐⭐⭐⭐ |
 | `legislative_baseline.py` | 505 | Legislative text baselines | ⭐⭐⭐⭐ |
 | `bias_auditor.py` | 474 | Fairness & bias auditing | ⭐⭐⭐⭐⭐ |
 | `nist_risk_mapper.py` | 470 | NIST AI RMF mapping | ⭐⭐⭐⭐ |
@@ -40,14 +44,14 @@
 | `validation_middleware.py` | 442 | Cross-output consistency checks | ⭐⭐⭐⭐ |
 | `trust_score_calculator.py` | 389 | Trust score computation | ⭐⭐⭐⭐ |
 | `realtime_fairness_audit.py` | 380 | Runtime bias detection | ⭐⭐⭐⭐ |
+| `document_qa.py` | 380 | Document Q&A via Ollama (v8.4.2) | ⭐⭐⭐⭐ |
 | `ai_section_analyzer.py` | 376 | Section-level AI analysis | ⭐⭐⭐ |
 | `data_lineage_visualizer.py` | 363 | Pipeline flowchart generation | ⭐⭐⭐ |
 | `escalation_manager.py` | 288 | Risk-based escalation routing | ⭐⭐⭐ |
 | `ai_contribution_tracker.py` | 267 | AI contribution tracking | ⭐⭐⭐ |
 | `sentence_level_detector.py` | 260 | Sentence-level AI detection | ⭐⭐⭐ |
-| `document_qa.py` | 380 | Document Q&A via Ollama (NEW v8.4.2) | ⭐⭐⭐⭐ |
-| `diagnostic_logger.py` | 250 | Comprehensive diagnostic logging (NEW v8.4.2) | ⭐⭐⭐ |
-| `version.py` | 8 | Version centralization (NEW v8.4) | ⭐ |
+| `diagnostic_logger.py` | 250 | Comprehensive diagnostic logging (v8.4.2) | ⭐⭐⭐ |
+| `version.py` | 8 | Version centralization (v8.4) | ⭐ |
 | `test_model_detection.py` | 233 | Model detection tests | ⭐⭐ |
 | `section_analysis_integration.py` | 203 | Section analysis integration | ⭐⭐⭐ |
 | `integrate_v7_ethical_modules.py` | 93 | V7 module integration | ⭐⭐ |
@@ -150,34 +154,40 @@
 
 **Sparrow SPOT Scale™** is a **production-ready research platform** with enterprise-grade architecture, sophisticated AI detection capabilities, strong governance alignment, and comprehensive diagnostic capabilities.
 
-### Strengths (v8.5.1)
+### Strengths (v8.6.0)
 - Exceeds typical research prototypes in functionality
 - Approaches commercial-grade tools in capability
 - Strong compliance and governance features
 - Excellent domain-specific handling
-- **NEW v8.5:** Legislative Threat Detection Suite with 5 pattern types (40+ regex patterns)
-- **NEW v8.5:** Automatic bilingual PDF column extraction (FR/EN detection threshold: FR > 10 AND EN > 5)
-- **NEW v8.5:** Zero-data-loss DPA reporting (270 → 1,565 lines, all 925 findings captured)
-- **NEW v8.5:** Discretionary Power Analysis available via GUI checkbox and `--legislative-threat` CLI flag
+- **NEW v8.6:** Enhanced Document Q&A with multi-chunk support (token calculator, semantic chunker, intelligent routing)
+- **NEW v8.6:** Token-aware chunking enables analysis of documents exceeding LLM context windows (tested on 286K token documents)
+- **NEW v8.6:** Smart query routing (keyword/semantic/comprehensive/quick strategies)
+- **NEW v8.6:** Model recommendation engine (30+ Ollama models with context windows mapped)
+- **v8.5:** Legislative Threat Detection Suite with 5 pattern types (40+ regex patterns)
+- **v8.5:** Automatic bilingual PDF column extraction (FR/EN detection threshold: FR > 10 AND EN > 5)
 - **v8.4.2:** Deep consensus across all 5 output formats ensures consistency
 - **v8.4.2:** Document Q&A enables direct interaction with analyzed documents
 - **v8.4.2:** Diagnostic logging provides detailed operation tracking
 
-### Recent Quality Improvements (v8.5.1)
-- ✅ Legislative Threat Detection Suite (Phase 1 complete, 5 of 6 modules planned)
-- ✅ Discretionary Power Analyzer with improved reporting format (0% data loss)
-- ✅ Bilingual PDF column extraction with intelligent detection (tested on Bill C-15)
-- ✅ Text cleaning for French artifacts, page numbers, excess whitespace
-- ✅ GUI integration with automatic PDF extraction before analysis
-- ✅ Subprocess support with temp file cleanup
-- ✅ TECHNICAL_ARCHITECTURE_REPORT.md updated with comprehensive v8.5 documentation
-- ✅ DPA_v8.5.1_IMPROVED_REPORTING.md created (500+ lines of detailed documentation)
+### Recent Quality Improvements (v8.6.0)
+- ✅ Enhanced Document Q&A System (Phase 1-6 complete, 3 new modules: 1,830 lines)
+- ✅ Token Calculator with 3 estimation methods (quick/tiktoken/precise)
+- ✅ Semantic Chunker with section-based, sliding window, and semantic strategies
+- ✅ Multi-chunk Q&A engine with query routing and answer synthesis
+- ✅ GUI integration: Document Size Analysis panel, Smart Chunking controls
+- ✅ CLI integration: --analyze-tokens, --enable-chunking, --qa-routing flags
+- ✅ Comprehensive testing on Bill C-15 (1.15M characters, 286K tokens, 4 chunks)
+- ✅ QA_SYSTEM_ARCHITECTURE.md created (comprehensive 400+ line technical reference)
+- ✅ Legislative Threat Detection Suite (v8.5)
+- ✅ Discretionary Power Analyzer with improved reporting format
+- ✅ Bilingual PDF column extraction with intelligent detection
 
 ### Areas for Enhancement
+- Ollama integration for enhanced Q&A (currently using mock mode)
+- Semantic similarity chunking (planned for v8.6.1)
 - Expanded unit test coverage
 - API documentation generation
 - Performance benchmarking suite
-- Trained document classifiers (planned for v9.0)
 
 ---
 
