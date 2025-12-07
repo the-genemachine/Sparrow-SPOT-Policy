@@ -2147,6 +2147,8 @@ def create_arg_parser():
                         help='v8.3: Auto-generate AI transparency disclosure statements (formal, plain-language, technical, social media formats).')
     transparency_group.add_argument('--trace-data-sources', action='store_true',
                         help='v8.3: Trace quantitative claims to authoritative data sources (Statistics Canada, IMF, OECD). Validates economic assumptions against historical data.')
+    transparency_group.add_argument('--document-qa', type=str, metavar='QUESTION',
+                        help='v8.4.2: Ask a question about the document using Ollama. Answer saved to qa/ directory.')
     
     return parser
 
@@ -2760,6 +2762,39 @@ def main():
                 
             except Exception as e:
                 print(f"   ⚠️  Enhanced provenance skipped: {str(e)}")
+        
+        # v8.4.2: Document Q&A (if requested)
+        if args.document_qa:
+            print(f"\n❓ Generating document Q&A...")
+            try:
+                from document_qa import generate_document_qa
+                
+                # Create qa directory
+                qa_dir = output_dir / "qa"
+                
+                # Get contribution tracker if available
+                tracker = None
+                if grader.narrative_pipeline and hasattr(grader.narrative_pipeline, 'contribution_tracker'):
+                    tracker = grader.narrative_pipeline.contribution_tracker
+                
+                qa_file = generate_document_qa(
+                    document_text=text,
+                    question=args.document_qa,
+                    output_dir=qa_dir,
+                    output_name=output_name,
+                    model=args.ollama_model,
+                    analysis_context=report,
+                    contribution_tracker=tracker
+                )
+                
+                if qa_file:
+                    print(f"   ✓ Document Q&A: {qa_file}")
+                    generation_sequence.append({'file': qa_file, 'type': 'document_qa', 'timestamp': datetime.now().isoformat()})
+                
+            except Exception as e:
+                print(f"   ⚠️  Document Q&A failed: {str(e)}")
+                if diagnostic_logger:
+                    diagnostic_logger.error("document_qa_failed", error=str(e))
         
         # v8.4.1: Full Provenance Report (document origin + AI usage audit trail)
         if args.provenance_report:

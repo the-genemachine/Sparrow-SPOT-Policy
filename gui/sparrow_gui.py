@@ -294,6 +294,8 @@ def analyze_document(
     deep_analysis,
     citation_check,
     check_urls,
+    enable_document_qa,  # v8.4.2: Document Q&A
+    document_qa_question,  # v8.4.2: Question for Q&A
     
     # Transparency flags
     enhanced_provenance,
@@ -559,6 +561,38 @@ def analyze_document(
                     if chart_path:
                         output_files.append(chart_path)
                 
+                # v8.4.2: Document Q&A (if requested)
+                if enable_document_qa and document_qa_question and document_qa_question.strip():
+                    progress(0.93, desc="Generating document Q&A...")
+                    try:
+                        from document_qa import generate_document_qa
+                        # Determine output directory (handle test_articles paths)
+                        if output_name.startswith('test_articles/'):
+                            qa_output_dir = Path('..') / Path(output_name).parent
+                        else:
+                            qa_output_dir = Path(output_name).parent if '/' in output_name else Path('.')
+                        
+                        # Get contribution tracker if available
+                        tracker = None
+                        if narrative_pipeline and hasattr(narrative_pipeline, 'contribution_tracker'):
+                            tracker = narrative_pipeline.contribution_tracker
+                        
+                        qa_file = generate_document_qa(
+                            document_text=text,
+                            question=document_qa_question.strip(),
+                            output_dir=qa_output_dir,
+                            output_name=Path(output_name).name,
+                            model=ollama_model,
+                            analysis_context=results,
+                            contribution_tracker=tracker
+                        )
+                        if qa_file:
+                            output_files.append(qa_file)
+                            print(f"   ✓ Document Q&A: {qa_file}")
+                    except Exception as e:
+                        print(f"   ⚠️ Document Q&A failed: {e}")
+                        # Don't fail entire analysis
+                
                 # v8.4.1: Generate provenance report LAST (after all AI operations)
                 if provenance_report:
                     progress(0.95, desc="Generating provenance report...")
@@ -657,6 +691,7 @@ def analyze_document(
 
 def run_via_subprocess(url_or_file, variant, document_type, output_name, document_title, narrative_style, narrative_length,
                        ollama_model, deep_analysis, citation_check, check_urls,
+                       enable_document_qa, document_qa_question,
                        enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                        nist_compliance, lineage_chart_format, progress):
     """
@@ -696,6 +731,8 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
         cmd.append("--citation-check")
     if check_urls:
         cmd.append("--check-urls")
+    if enable_document_qa and document_qa_question and document_qa_question.strip():
+        cmd.extend(["--document-qa", document_qa_question.strip()])
     if enhanced_provenance:
         cmd.append("--enhanced-provenance")
     if provenance_report:
@@ -1303,8 +1340,8 @@ def generate_lineage_chart(results, output_name, format):
 
 def update_settings_summary(pdf_file, url_input, variant, document_type, output_name, document_title,
                            narrative_style, narrative_length, ollama_model, ollama_custom_query,
-                           deep_analysis, citation_check, check_urls, enhanced_provenance,
-                           provenance_report, generate_ai_disclosure, trace_data_sources, 
+                           deep_analysis, citation_check, check_urls, enable_document_qa, document_qa_question,
+                           enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources, 
                            nist_compliance, lineage_chart_format, low_memory_mode):
     """Generate a summary of current settings."""
     
@@ -1357,6 +1394,8 @@ def update_settings_summary(pdf_file, url_input, variant, document_type, output_
 - Deep AI Analysis (6 levels): {'✅ Enabled' if deep_analysis else '❌ Disabled'}
 - Citation Quality Check: {'✅ Enabled' if citation_check else '❌ Disabled'}
 - URL Verification: {'✅ Enabled' if check_urls else '❌ Disabled'}
+- Document Q&A: {'✅ Enabled' if enable_document_qa and document_qa_question else '❌ Disabled'}
+{f"  - Question: _{document_qa_question[:60]}{'...' if len(document_qa_question) > 60 else ''}_" if enable_document_qa and document_qa_question else ""}
 
 ---
 
@@ -1686,6 +1725,22 @@ def create_interface():
                     value=False,
                     info="Check if cited URLs are accessible. Only works with --citation-check. Checks first 10 URLs."
                 )
+                
+                gr.Markdown("### Document Q&A")
+                
+                enable_document_qa = gr.Checkbox(
+                    label="Enable Document Q&A",
+                    value=False,
+                    info="Ask a specific question about the document using Ollama."
+                )
+                
+                document_qa_question = gr.Textbox(
+                    label="Question about the document",
+                    placeholder="e.g., 'What are the key stakeholders mentioned?' or 'Summarize the budget allocation for healthcare'",
+                    lines=2,
+                    info="Ask any question about the document content. Answer saved to qa/ directory.",
+                    value=""
+                )
             
             # ========== TAB 4: TRANSPARENCY FEATURES ==========
             with gr.Tab("🔒 Transparency & Compliance"):
@@ -1801,7 +1856,7 @@ def create_interface():
         all_inputs = [
             pdf_file, url_input, variant, document_type, output_name, document_title,
             narrative_style, narrative_length, ollama_model, ollama_custom_query,
-            deep_analysis, citation_check, check_urls,
+            deep_analysis, citation_check, check_urls, enable_document_qa, document_qa_question,
             enhanced_provenance, provenance_report, generate_ai_disclosure,
             trace_data_sources, nist_compliance, lineage_chart_format, low_memory_mode
         ]
@@ -1837,6 +1892,8 @@ def create_interface():
                 deep_analysis,
                 citation_check,
                 check_urls,
+                enable_document_qa,  # v8.4.2: Document Q&A
+                document_qa_question,  # v8.4.2: Q&A question
                 
                 # Transparency flags
                 enhanced_provenance,
