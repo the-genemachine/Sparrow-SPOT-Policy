@@ -52,6 +52,14 @@ try:
     from article_analyzer import ArticleAnalyzer
     from version import SPARROW_VERSION, get_version_string
     
+    # v8.5: PDF column extraction for bilingual documents
+    try:
+        import pdfplumber
+        PDFPLUMBER_AVAILABLE = True
+    except ImportError:
+        PDFPLUMBER_AVAILABLE = False
+        print("⚠️  pdfplumber not available - bilingual PDF column extraction disabled")
+    
     SPARROW_AVAILABLE = True
 except ImportError as e:
     SPARROW_AVAILABLE = False
@@ -112,6 +120,113 @@ def cleanup_after_analysis():
         pass  # PyTorch not installed, skip
     
     print("🧹 Memory cleanup completed")
+
+
+def extract_pdf_columns(pdf_path: str, output_dir: Path) -> str:
+    """
+    Extract English column from bilingual PDF with two-column layout.
+    
+    Args:
+        pdf_path: Path to input PDF
+        output_dir: Directory to save extracted text
+        
+    Returns:
+        Path to extracted text file, or original PDF path if extraction fails
+    """
+    if not PDFPLUMBER_AVAILABLE:
+        return pdf_path
+    
+    try:
+        import pdfplumber
+        import re
+        
+        print("📄 Detecting bilingual PDF layout...")
+        
+        # Quick check: sample first few pages to detect two-column layout
+        with pdfplumber.open(pdf_path) as pdf:
+            if len(pdf.pages) == 0:
+                return pdf_path
+            
+            # Sample first 3 pages for better detection
+            sample_pages = min(3, len(pdf.pages))
+            sample_text = ""
+            for i in range(sample_pages):
+                page_text = pdf.pages[i].extract_text()
+                if page_text:
+                    sample_text += page_text + " "
+            
+            if not sample_text:
+                return pdf_path
+            
+            # Heuristic: detect French content and legislative document patterns
+            # Legislative documents often have both English and French side-by-side
+            french_indicators = [
+                'de la', 'du Canada', 'le ministre', 'des finances', 
+                'loi', 'article', 'paragraphe', 'alinéa', 'ou', 'et'
+            ]
+            
+            # Count French phrase occurrences
+            french_count = sum(sample_text.lower().count(indicator) for indicator in french_indicators)
+            
+            # Also check for common English legislative terms
+            english_legislative = ['Act', 'Section', 'subsection', 'Minister', 'Parliament']
+            english_count = sum(sample_text.count(term) for term in english_legislative)
+            
+            # If we have both significant French AND English content, likely bilingual
+            is_bilingual = french_count > 10 and english_count > 5
+            
+            if not is_bilingual:
+                print(f"   Not detected as bilingual document (FR:{french_count}, EN:{english_count})")
+                print("   Using standard extraction")
+                return pdf_path
+        
+        print(f"   Bilingual layout detected (FR:{french_count}, EN:{english_count}) - extracting English column only...")
+        
+        # Extract English column
+        english_text = []
+        
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_width = page.width
+                page_height = page.height
+                
+                # Define left column (English) - approximately left half
+                left_bbox = (
+                    30,                    # left margin
+                    50,                    # top margin  
+                    page_width / 2 - 20,   # right edge (leave gap)
+                    page_height - 50       # bottom margin
+                )
+                
+                # Extract left column text
+                left_column = page.crop(left_bbox)
+                text = left_column.extract_text()
+                
+                if text:
+                    # Clean extracted text
+                    text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)  # Remove excess newlines
+                    text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)  # Remove page numbers
+                    text = re.sub(r' {3,}', '  ', text)  # Remove excess spaces
+                    english_text.append(text.strip())
+        
+        # Save extracted text
+        output_file = output_dir / f"{Path(pdf_path).stem}_english_only.txt"
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        full_text = "\n\n".join(english_text)
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(full_text)
+        
+        print(f"   ✅ Extracted {len(english_text)} pages ({len(full_text):,} characters)")
+        print(f"   Saved to: {output_file}")
+        
+        return str(output_file)
+        
+    except Exception as e:
+        print(f"   ⚠️  Column extraction failed: {e}")
+        print(f"   Falling back to standard PDF extraction")
+        return pdf_path
 
 
 def manual_cleanup_button():
@@ -365,8 +480,20 @@ def analyze_document(
         if input_path:
             is_pdf = input_path.lower().endswith('.pdf')
             if is_pdf:
-                grader = SPARROWGrader()
-                text = grader.extract_text_from_pdf(input_path)
+                # v8.5: Check for bilingual PDF and extract English column only
+                output_dir = Path("./temp_extractions")
+                extracted_path = extract_pdf_columns(input_path, output_dir)
+                temp_files.append(str(output_dir))  # Track for cleanup
+                
+                # Now extract text from the processed file
+                if extracted_path.endswith('.txt'):
+                    # Column extraction succeeded, use the text file
+                    with open(extracted_path, 'r', encoding='utf-8') as f:
+                        text = f.read()
+                else:
+                    # Standard PDF extraction
+                    grader = SPARROWGrader()
+                    text = grader.extract_text_from_pdf(input_path)
             else:
                 with open(input_path, 'r', encoding='utf-8') as f:
                     text = f.read()
@@ -733,7 +860,7 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
     Run analysis via subprocess for URL inputs or low memory mode.
     
     v8.4.1: Updated to handle both URLs and file paths for low memory mode.
-    v8.5: Added legislative_threat parameter.
+    v8.5: Added legislative_threat parameter and PDF column extraction.
     """
     import subprocess
     import os
@@ -744,12 +871,25 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
     # Determine if input is a URL or file path
     is_url = url_or_file.startswith('http://') or url_or_file.startswith('https://')
     
+    # v8.5: Handle bilingual PDF column extraction before subprocess
+    temp_files = []
+    input_path = url_or_file
+    if not is_url and input_path.lower().endswith('.pdf'):
+        output_dir = Path("./temp_extractions")
+        extracted_path = extract_pdf_columns(input_path, output_dir)
+        temp_files.append(str(output_dir))
+        
+        # Use extracted text file instead of PDF
+        if extracted_path != input_path:
+            input_path = extracted_path
+            print(f"   Using extracted text: {input_path}")
+    
     # Use sys.executable to get the current Python interpreter
     if is_url:
         cmd = [sys.executable, grader_script, "--url", url_or_file, "--variant", variant, "--output", output_name]
     else:
-        # It's a file path - use it as positional argument
-        cmd = [sys.executable, grader_script, url_or_file, "--variant", variant, "--output", output_name]
+        # It's a file path - use potentially extracted text file
+        cmd = [sys.executable, grader_script, input_path, "--variant", variant, "--output", output_name]
     
     # Add document title if provided (user-friendly name for certificate/reports)
     if document_title:
@@ -791,6 +931,15 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
         # Run from project root to ensure proper output directory structure
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200, cwd=str(SPOT_NEWS_DIR))
         
+        # Cleanup temp files after subprocess completes
+        for temp_path in temp_files:
+            try:
+                if Path(temp_path).exists():
+                    shutil.rmtree(temp_path)
+                    print(f"🧹 Cleaned up: {temp_path}")
+            except Exception as e:
+                print(f"⚠️  Could not clean up {temp_path}: {e}")
+        
         if result.returncode == 0:
             progress(1.0, desc="Complete!")
             return f"""✅ Analysis Complete (via subprocess)
@@ -815,8 +964,22 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
 ```
 """, None
     except subprocess.TimeoutExpired:
+        # Cleanup on timeout
+        for temp_path in temp_files:
+            try:
+                if Path(temp_path).exists():
+                    shutil.rmtree(temp_path)
+            except:
+                pass
         return "❌ Analysis timed out (>20 minutes)", None
     except Exception as e:
+        # Cleanup on exception
+        for temp_path in temp_files:
+            try:
+                if Path(temp_path).exists():
+                    shutil.rmtree(temp_path)
+            except:
+                pass
         return f"❌ Subprocess error: {str(e)}", None
 
 

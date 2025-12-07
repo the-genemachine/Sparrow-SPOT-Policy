@@ -270,7 +270,60 @@ class DiscretionaryPowerAnalyzer:
         context = f"{before}**{matched}**{after}"
         context = re.sub(r'\s+', ' ', context).strip()
         
+        # Clean up bilingual text artifacts
+        context = self._clean_bilingual_text(context)
+        
         return context
+    
+    def _clean_bilingual_text(self, text: str) -> str:
+        """
+        Clean up bilingual (English/French) text artifacts and duplicates.
+        
+        Args:
+            text: Raw text possibly containing bilingual artifacts
+            
+        Returns:
+            Cleaned text with better formatting
+        """
+        # Remove obvious duplicate patterns (garbled repetitions)
+        # Pattern: text followed by similar-looking corrupted version
+        text = re.sub(r'(\b\w+\b)\s+\(\1\)', r'\1', text)  # Remove (duplicate) patterns
+        
+        # Clean up common bilingual markers
+        # Keep content before French section markers if they appear
+        french_markers = [
+            r'\s+a\)\s+[a-z]{3,}(?:\s+[a-z]{3,}){3,}',  # Detect French: "a) word word word word"
+            r'\s+b\)\s+[a-z]{3,}(?:\s+[a-z]{3,}){3,}',  # Detect French: "b) word word word word"
+        ]
+        
+        for marker in french_markers:
+            # If we detect what looks like French translation starting, truncate there
+            match = re.search(marker, text)
+            if match:
+                # Keep English portion only (before the French translation)
+                text = text[:match.start()].strip()
+        
+        # Remove garbled character sequences (likely encoding issues)
+        # Pattern: sequences of accented characters mixed with random chars
+        text = re.sub(r'[éèêëàâäôöûüîïç]{3,}', '', text)  # Remove clusters of accented chars
+        text = re.sub(r'\b[a-z]{1,2}[a-z]{1,2}[a-z]{1,2}\b', lambda m: '' if len(set(m.group())) < 2 else m.group(), text)
+        
+        # Clean up duplicate whitespace again after cleaning
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Limit length to avoid extremely long contexts
+        if len(text) > 500:
+            # Find a good break point near the match (the ** markers)
+            match_pos = text.find('**')
+            if match_pos > 250:
+                # Keep text centered around the match
+                start = max(0, match_pos - 200)
+                end = min(len(text), match_pos + 300)
+                text = '...' + text[start:end] + '...'
+            else:
+                text = text[:500] + '...'
+        
+        return text
     
     def _assess_risk(self, pattern_type: str, context: str, base_risk: str) -> str:
         """
