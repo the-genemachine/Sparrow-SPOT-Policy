@@ -181,20 +181,23 @@ class OllamaSummaryGenerator:
         
         # v8.3.3: Include AI Transparency dimension if available
         # v8.4.0: Handle INCONCLUSIVE detection
+        # v8.4.2: Deep analysis consensus takes precedence over INCONCLUSIVE flag
         ai_transparency_text = ""
         ai_detection = report.get('ai_detection', {})
         detection_inconclusive = ai_detection.get('detection_inconclusive', False)
         detection_spread = ai_detection.get('detection_spread', 0)
         
         deep_analysis = report.get('deep_analysis', {})
+        has_deep_consensus = deep_analysis and 'consensus' in deep_analysis
+        
         if deep_analysis:
             consensus = deep_analysis.get('consensus', {})
             ai_percentage = consensus.get('ai_percentage', 0)
             transparency_score = consensus.get('transparency_score', 0)
             primary_model = consensus.get('primary_model', 'Unknown')
             
-            # v8.4.0: INCONCLUSIVE detection handling
-            if detection_inconclusive or detection_spread > 0.50:
+            # v8.4.2: Only show INCONCLUSIVE if deep analysis consensus is NOT available
+            if (detection_inconclusive or detection_spread > 0.50) and not has_deep_consensus:
                 ai_transparency_text = f"""
 
 AI Transparency (AT):
@@ -214,8 +217,8 @@ AI Transparency (AT):
 - Note: AI detection is probabilistic, not definitive"""
                 scores_text += f"\n- AT (AI Transparency): {transparency_score}/100"
         
-        # v8.4.0: Build INCONCLUSIVE-aware prompt
-        if detection_inconclusive or detection_spread > 0.50:
+        # v8.4.2: Build INCONCLUSIVE-aware prompt (only if no deep consensus)
+        if (detection_inconclusive or detection_spread > 0.50) and not has_deep_consensus:
             ai_guidance = """
 IMPORTANT: AI detection is INCONCLUSIVE for this document. Do NOT claim any specific
 AI percentage as fact. Say "AI detection was inconclusive" and recommend manual review.

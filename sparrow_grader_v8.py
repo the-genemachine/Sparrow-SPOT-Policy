@@ -2506,27 +2506,42 @@ def main():
                         f.write(f"This analysis was generated using Sparrow SPOT Scale™ {get_version_string()} (SPOT-Policy™) ")
                         f.write("with the narrative engine pipeline.\n\n")
                         
-                        ai_detection_data = report.get('ai_detection', {})
-                        if isinstance(ai_detection_data, dict):
-                            # Fix #1: Standardize AI contribution extraction (overall_percentage or ai_detection_score)
-                            ai_contrib = ai_detection_data.get('overall_percentage')
-                            if ai_contrib is None:
-                                ai_score = ai_detection_data.get('ai_detection_score', 0)
-                                ai_contrib = ai_score * 100 if ai_score <= 1 else ai_score
-                            f.write(f"**AI Contribution:** {ai_contrib:.1f}%\n")
+                        # v8.4.2: Prefer deep analysis consensus over basic AI detection
+                        deep_analysis = report.get('deep_analysis', {})
+                        consensus = deep_analysis.get('consensus', {})
+                        
+                        if consensus and 'ai_percentage' in consensus:
+                            # Use deep analysis consensus (more accurate)
+                            ai_contrib = consensus.get('ai_percentage', 0)
+                            primary_model = consensus.get('primary_model', 'Unknown')
+                            model_confidence = consensus.get('confidence', 0)
                             
-                            # Add model detection information
-                            likely_model = ai_detection_data.get('likely_ai_model', {})
-                            if isinstance(likely_model, dict) and likely_model.get('model'):
-                                model_name = likely_model.get('model')
-                                model_conf = likely_model.get('confidence', 0)
-                                model_analysis = likely_model.get('analysis', '')
-                                if model_name and model_name != 'Mixed/Uncertain':
-                                    f.write(f"**Detected AI Model:** {model_name} ({model_conf*100:.0f}% confidence)\n")
-                                    if model_analysis:
-                                        f.write(f"**Model Analysis:** {model_analysis}\n")
-                                elif model_name == 'Mixed/Uncertain':
-                                    f.write(f"**Detected AI Model:** Mixed/Uncertain patterns detected\n")
+                            f.write(f"**AI Contribution:** {ai_contrib:.1f}%\n")
+                            if primary_model and primary_model != 'Unknown':
+                                f.write(f"**Detected AI Model:** {primary_model} ({model_confidence:.0f}% confidence)\n")
+                        else:
+                            # Fallback to basic AI detection
+                            ai_detection_data = report.get('ai_detection', {})
+                            if isinstance(ai_detection_data, dict):
+                                # Fix #1: Standardize AI contribution extraction (overall_percentage or ai_detection_score)
+                                ai_contrib = ai_detection_data.get('overall_percentage')
+                                if ai_contrib is None:
+                                    ai_score = ai_detection_data.get('ai_detection_score', 0)
+                                    ai_contrib = ai_score * 100 if ai_score <= 1 else ai_score
+                                f.write(f"**AI Contribution:** {ai_contrib:.1f}%\n")
+                                
+                                # Add model detection information
+                                likely_model = ai_detection_data.get('likely_ai_model', {})
+                                if isinstance(likely_model, dict) and likely_model.get('model'):
+                                    model_name = likely_model.get('model')
+                                    model_conf = likely_model.get('confidence', 0)
+                                    model_analysis = likely_model.get('analysis', '')
+                                    if model_name and model_name != 'Mixed/Uncertain':
+                                        f.write(f"**Detected AI Model:** {model_name} ({model_conf*100:.0f}% confidence)\n")
+                                        if model_analysis:
+                                            f.write(f"**Model Analysis:** {model_analysis}\n")
+                                    elif model_name == 'Mixed/Uncertain':
+                                        f.write(f"**Detected AI Model:** Mixed/Uncertain patterns detected\n")
                         
                         f.write(f"**Human Review:** Completed {narrative_outputs.get('metadata', {}).get('generated_at', 'N/A')}\n")
                         f.write(f"**Evaluation Variant:** SPOT-Policy™\n")

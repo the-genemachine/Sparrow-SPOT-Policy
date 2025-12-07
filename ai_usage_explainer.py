@@ -130,9 +130,15 @@ class AIUsageExplainer:
         """Generate executive summary section."""
         
         ai_percentage = ai_detection.get('ai_detection_score', 0) * 100
+        has_deep_consensus = False
         if deep_analysis:
             level1 = deep_analysis.get('level1_document', {})
-            ai_percentage = level1.get('ai_percentage', ai_percentage)
+            consensus = deep_analysis.get('consensus', {})
+            if consensus and 'ai_percentage' in consensus:
+                ai_percentage = consensus.get('ai_percentage', ai_percentage)
+                has_deep_consensus = True
+            elif level1:
+                ai_percentage = level1.get('ai_percentage', ai_percentage)
         
         model_info = ai_detection.get('likely_ai_model', {})
         primary_model = model_info.get('model', 'Unknown')
@@ -154,8 +160,8 @@ class AIUsageExplainer:
         detection_inconclusive = ai_detection.get('detection_inconclusive', False)
         inconclusive_reason = ai_detection.get('inconclusive_reason', '')
         
-        # v8.4.0: Override usage level if INCONCLUSIVE
-        if detection_inconclusive or detection_spread > 50:
+        # v8.4.2: Override usage level only if deep consensus is NOT available
+        if (detection_inconclusive or detection_spread > 50) and not has_deep_consensus:
             usage_level = "⚠️ INCONCLUSIVE"
             usage_description = (
                 "CANNOT be reliably assessed. Detection methods produced conflicting results "
@@ -204,9 +210,9 @@ class AIUsageExplainer:
         
         flagged_count = len(ai_detection.get('flagged_sections', []))
         
-        # v8.4.0: Add INCONCLUSIVE warning when detection spread is too high
+        # v8.4.2: Add INCONCLUSIVE warning only when no deep consensus available
         disagreement_warning = ""
-        if detection_inconclusive or detection_spread > 50:
+        if (detection_inconclusive or detection_spread > 50) and not has_deep_consensus:
             disagreement_warning = f"""
 ### 🚨 DETECTION INCONCLUSIVE
 
@@ -227,8 +233,8 @@ significant uncertainty in the AI content estimate. The {ai_percentage:.1f}% fig
 average that obscures substantial disagreement between methods. **Interpret with caution.**
 """
         
-        # v8.4.0: Suppress model attribution when INCONCLUSIVE
-        if detection_inconclusive or detection_spread > 50:
+        # v8.4.2: Suppress model attribution only when INCONCLUSIVE and no deep consensus
+        if (detection_inconclusive or detection_spread > 50) and not has_deep_consensus:
             model_display = "N/A (Detection Inconclusive)"
             model_confidence_display = "N/A"
         else:
@@ -372,11 +378,13 @@ the content may be difficult to classify or contains mixed authorship.
         """Generate model attribution analysis."""
         
         # v8.4.0: Check for INCONCLUSIVE detection
+        # v8.4.2: Check if deep consensus is available
         detection_spread = ai_detection.get('detection_spread', 0) * 100
         detection_inconclusive = ai_detection.get('detection_inconclusive', False)
+        has_deep_consensus = deep_analysis and 'consensus' in deep_analysis and deep_analysis.get('consensus', {}).get('ai_percentage') is not None
         
-        # v8.4.0: If INCONCLUSIVE, suppress model attribution entirely
-        if detection_inconclusive or detection_spread > 50:
+        # v8.4.2: Only suppress if INCONCLUSIVE and no deep consensus
+        if (detection_inconclusive or detection_spread > 50) and not has_deep_consensus:
             return f"""## MODEL ATTRIBUTION ANALYSIS
 
 ### 🚨 ATTRIBUTION SUPPRESSED - Detection Inconclusive

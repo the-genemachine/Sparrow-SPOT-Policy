@@ -740,8 +740,9 @@ class CertificateGenerator:
         detection_inconclusive = ai_detection_data.get('detection_inconclusive', False)
         detection_spread = ai_detection_data.get('detection_spread', 0)
         
-        # v8.4.0: Suppress attribution confidence when detection is INCONCLUSIVE
-        if detection_inconclusive or detection_spread > 0.50:
+        # v8.4.2: Only apply INCONCLUSIVE override if deep analysis consensus is NOT available
+        # Deep analysis takes precedence as it's more sophisticated (6-level analysis)
+        if (detection_inconclusive or detection_spread > 0.50) and not has_deep_analysis:
             ai_model = 'INCONCLUSIVE'
             ai_model_confidence = 'N/A'
             # Add confidence interval display if available
@@ -918,7 +919,7 @@ class CertificateGenerator:
             
             deep_analysis_section = f"""
             <div class="deep-analysis" style="background: #f0f9ff; padding: 25px; margin: 25px 0; border-left: 5px solid #0ea5e9; border-radius: 4px;">
-                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v{sparrow_version})</h3>
+                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v{SPARROW_VERSION})</h3>
                 {detection_warning_html}
                 <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -970,7 +971,7 @@ class CertificateGenerator:
         # v8.4.0: Generate Critical Findings section
         critical_findings_section = self._generate_critical_findings(
             report, ai_detection_data if 'ai_detection_data' in dir() else report.get('ai_detection', {}),
-            trust_score, fairness_score, composite, criteria
+            trust_score, fairness_score, composite, criteria, has_deep_analysis
         )
         
         html = self.policy_certificate_template.format(
@@ -1494,7 +1495,7 @@ IMPORTANT - Consistency Rules:
 """
         return footer_html
     
-    def _generate_critical_findings(self, report, ai_detection_data, trust_score, fairness_score, composite, criteria):
+    def _generate_critical_findings(self, report, ai_detection_data, trust_score, fairness_score, composite, criteria, has_deep_analysis=False):
         """
         v8.4.0: Generate Critical Findings section for TOP of certificate.
         
@@ -1515,7 +1516,8 @@ IMPORTANT - Consistency Rules:
         detection_inconclusive = ai_detection_data.get('detection_inconclusive', False)
         detection_spread = ai_detection_data.get('detection_spread', 0)
         
-        if detection_inconclusive or detection_spread > 0.50:
+        # v8.4.2: Only flag INCONCLUSIVE if deep analysis consensus is NOT available
+        if (detection_inconclusive or detection_spread > 0.50) and not has_deep_analysis:
             model_scores = ai_detection_data.get('model_scores', {})
             if model_scores:
                 score_values = [v * 100 for v in model_scores.values() if isinstance(v, (int, float))]
