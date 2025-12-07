@@ -28,6 +28,13 @@ try:
 except ImportError:
     ANALYSIS_RESULTS_AVAILABLE = False
 
+# Import version info
+try:
+    from version import SPARROW_VERSION, CERTIFICATE_VERSION
+except ImportError:
+    SPARROW_VERSION = "?"
+    CERTIFICATE_VERSION = "?"
+
 
 class CertificateGenerator:
     """Generate HTML certificates for v7 grading results with ethical framework data."""
@@ -157,6 +164,9 @@ class CertificateGenerator:
                 <p class="subtitle">Policy & Legislative Document Quality Assessment</p>
                 <div class="doc-type-badge">{doc_type_badge}</div>
                 <div class="seal">★</div>
+                <div style='margin-top:10px;font-size:0.95em;color:#888;'>
+                    <strong>SPARROW Version:</strong> {sparrow_version} &nbsp;|&nbsp; <strong>Certificate Version:</strong> {certificate_version}
+                </div>
             </div>
 
             <!-- Article Info -->
@@ -263,7 +273,7 @@ class CertificateGenerator:
             <div class="methodology">
                 <h3>Assessment Methodology</h3>
                 <ul>
-                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v8.3 with Narrative Engine</li>
+                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v{sparrow_version} with Narrative Engine</li>
                     <li>Advanced NLP with machine learning</li>
                     <li>Policy-adapted evaluation framework with AI detection</li>
                     <li>Expert-level assessment protocols with fairness auditing</li>
@@ -405,9 +415,12 @@ class CertificateGenerator:
             <!-- Header -->
             <div class="header">
                 <h1>Sparrow SPOT Scale™ Certification</h1>
-                <p class="subtitle">Journalism & Content Quality Assessment</p>
+                <p class="subtitle">Journalism Quality Assessment</p>
                 <div class="doc-type-badge">JOURNALISM ARTICLE</div>
                 <div class="seal">★</div>
+                <div style='margin-top:10px;font-size:0.95em;color:#888;'>
+                    <strong>SPARROW Version:</strong> {sparrow_version} &nbsp;|&nbsp; <strong>Certificate Version:</strong> {certificate_version}
+                </div>
             </div>
 
             <!-- Article Info -->
@@ -491,9 +504,9 @@ class CertificateGenerator:
                         <div style="font-size: 0.85em; color: #666;">NIST AI RMF v1.0 Based</div>
                     </div>
                     <!-- Fairness Assessment -->
-                    <div class="badge" style="padding: 12px; border: 2px solid {fairness_color}; border-radius: 4px; background: white;">
-                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">Fairness Metrics{fairness_status}</div>
-                        <div style="font-size: 1.2em; font-weight: 700; color: {fairness_color}; margin: 5px 0;">{fairness_score}%</div>
+                    <div class="badge" style="padding: 12px; border: 2px solid #27ae60; border-radius: 4px; background: white;">
+                        <div style="font-size: 0.9em; color: #555; font-weight: 600;">Fairness Metrics</div>
+                        <div style="font-size: 1.2em; font-weight: 700; color: #27ae60; margin: 5px 0;">{fairness_score}%</div>
                         <div style="font-size: 0.85em; color: #666;">Demographic Parity & Equalized Odds</div>
                     </div>
                 </div>
@@ -510,7 +523,7 @@ class CertificateGenerator:
             <div class="methodology">
                 <h3>Assessment Methodology</h3>
                 <ul>
-                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v8.3 with Narrative Engine</li>
+                    <li>Multi-dimensional analysis via Sparrow SPOT Scale™ v{sparrow_version} with Narrative Engine</li>
                     <li>Advanced NLP with machine learning</li>
                     <li>Journalism-adapted evaluation framework with AI detection</li>
                     <li>Credibility scoring protocols with fairness auditing</li>
@@ -905,7 +918,7 @@ class CertificateGenerator:
             
             deep_analysis_section = f"""
             <div class="deep-analysis" style="background: #f0f9ff; padding: 25px; margin: 25px 0; border-left: 5px solid #0ea5e9; border-radius: 4px;">
-                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v8.3.5)</h3>
+                <h3 style="color: #0369a1; margin-bottom: 15px;">🔬 Deep AI Transparency Analysis (v{sparrow_version})</h3>
                 {detection_warning_html}
                 <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -963,6 +976,8 @@ class CertificateGenerator:
         html = self.policy_certificate_template.format(
             title=f"Sparrow SPOT Scale™ - {document_title}",
             document_title=document_title or "Policy Document",
+            sparrow_version=SPARROW_VERSION,
+            certificate_version=CERTIFICATE_VERSION,
             doc_type_badge=doc_type_badge,
             critical_findings_section=critical_findings_section,
             ft_score=criteria.get('FT', {}).get('score', 'N/A'),
@@ -1221,7 +1236,9 @@ class CertificateGenerator:
             fairness_color=fairness_color,
             fairness_status=fairness_status,
             escalation_warning=escalation_warning,
-            deep_analysis_section=deep_analysis_section
+            deep_analysis_section=deep_analysis_section,
+            sparrow_version=SPARROW_VERSION,
+            certificate_version=CERTIFICATE_VERSION
         )
         
         # Write to file

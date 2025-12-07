@@ -2099,6 +2099,7 @@ def create_arg_parser():
     input_group.add_argument('--url', help='URL of remote document or PDF to analyze')
     
     parser.add_argument('-o', '--output', help='Output filename (without extension)', default='report')
+    parser.add_argument('--document-title', help='Human-readable document title for reports and certificates (if not provided, uses filename stem)', default=None)
     parser.add_argument('--variant', choices=['journalism', 'policy'], default='journalism',
                         help='Evaluation variant: journalism (SPARROW SPOT) or policy (SPOT-Policy™). Default: journalism')
     parser.add_argument('--narrative-style', choices=['journalistic', 'academic', 'civic', 'critical', 'explanatory'],
@@ -2235,8 +2236,10 @@ def main():
             pdf_path = args.input_file if is_pdf else None
             report = grader.grade_article(text, doc_type='journalistic', quiet=False, pdf_path=pdf_path)
             
-            # Add document title to report
-            if args.url:
+            # Add document title to report (use CLI arg if provided, otherwise derive from filename)
+            if args.document_title:
+                doc_title = args.document_title
+            elif args.url:
                 doc_title = input_name.rsplit('.', 1)[0] if '.' in input_name else input_name
             else:
                 doc_title = Path(args.input_file).stem
@@ -2266,8 +2269,10 @@ def main():
             pdf_path = args.input_file if is_pdf else None
             report = grader.grade(text, pdf_path=pdf_path)
             
-            # Add document title to report
-            if args.url:
+            # Add document title to report (use CLI arg if provided, otherwise derive from filename)
+            if args.document_title:
+                doc_title = args.document_title
+            elif args.url:
                 doc_title = input_name.rsplit('.', 1)[0] if '.' in input_name else input_name
             else:
                 doc_title = Path(args.input_file).stem
@@ -2402,7 +2407,7 @@ def main():
         # Text summary (core)
         output_txt = str(core_dir / f"{output_name}.txt")
         with open(output_txt, 'w') as f:
-            f.write(f"Sparrow SPOT Scale™ v8.0 Report (with Narrative Engine)\n")
+            f.write(f"Sparrow SPOT Scale™ {get_version_string()} Report (with Narrative Engine)\n")
             f.write(f"Variant: {args.variant.upper()}\n")
             f.write("="*70 + "\n\n")
             
@@ -2473,7 +2478,7 @@ def main():
                         
                         # Add metadata header
                         f.write("---\n")
-                        f.write(f"# Sparrow SPOT Scale™ v8.0 Narrative Analysis\n")
+                        f.write(f"# Sparrow SPOT Scale™ {get_version_string()} Narrative Analysis\n")
                         f.write(f"**Style:** {args.narrative_style.title()}\n")
                         # Fix: Handle None input_file (for URLs)
                         doc_name = Path(args.input_file).stem if args.input_file else (args.url.split('/')[-1].split('?')[0] if args.url else 'remote_document')
@@ -2498,7 +2503,7 @@ def main():
                         # Footer with methodology and AI transparency
                         f.write("\n\n---\n")
                         f.write("## Methodology\n\n")
-                        f.write("This analysis was generated using Sparrow SPOT Scale™ v8.0 (SPOT-Policy™) ")
+                        f.write(f"This analysis was generated using Sparrow SPOT Scale™ {get_version_string()} (SPOT-Policy™) ")
                         f.write("with the narrative engine pipeline.\n\n")
                         
                         ai_detection_data = report.get('ai_detection', {})
@@ -2598,11 +2603,13 @@ def main():
             # v8.4.2: Create certificates directory
             certificates_dir.mkdir(parents=True, exist_ok=True)
             
-            # Extract document title (handle both file and URL input)
-            if args.url:
-                doc_title = input_name.rsplit('.', 1)[0] if '.' in input_name else input_name
-            else:
-                doc_title = Path(args.input_file).stem
+            # Use user-supplied document title if present, else fallback to filename
+            doc_title = report.get('document_title')
+            if not doc_title:
+                if args.url:
+                    doc_title = input_name.rsplit('.', 1)[0] if '.' in input_name else input_name
+                else:
+                    doc_title = Path(args.input_file).stem
             output_html = str(certificates_dir / f"{output_name}_certificate.html")
             
             if args.variant == 'policy':

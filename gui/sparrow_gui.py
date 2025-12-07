@@ -50,6 +50,7 @@ try:
     # Now import sparrow_grader_v8 (it will add parent for article_analyzer)
     from sparrow_grader_v8 import SPARROWGrader, SPOTPolicy
     from article_analyzer import ArticleAnalyzer
+    from version import SPARROW_VERSION, get_version_string
     
     SPARROW_AVAILABLE = True
 except ImportError as e:
@@ -331,7 +332,7 @@ def analyze_document(
         progress(0.15, desc="Running in Low Memory Mode (subprocess)...")
         input_for_subprocess = pdf_file.name if pdf_file else url_input
         return run_via_subprocess(
-            input_for_subprocess, variant, document_type, output_name, narrative_style, narrative_length,
+            input_for_subprocess, variant, document_type, output_name, document_title, narrative_style, narrative_length,
             ollama_model, deep_analysis, citation_check, check_urls,
             enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
             nist_compliance, lineage_chart_format, progress
@@ -368,7 +369,7 @@ def analyze_document(
         else:
             # Handle URL - use subprocess for now
             return run_via_subprocess(
-                url_input, variant, document_type, output_name, narrative_style, narrative_length,
+                url_input, variant, document_type, output_name, document_title, narrative_style, narrative_length,
                 ollama_model, deep_analysis, citation_check, check_urls,
                 enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                 nist_compliance, lineage_chart_format, progress
@@ -654,7 +655,7 @@ def analyze_document(
         cleanup_after_analysis()
 
 
-def run_via_subprocess(url_or_file, variant, document_type, output_name, narrative_style, narrative_length,
+def run_via_subprocess(url_or_file, variant, document_type, output_name, document_title, narrative_style, narrative_length,
                        ollama_model, deep_analysis, citation_check, check_urls,
                        enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                        nist_compliance, lineage_chart_format, progress):
@@ -678,6 +679,10 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, narrati
     else:
         # It's a file path - use it as positional argument
         cmd = [sys.executable, grader_script, url_or_file, "--variant", variant, "--output", output_name]
+    
+    # Add document title if provided (user-friendly name for certificate/reports)
+    if document_title:
+        cmd.extend(["--document-title", document_title])
     
     if narrative_style != "None":
         cmd.extend(["--narrative-style", narrative_style])
@@ -707,7 +712,9 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, narrati
     progress(0.3, desc="Running Sparrow via subprocess...")
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        # Increased timeout for deep analysis on large documents (10 minutes -> 20 minutes)
+        # Run from project root to ensure proper output directory structure
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200, cwd=str(SPOT_NEWS_DIR))
         
         if result.returncode == 0:
             progress(1.0, desc="Complete!")
@@ -733,7 +740,7 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, narrati
 ```
 """, None
     except subprocess.TimeoutExpired:
-        return "❌ Analysis timed out (>10 minutes)", None
+        return "❌ Analysis timed out (>20 minutes)", None
     except Exception as e:
         return f"❌ Subprocess error: {str(e)}", None
 
@@ -1518,8 +1525,8 @@ def create_interface():
         </style>
         """)
         
-        gr.Markdown("""
-        # 🦅 Sparrow SPOT Scale™ v8.3.2
+        gr.Markdown(f"""
+        # 🦅 Sparrow SPOT Scale™ v{SPARROW_VERSION}
         ### Automated Policy & Journalism Analysis
         
         Comprehensive transparency analysis for policy documents with AI detection, 
@@ -1876,9 +1883,9 @@ if __name__ == "__main__":
     # Create and launch the interface
     interface = create_interface()
     
-    print("""
+    print(f"""
     ╔══════════════════════════════════════════════════════════╗
-    ║         Sparrow SPOT Scale™ v8.4.1 - Web Interface        ║
+    ║         Sparrow SPOT Scale™ v{SPARROW_VERSION} - Web Interface        ║
     ╚══════════════════════════════════════════════════════════╝
     
     🚀 Starting Gradio server...
