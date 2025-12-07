@@ -102,10 +102,10 @@ class DocumentQA:
                     component="document_qa",
                     model_used=model,
                     model_version="local",
-                    prompt_details=f"Q&A: {question[:100]}...",
-                    output_length=len(answer),
-                    duration_seconds=duration,
-                    timestamp=start_time.isoformat()
+                    prompt_details=f"Q&A: {question[:100]}... (Duration: {duration:.1f}s, Length: {len(answer)} chars)",
+                    contribution_type='generation',
+                    confidence_level=0.7,  # Lower confidence for Q&A vs structured analysis
+                    requires_review=True
                 )
             
             # Build metadata

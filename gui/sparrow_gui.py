@@ -336,6 +336,7 @@ def analyze_document(
         return run_via_subprocess(
             input_for_subprocess, variant, document_type, output_name, document_title, narrative_style, narrative_length,
             ollama_model, deep_analysis, citation_check, check_urls,
+            enable_document_qa, document_qa_question,
             enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
             nist_compliance, lineage_chart_format, progress
         )
@@ -373,6 +374,7 @@ def analyze_document(
             return run_via_subprocess(
                 url_input, variant, document_type, output_name, document_title, narrative_style, narrative_length,
                 ollama_model, deep_analysis, citation_check, check_urls,
+                enable_document_qa, document_qa_question,
                 enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                 nist_compliance, lineage_chart_format, progress
             )
