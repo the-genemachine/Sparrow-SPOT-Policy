@@ -1,7 +1,7 @@
 # Sparrow SPOT Scale™ - Project Metrics Report
 
 **Generated:** December 7, 2025  
-**Version:** 8.4.2  
+**Version:** 8.5.1  
 **Repository:** Sparrow-SPOT-Policy
 
 ---
@@ -10,10 +10,11 @@
 
 | Module | Lines | Purpose | Complexity |
 |--------|-------|---------|------------|
-| `sparrow_grader_v8.py` | 3,155 | Main grading engine, CLI, orchestration | ⭐⭐⭐⭐⭐ |
+| `sparrow_grader_v8.py` | 3,240 | Main grading engine, CLI, orchestration (v8.5 with --legislative-threat) | ⭐⭐⭐⭐⭐ |
 | `sparrow_grader_v7.py` | 1,587 | Legacy grader (maintained for compatibility) | ⭐⭐⭐⭐ |
 | `certificate_generator.py` | 1,544 | HTML certificate generation with templates | ⭐⭐⭐⭐ |
 | `ai_detection_engine.py` | 1,390 | Multi-method AI content detection | ⭐⭐⭐⭐⭐ |
+| `discretionary_power_analyzer.py` | 664 | Legislative threat detection, 5 pattern types (NEW v8.5) | ⭐⭐⭐⭐⭐ |
 | `format_renderer.py` | 773 | Multi-format output rendering (updated for consensus) | ⭐⭐⭐ |
 | `ai_usage_explainer.py` | 1,031 | Plain-language AI usage reports | ⭐⭐⭐⭐ |
 | `deep_analyzer.py` | 740 | 6-level transparency analysis | ⭐⭐⭐⭐⭐ |
@@ -59,7 +60,7 @@
 
 | Module | Lines | Purpose |
 |--------|-------|----------|
-| `gui/sparrow_gui.py` | 1,961 | Gradio-based web interface (updated with Q&A controls) |
+| `gui/sparrow_gui.py` | 2,157 | Gradio-based web interface (updated with PDF extraction, legislative threat checkbox) |
 | `gui/test_gui_analysis.py` | 122 | GUI testing utilities |
 | `gui/__init__.py` | 3 | Package initialization |
 
@@ -69,8 +70,8 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total Python Files** | 46 |
-| **Total Lines of Code (Python)** | 30,836 |
+| **Total Python Files** | 47 |
+| **Total Lines of Code (Python)** | 31,521 |
 | **Classes Defined** | 82 |
 | **Functions/Methods** | 590 |
 | **Documentation Files** | 58 |
@@ -86,7 +87,7 @@
 
 | Document | Lines | Topic |
 |----------|-------|-------|
-| `TECHNICAL_ARCHITECTURE_REPORT.md` | 3,061 | Complete system architecture (updated to v8.4.2) |
+| `TECHNICAL_ARCHITECTURE_REPORT.md` | 3,286 | Complete system architecture (updated to v8.5 with Legislative Threat Detection) |
 | `PACKAGING_AND_DISTRIBUTION_GUIDE.md` | 1,337 | Deployment & distribution |
 | `AGENTIC_ARCHITECTURE_ANALYSIS.md` | 941 | AI agent patterns |
 | `BUSINESS_VALUE_AND_STARTUP_GUIDE.md` | 926 | Business case & startup guide |
@@ -96,6 +97,7 @@
 | `NARRATIVE_ENGINE_IMPLEMENTATION.md` | 572 | Narrative layer |
 | `V8.3_MARKET_ANALYSIS.md` | 533 | Market positioning |
 | `CERTIFICATE_COMPLETE_SUMMARY.md` | 530 | Certificate features |
+| `DPA_v8.5.1_IMPROVED_REPORTING.md` | 504 | Legislative threat detection improvements & bilingual PDF extraction (NEW v8.5) |
 
 ---
 
@@ -148,22 +150,28 @@
 
 **Sparrow SPOT Scale™** is a **production-ready research platform** with enterprise-grade architecture, sophisticated AI detection capabilities, strong governance alignment, and comprehensive diagnostic capabilities.
 
-### Strengths (v8.4.2)
+### Strengths (v8.5.1)
 - Exceeds typical research prototypes in functionality
 - Approaches commercial-grade tools in capability
 - Strong compliance and governance features
 - Excellent domain-specific handling
-- **NEW:** Deep consensus across all 5 output formats ensures consistency
-- **NEW:** Document Q&A enables direct interaction with analyzed documents
-- **NEW:** Diagnostic logging provides detailed operation tracking
-- **NEW:** Subprocess execution with increased timeout (1200s) handles complex analyses
+- **NEW v8.5:** Legislative Threat Detection Suite with 5 pattern types (40+ regex patterns)
+- **NEW v8.5:** Automatic bilingual PDF column extraction (FR/EN detection threshold: FR > 10 AND EN > 5)
+- **NEW v8.5:** Zero-data-loss DPA reporting (270 → 1,565 lines, all 925 findings captured)
+- **NEW v8.5:** Discretionary Power Analysis available via GUI checkbox and `--legislative-threat` CLI flag
+- **v8.4.2:** Deep consensus across all 5 output formats ensures consistency
+- **v8.4.2:** Document Q&A enables direct interaction with analyzed documents
+- **v8.4.2:** Diagnostic logging provides detailed operation tracking
 
-### Recent Quality Improvements (v8.4.2)
-- ✅ Fixed LinkedIn/X narratives to use deep consensus (12.0% vs 0.0%)
-- ✅ All outputs now show identical AI percentages (consistency validated)
-- ✅ Diagnostic logging tracks all operations with performance data
-- ✅ Document Q&A integrated with Ollama for direct document queries
-- ✅ File organization optimized with automated directory creation
+### Recent Quality Improvements (v8.5.1)
+- ✅ Legislative Threat Detection Suite (Phase 1 complete, 5 of 6 modules planned)
+- ✅ Discretionary Power Analyzer with improved reporting format (0% data loss)
+- ✅ Bilingual PDF column extraction with intelligent detection (tested on Bill C-15)
+- ✅ Text cleaning for French artifacts, page numbers, excess whitespace
+- ✅ GUI integration with automatic PDF extraction before analysis
+- ✅ Subprocess support with temp file cleanup
+- ✅ TECHNICAL_ARCHITECTURE_REPORT.md updated with comprehensive v8.5 documentation
+- ✅ DPA_v8.5.1_IMPROVED_REPORTING.md created (500+ lines of detailed documentation)
 
 ### Areas for Enhancement
 - Expanded unit test coverage
@@ -173,4 +181,4 @@
 
 ---
 
-*Report generated by Sparrow SPOT Scale™ v8.4.2 metrics analysis*
+*Report generated by Sparrow SPOT Scale™ v8.5.1 metrics analysis*
