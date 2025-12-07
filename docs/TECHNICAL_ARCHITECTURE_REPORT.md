@@ -1,7 +1,7 @@
-# Sparrow SPOT Scale™ v8.4: Technical Architecture Report
+# Sparrow SPOT Scale™ v8.5: Technical Architecture Report
 
 **Report Date:** December 7, 2025 (Updated)  
-**System Version:** v8.4.2 (Deep Analysis Consensus, Document Q&A, Diagnostic Logging)  
+**System Version:** v8.5.1 (Legislative Threat Detection Suite, Improved DPA Reporting)  
 **Repository:** Sparrow-SPOT-Policy  
 **Classification:** Technical Documentation
 
@@ -9,7 +9,30 @@
 
 ## Executive Summary
 
-This report provides a comprehensive technical overview of the Sparrow SPOT Scale™ v8.4 system architecture, including all files, modules, classes, functions, and analytical models used in the framework. The system combines journalism evaluation (SPARROW Scale™) with government policy analysis (SPOT-Policy™) through a dual-variant architecture supported by an ethical AI framework, narrative generation engine, and enhanced transparency features.
+This report provides a comprehensive technical overview of the Sparrow SPOT Scale™ v8.5 system architecture, including all files, modules, classes, functions, and analytical models used in the framework. The system combines journalism evaluation (SPARROW Scale™) with government policy analysis (SPOT-Policy™) through a dual-variant architecture supported by an ethical AI framework, narrative generation engine, enhanced transparency features, and a comprehensive legislative threat detection suite.
+
+**Latest: Version 8.5.1 Enhancement (December 7, 2025):**
+- **Improved DPA Reporting:** Report format enhanced from 270 to 1,565 lines with zero data loss
+- **100% CRITICAL findings shown** (107/107) - Full detail for accountability
+- **100% HIGH findings shown** (34/34) - Complete ministerial discretion documentation
+- **100% MEDIUM findings indexed** (784/784) - Summary tables + reference indices
+- **Bilingual PDF Column Extraction:** Automatic English column detection and extraction
+- **Smart Bilingual Detection:** FR/EN threshold detection (FR > 10 AND EN > 5)
+- **Text Cleaning:** Removes French artifacts, page numbers, excess whitespace
+- **Subprocess Support:** PDF extraction integrated into Low Memory Mode
+- **Zero Data Loss:** All 925 Bill C-15 findings captured (100% vs 1.3% before)
+
+**Version 8.5.0 Enhancement (December 6, 2025):**
+- **Legislative Threat Detection Suite (P0):** New comprehensive threat analysis system
+- **Discretionary Power Analyzer (DPA):** 665 lines, 5 pattern types, 40+ regex patterns
+- **Pattern Detection:** permissive_language, self_judgment, undefined_timelines, broad_scope, exclusion_powers
+- **Scoring Algorithms:** Discretionary Power Score (0-100), Power Concentration Index (0-100)
+- **Risk Levels:** LOW/MEDIUM/HIGH/CRITICAL based on pattern counts and combinations
+- **Output Formats:** JSON (machine-readable) + Markdown (human-readable reports)
+- **CLI Integration:** `--legislative-threat` flag in main pipeline
+- **GUI Integration:** "⚖️ Run Discretionary Power Analysis" checkbox in Transparency & Compliance tab
+- **Test Results:** Bill C-15 (634 pages) - CRITICAL RISK (100/100 score), 925 findings detected
+- **Output Directory:** All files saved to `[output]/threats/` (sibling to certificates/, core/, logs/)
 
 **Version 8.4.2 Enhancement (December 7, 2025):**
 - **Document Q&A Feature:** New `document_qa.py` module enabling direct document queries via Ollama
@@ -92,8 +115,20 @@ This report provides a comprehensive technical overview of the Sparrow SPOT Scal
 #### **sparrow_grader_v8.py**
 
 **Location:** `/home/gene/Wave-2-2025-Methodology/sparrow_grader_v8.py` (also in `SPOT_News/`)  
-**Size:** 2,670 lines  
-**Purpose:** Main orchestration script for dual-variant grading system with enhanced transparency
+**Size:** 3,240 lines (updated in v8.5)  
+**Purpose:** Main orchestration script for dual-variant grading system with enhanced transparency and legislative threat detection
+
+**v8.5 Enhancements (December 6-7, 2025):**
+- Added `--legislative-threat` flag for discretionary power analysis
+- Integrated `DiscretionaryPowerAnalyzer` class
+- Legislative threat detection in main pipeline (after Document Q&A, before Provenance)
+- Output to `[output_dir]/threats/` subdirectory
+- Full subprocess support for Low Memory Mode
+
+**v8.4 Enhancements:**
+- Subprocess execution for memory efficiency
+- Increased timeout to 1200 seconds (20 minutes)
+- Working directory fix for proper file organization
 
 **v8.3 Enhancements:**
 - Integrated 4 transparency modules for comprehensive analysis
@@ -163,6 +198,8 @@ This report provides a comprehensive technical overview of the Sparrow SPOT Scal
   - **v8.3:** `--nist-compliance`: Generate NIST AI RMF compliance report
   - **v8.3:** `--enhanced-provenance`: Extract comprehensive document metadata
   - **v8.3:** `--generate-ai-disclosure`: Generate transparency disclosure statements (4 formats)
+  - **v8.3:** `--trace-data-sources`: Validate quantitative claims against authoritative sources
+  - **v8.5:** `--legislative-threat`: Run Discretionary Power Analysis on legislative documents
   - **v8.3:** `--trace-data-sources`: Validate quantitative claims against authoritative sources
 
 ##### `main()`
@@ -789,7 +826,184 @@ Trust Score = (Transparency × 0.30) + (Consistency × 0.25) + (Fairness × 0.25
 
 ---
 
+## Part 2.3: Legislative Threat Detection Suite (v8.5)
+
+### **discretionary_power_analyzer.py** ✨ NEW
+
+**Location:** `/home/gene/Sparrow-SPOT-Policy/discretionary_power_analyzer.py`  
+**Size:** 664 lines  
+**Purpose:** Analyze legislative documents for discretionary powers, accountability gaps, and governance threats  
+**Module:** `DiscretionaryPowerAnalyzer` class  
+**Status:** ✅ PRODUCTION (v8.5.1 with improved reporting)
+
+#### Pattern Detection System (5 Types, 40+ Patterns)
+
+| Pattern Type | Risk Level | Examples | Count |
+|--------------|-----------|----------|-------|
+| **Permissive Language** | MEDIUM | "may", "may consider", "in the opinion of" | 8 patterns |
+| **Self Judgment** | HIGH | "if the Minister is satisfied", "deems appropriate" | 7 patterns |
+| **Undefined Timelines** | MEDIUM | "as soon as practicable", "without delay", "reasonable time" | 10 patterns |
+| **Broad Scope** | CRITICAL | "any entity", "any provision", "any person" | 8 patterns |
+| **Exclusion Powers** | HIGH | "exempt from", "notwithstanding", "not subject to" | 7 patterns |
+
+#### Analysis Methods
+
+**Method:** `analyze(text: str, document_name: str) → dict`
+- Splits document into sections with location tracking
+- Applies all pattern types via regex matching
+- Calculates risk scores and concentration metrics
+- Generates recommendations based on findings
+- Returns comprehensive results dictionary
+
+**Key Metrics:**
+- **Discretionary Power Score** (0-100): Overall discretionary authority level
+- **Power Concentration Index** (0-100): How concentrated power is in few hands
+- **Risk Levels:** LOW / MEDIUM / HIGH / CRITICAL
+- **Total Findings:** Count of all patterns detected
+
+#### Improved Report Format (v8.5.1)
+
+**Report Structure:**
+1. **Executive Summary** - Risk level and key metrics
+2. **CRITICAL Risk Findings (100%)** - ALL findings shown with full detail
+3. **HIGH Risk Findings (100%)** - ALL findings shown with full detail
+4. **MEDIUM Risk Findings (Summary)** - Representative examples + reference index + frequency table
+5. **LOW Risk Findings (Summary)** - Representative examples + reference index + frequency table
+
+**Output Comparison:**
+```
+Before (v8.5.0):  270 lines, 90% data loss ("... and 774 more")
+After (v8.5.1):   1,565 lines, 0% data loss (all 925 findings captured)
+```
+
+**Example Report (Bill C-15, 634 pages):**
+- Total Findings: 925
+- CRITICAL: 107/107 (100%)
+- HIGH: 34/34 (100%)
+- MEDIUM: 784/784 indexed
+- Risk Level: CRITICAL (100/100 score)
+
+#### Bilingual PDF Extraction
+
+**New Feature:** Automatic column detection for bilingual (English/French) legislative PDFs
+
+**Detection Logic:**
+```python
+# Sample first 3 pages for French/English content
+french_count = count('de la', 'du Canada', 'loi', 'article', ...)
+english_count = count('Act', 'Section', 'Minister', 'Parliament', ...)
+
+# If both significant, extract English column only
+is_bilingual = french_count > 10 and english_count > 5
+```
+
+**Extraction Process:**
+1. Detect bilingual layout from sample pages
+2. Define left column bounding box (English)
+3. Extract using pdfplumber with text cleaning
+4. Save as `{filename}_english_only.txt`
+5. Use extracted text for analysis
+
+**Integration:**
+- GUI main path: Extracts before text analysis
+- GUI subprocess path: Extracts before CLI call
+- CLI: Auto-detects and extracts if needed
+
+#### CLI Usage
+
+```bash
+# Analyze document for legislative threats
+python discretionary_power_analyzer.py bill_c15.txt \
+    --output-dir ./output/threats/ \
+    --format both  # JSON + Markdown
+
+# Output files:
+# - bill_c15_dpa_TIMESTAMP.json     (machine-readable)
+# - bill_c15_dpa_TIMESTAMP.md       (human-readable report)
+```
+
+#### GUI Integration
+
+**Checkbox:** "⚖️ Run Discretionary Power Analysis"  
+**Location:** Transparency & Compliance tab  
+**Works in:** Normal mode + Low Memory Mode (subprocess)
+
+**Output Directory:** `[output_name]/threats/`
+
+#### Key Methods
+
+| Method | Purpose | Returns |
+|--------|---------|---------|
+| `analyze()` | Main analysis pipeline | Results dictionary |
+| `save_results()` | Save to JSON/Markdown | File path |
+| `_split_into_sections()` | Parse document structure | Sections list |
+| `_extract_context()` | Get context around match | Context string |
+| `_clean_bilingual_text()` | Remove French artifacts | Cleaned text |
+| `_calculate_discretionary_score()` | Risk scoring | Float 0-100 |
+| `_calculate_power_concentration()` | Concentration analysis | Float 0-100 |
+| `_determine_overall_risk()` | Risk classification | Risk level string |
+| `_format_markdown_report()` | Generate markdown (v8.5.1) | Markdown string |
+
+#### Testing & Validation
+
+**Bill C-15 Test Results:**
+- Input: 634-page PDF, bilingual (English/French)
+- Extraction: 1,152,779 characters of clean English
+- Analysis: 925 findings detected
+- Report: 1,565 lines, publication-ready
+- All CRITICAL/HIGH findings fully documented
+- All MEDIUM findings indexed by section
+- Pattern frequency table generated
+
+**Verification Metrics:**
+```
+✓ Bilingual detection: Working (FR:207, EN:9)
+✓ Column extraction: 632 pages extracted
+✓ Text cleaning: Removes French, page numbers
+✓ Pattern matching: All 5 types functional
+✓ Risk scoring: CRITICAL properly identified
+✓ Report generation: No truncation
+```
+
+#### Known Patterns Detected
+
+**Broad Scope Examples:**
+- "any entity", "any person", "any provision"
+- "applies to", "relating to", "concerning"
+
+**Self Judgment Examples:**
+- "if the Minister is satisfied"
+- "considers appropriate"
+- "deems necessary"
+
+**Permissive Examples:**
+- "may grant", "may impose", "may establish"
+- "subject to", "in the discretion of"
+
+**Undefined Timeline Examples:**
+- "as soon as practicable"
+- "without unnecessary delay"
+- "reasonable time"
+
+**Exclusion Power Examples:**
+- "exempt from", "notwithstanding"
+- "excepted from", "not subject to"
+
+#### Future Enhancements (v8.5.2+)
+
+- [ ] Buried Provision Scanner - Detect hidden/vague language
+- [ ] Accountability Gap Detector - Identify oversight gaps
+- [ ] Transparency Theater Detector - Find pseudo-transparency measures
+- [ ] Exemption Cascade Analyzer - Track cumulative exemptions
+- [ ] Temporal Anomaly Detector - Flag unusual timelines
+- [ ] Interactive HTML reports with filtering
+- [ ] Cross-bill comparison analysis
+- [ ] Historical trend analysis
+
+---
+
 ## Part 3: Narrative Generation Engine (6-Step Pipeline)
+
 
 ### 3.1 Pipeline Orchestrator
 
@@ -2268,16 +2482,17 @@ def calculate_trust_score(analysis):
 
 ---
 
-## Part 6A: User Interface (v8.3)
+## Part 6A: User Interface (v8.5)
 
 ### 6A.1 Gradio Web GUI
 
 #### **gui/sparrow_gui.py**
 
-**Purpose:** Interactive web interface for Sparrow analysis with organized flag management  
-**Size:** 440 lines  
-**Location:** `/home/gene/Wave-2-2025-Methodology/SPOT_News/gui/sparrow_gui.py`  
+**Purpose:** Interactive web interface for Sparrow analysis with organized flag management and legislative threat detection  
+**Size:** 2,157 lines (expanded in v8.5 from 440 lines)  
+**Location:** `/home/gene/Sparrow-SPOT-Policy/gui/sparrow_gui.py`  
 **Framework:** Gradio 6.0+
+**v8.5 New Feature:** Automatic PDF column extraction for bilingual documents
 
 **Key Function:**
 
