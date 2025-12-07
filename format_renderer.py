@@ -203,19 +203,32 @@ class FormatRenderer:
                     tweets.append(risk_tweet)
                 elif tweet_num == 8:
                     # Recommendation #5: AI transparency disclosure
-                    # Fix #1: Extract with one decimal precision
-                    ai_data = components.get('ai_detection', {})
-                    if isinstance(ai_data, dict):
-                        ai_detection = ai_data.get('overall_percentage')
-                        if ai_detection is None:
-                            ai_score = ai_data.get('ai_detection_score', 0)
-                            ai_detection = ai_score * 100 if ai_score <= 1 else ai_score
-                    else:
-                        ai_detection = ai_data if ai_data else 0
+                    # v8.4.2: Prefer deep analysis consensus over basic AI detection
+                    deep_analysis = components.get('deep_analysis', {})
+                    consensus = deep_analysis.get('consensus', {})
                     
-                    # Add model detection if available
+                    if consensus and 'ai_percentage' in consensus:
+                        # Use deep analysis consensus (more accurate)
+                        ai_detection = consensus.get('ai_percentage', 0)
+                    else:
+                        # Fallback to basic AI detection
+                        ai_data = components.get('ai_detection', {})
+                        if isinstance(ai_data, dict):
+                            ai_detection = ai_data.get('overall_percentage')
+                            if ai_detection is None:
+                                ai_score = ai_data.get('ai_detection_score', 0)
+                                ai_detection = ai_score * 100 if ai_score <= 1 else ai_score
+                        else:
+                            ai_detection = ai_data if ai_data else 0
+                    
+                    # Add model detection if available - check consensus first
                     model_info = ""
-                    if isinstance(ai_data, dict):
+                    if consensus and 'primary_model' in consensus:
+                        model_name = consensus.get('primary_model')
+                        model_conf = consensus.get('confidence', 0)
+                        if model_name and model_name != 'Unknown':
+                            model_info = f" Detected: {model_name} ({model_conf:.0f}% confidence)."
+                    elif isinstance(ai_data, dict):
                         likely_model = ai_data.get('likely_ai_model', {})
                         if isinstance(likely_model, dict) and likely_model.get('model'):
                             model_name = likely_model.get('model')
@@ -331,15 +344,23 @@ class FormatRenderer:
             article.append("\nTransparency & Governance\n")
             article.append("-"*50)
             
-            # Extract AI detection properly
-            ai_data = components.get('ai_detection', {})
-            if isinstance(ai_data, dict):
-                ai_detection = ai_data.get('overall_percentage')
-                if ai_detection is None:
-                    ai_score = ai_data.get('ai_detection_score', 0)
-                    ai_detection = ai_score * 100 if ai_score <= 1 else ai_score
+            # v8.4.2: Prefer deep analysis consensus over basic AI detection
+            deep_analysis = components.get('deep_analysis', {})
+            consensus = deep_analysis.get('consensus', {})
+            
+            if consensus and 'ai_percentage' in consensus:
+                # Use deep analysis consensus (more accurate)
+                ai_detection = consensus.get('ai_percentage', 0)
             else:
-                ai_detection = ai_data if ai_data else 0
+                # Fallback to basic AI detection
+                ai_data = components.get('ai_detection', {})
+                if isinstance(ai_data, dict):
+                    ai_detection = ai_data.get('overall_percentage')
+                    if ai_detection is None:
+                        ai_score = ai_data.get('ai_detection_score', 0)
+                        ai_detection = ai_score * 100 if ai_score <= 1 else ai_score
+                else:
+                    ai_detection = ai_data if ai_data else 0
             
             # Extract trust score properly
             trust_data = components.get('trust_score', {})
@@ -361,7 +382,14 @@ class FormatRenderer:
             
             # Add model detection information
             model_disclosure = f"\nAI Involvement: {ai_detection:.1f}% AI-assisted analysis detected."
-            if isinstance(ai_data, dict):
+            
+            # v8.4.2: Check consensus for model info first, then fallback to basic detection
+            if consensus and 'primary_model' in consensus:
+                model_name = consensus.get('primary_model')
+                model_conf = consensus.get('confidence', 0)
+                if model_name and model_name != 'Unknown':
+                    model_disclosure += f" Likely model: {model_name} ({model_conf:.0f}% confidence)."
+            elif isinstance(ai_data, dict):
                 likely_model = ai_data.get('likely_ai_model', {})
                 if isinstance(likely_model, dict) and likely_model.get('model'):
                     model_name = likely_model.get('model')

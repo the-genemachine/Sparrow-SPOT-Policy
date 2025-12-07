@@ -159,6 +159,7 @@ class NarrativeGenerationPipeline:
         
         # Enrich narrative_components with analysis data needed for format rendering
         narrative_components['ai_detection'] = analysis.get('ai_detection', {})
+        narrative_components['deep_analysis'] = analysis.get('deep_analysis', {})  # v8.4.2: Add deep analysis for consensus
         narrative_components['bias_audit'] = analysis.get('bias_audit', {})
         narrative_components['trust_score'] = analysis.get('trust_score', {})
         narrative_components['risk_tier'] = analysis.get('risk_tier', {})
