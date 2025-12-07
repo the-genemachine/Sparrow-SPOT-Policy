@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sparrow SPOT Scale™ v8.4.0 - Dual Variant System with Ethical Framework & AI Transparency
+Sparrow SPOT Scale™ - Dual Variant System with Ethical Framework & AI Transparency
 Combines:
   - SPARROW Scale™ (Journalism evaluation) from v3
   - SPOT-Policy™ (Government policy evaluation) enhanced with Ethical AI Toolkit in v7
@@ -11,17 +11,7 @@ Systematic Protocol for Article Reliability, Rigor, and Overall Worth
 
 Generates professional certification for both journalistic and policy content
 
-v8 Enhancement: Added AI Transparency & Detection (AT) criterion
-- Explicit AI disclosure scoring
-- Funding allocation transparency
-- Deployment specificity analysis  
-- External validation tracking
-
-v8.4.0 Enhancement: Classification Logic Fix (Bill-C15-12 Discrepancy Resolution)
-- Fixed paradox where "Questionable Policy" coexists with "Transformative" PC score
-- Classification now considers composite score AND failing category count
-- High PC (>=90) with composite >=70 cannot be "Questionable"
-- Added classification_metadata for transparency
+See version.py for current version and release history.
 """
 
 import json
@@ -34,6 +24,9 @@ import re
 import statistics
 from contextlib import redirect_stdout
 from io import StringIO
+
+# Import version management
+from version import SPARROW_VERSION, get_version_string
 
 # v8: Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -601,7 +594,7 @@ class SPARROWGrader:
         
         report = {
             'variant': 'SPARROW Scale™',
-            'version': '8.3.2',
+            'version': SPARROW_VERSION,
             'document_type': doc_type,
             'timestamp': datetime.now().isoformat(),
             'sparrow_scores': sparrow_scores,
@@ -1510,7 +1503,7 @@ class SPOTPolicy:
         
         report = {
             'variant': 'SPOT-Policy™',
-            'version': '8.3.2',
+            'version': SPARROW_VERSION,
             'document_type': document_type,
             'timestamp': master_timestamp,
             'criteria': {},
@@ -2089,7 +2082,7 @@ def create_arg_parser():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description='Sparrow SPOT Scale™ v8.3 - Dual Variant Grading System with Narrative Engine, Deep AI Analysis & Enhanced Transparency',
+        description=f'Sparrow SPOT Scale™ {get_version_string()} - Dual Variant Grading System with Narrative Engine, Deep AI Analysis & Enhanced Transparency',
         epilog='Examples:\n'
                '  sparrow_grader_v8.py budget.pdf --variant policy --narrative-style journalistic --output 2025-Budget  # v8: Standard narrative\n'
                '  sparrow_grader_v8.py budget.pdf --variant policy --deep-analysis --output budget-full  # v8.2: Add 6-level AI transparency\n'
@@ -2157,8 +2150,24 @@ def main():
     if args.narrative_style and args.variant != 'policy':
         parser.error("--narrative-style requires --variant policy")
     
-    # v8.4.2: Set up pipeline logging
-    log_file_path = f"{args.output}_pipeline.log"
+    # v8.4.2: Create organized output directory structure
+    output_base = Path(args.output)
+    output_dir = output_base.parent if output_base.parent != Path('.') else Path('.')
+    output_name = output_base.stem
+    
+    # Create subdirectories for organized outputs
+    core_dir = output_dir / 'core'
+    reports_dir = output_dir / 'reports'
+    certificates_dir = output_dir / 'certificates'
+    narrative_dir = output_dir / 'narrative'
+    transparency_dir = output_dir / 'transparency'
+    logs_dir = output_dir / 'logs'
+    
+    # Only create directories as needed (will be created when files are saved)
+    
+    # v8.4.2: Set up pipeline logging in logs directory
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_file_path = str(logs_dir / f"{output_name}_pipeline.log")
     pipeline_logger = None
     try:
         pipeline_logger = PipelineLogger(log_file_path)
@@ -2167,7 +2176,7 @@ def main():
         print(f"⚠️ Could not initialize pipeline logging: {e}")
         pipeline_logger = None
     
-    print(f"\n🎯 Sparrow SPOT Scale™ v8.2 - Starting grading process (with Deep Analysis)...")
+    print(f"\n🎯 Sparrow SPOT Scale™ {get_version_string()} - Starting grading process (with Deep Analysis)...")
     print(f"   Variant: {args.variant}")
     
     # Determine input source
@@ -2379,20 +2388,19 @@ def main():
     print(f"\n💾 Saving results...")
     generation_sequence = []  # Track file generation order (Recommendation #7)
     try:
-        # JSON output
-        output_json = f"{args.output}.json"
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(output_json), exist_ok=True) if os.path.dirname(output_json) else None
+        # v8.4.2: Create core directory for main outputs
+        core_dir.mkdir(parents=True, exist_ok=True)
+        
+        # JSON output (core)
+        output_json = str(core_dir / f"{output_name}.json")
         with open(output_json, 'w') as f:
             # Note: We'll update generation_log after all files are saved
             json.dump(report, f, indent=2)
         print(f"   ✓ JSON: {output_json}")
         generation_sequence.append({'file': output_json, 'type': 'json', 'timestamp': report['timestamp']})
         
-        # Text summary
-        output_txt = f"{args.output}.txt"
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(output_txt), exist_ok=True) if os.path.dirname(output_txt) else None
+        # Text summary (core)
+        output_txt = str(core_dir / f"{output_name}.txt")
         with open(output_txt, 'w') as f:
             f.write(f"Sparrow SPOT Scale™ v8.0 Report (with Narrative Engine)\n")
             f.write(f"Variant: {args.variant.upper()}\n")
@@ -2444,8 +2452,11 @@ def main():
         # v8: Save narrative engine outputs
         if narrative_outputs:
             try:
+                # v8.4.2: Create narrative directory
+                narrative_dir.mkdir(parents=True, exist_ok=True)
+                
                 # Save narrative text
-                output_narrative = f"{args.output}_narrative.txt"
+                output_narrative = str(narrative_dir / f"{output_name}_narrative.txt")
                 with open(output_narrative, 'w') as f:
                     f.write("NARRATIVE ENGINE OUTPUT\n")
                     f.write("="*70 + "\n\n")
@@ -2456,7 +2467,7 @@ def main():
                 
                 # v8: Generate publish-ready markdown when --narrative-style is provided
                 if args.narrative_style:
-                    output_publish = f"{args.output}_publish.md"
+                    output_publish = str(narrative_dir / f"{output_name}_publish.md")
                     with open(output_publish, 'w') as f:
                         narrative_text = narrative_outputs.get('narrative_text', '')
                         
@@ -2522,28 +2533,29 @@ def main():
                 # Save X thread format
                 formats = narrative_outputs.get('outputs', {})
                 if 'x_thread' in formats:
-                    output_x_thread = f"{args.output}_x_thread.txt"
+                    output_x_thread = str(narrative_dir / f"{output_name}_x_thread.txt")
                     with open(output_x_thread, 'w') as f:
                         f.write(formats['x_thread'])
                     print(f"   ✓ X Thread: {output_x_thread}")
                 
                 # Save LinkedIn format
                 if 'linkedin' in formats:
-                    output_linkedin = f"{args.output}_linkedin.txt"
+                    output_linkedin = str(narrative_dir / f"{output_name}_linkedin.txt")
                     with open(output_linkedin, 'w') as f:
                         f.write(formats['linkedin'])
                     print(f"   ✓ LinkedIn: {output_linkedin}")
                 
                 # Save insights
                 if 'insights' in narrative_outputs:
-                    output_insights = f"{args.output}_insights.json"
+                    output_insights = str(narrative_dir / f"{output_name}_insights.json")
                     with open(output_insights, 'w') as f:
                         json.dump(narrative_outputs['insights'], f, indent=2)
                     print(f"   ✓ Insights: {output_insights}")
                 
                 # Save QA report
                 if 'qa_report' in narrative_outputs:
-                    output_qa = f"{args.output}_qa_report.json"
+                    reports_dir.mkdir(parents=True, exist_ok=True)
+                    output_qa = str(reports_dir / f"{output_name}_qa_report.json")
                     with open(output_qa, 'w') as f:
                         json.dump(narrative_outputs['qa_report'], f, indent=2)
                     print(f"   ✓ QA Report: {output_qa}")
@@ -2554,8 +2566,11 @@ def main():
         # v8.2: Save deep analysis report
         if deep_analysis_results:
             try:
+                # v8.4.2: Create reports directory
+                reports_dir.mkdir(parents=True, exist_ok=True)
+                
                 # Generate markdown report
-                output_deep_md = f"{args.output}_deep_analysis.md"
+                output_deep_md = str(reports_dir / f"{output_name}_deep_analysis.md")
                 deep_md = deep_analysis_results.get('_markdown_report', None)
                 if not deep_md:
                     # Generate markdown if not already in results
@@ -2567,7 +2582,7 @@ def main():
                 print(f"   ✓ Deep Analysis (Markdown): {output_deep_md}")
                 
                 # Save JSON data
-                output_deep_json = f"{args.output}_deep_analysis.json"
+                output_deep_json = str(reports_dir / f"{output_name}_deep_analysis.json")
                 with open(output_deep_json, 'w', encoding='utf-8') as f:
                     json.dump(deep_analysis_results, f, indent=2)
                 print(f"   ✓ Deep Analysis (JSON): {output_deep_json}")
@@ -2580,14 +2595,15 @@ def main():
             from certificate_generator import CertificateGenerator
             cert_gen = CertificateGenerator()
             
+            # v8.4.2: Create certificates directory
+            certificates_dir.mkdir(parents=True, exist_ok=True)
+            
             # Extract document title (handle both file and URL input)
             if args.url:
                 doc_title = input_name.rsplit('.', 1)[0] if '.' in input_name else input_name
             else:
                 doc_title = Path(args.input_file).stem
-            output_html = f"{args.output}_certificate.html"
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(output_html), exist_ok=True) if os.path.dirname(output_html) else None
+            output_html = str(certificates_dir / f"{output_name}_certificate.html")
             
             if args.variant == 'policy':
                 cert_gen.generate_policy_certificate(report, doc_title, output_html)
@@ -2598,9 +2614,8 @@ def main():
             
             # Plain-Language Summary (Ollama)
             try:
-                output_summary = f"{args.output}_summary.txt"
-                # Create directory if it doesn't exist
-                os.makedirs(os.path.dirname(output_summary), exist_ok=True) if os.path.dirname(output_summary) else None
+                core_dir.mkdir(parents=True, exist_ok=True)
+                output_summary = str(core_dir / f"{output_name}_summary.txt")
                 # Use ollama_model from narrative outputs if available, otherwise from args
                 model_to_use = narrative_outputs.get('metadata', {}).get('ollama_model', args.ollama_model)
                 # Pass narrative_length to enforce length constraints
@@ -2622,13 +2637,26 @@ def main():
     except Exception as e:
         print(f"   ⚠️  Failed to save outputs: {str(e)}")
     
-    # Update generation log with all files created (Recommendation #7)
+    # v8.4.2: Update generation log with all files created in organized directories
     try:
         import glob
-        generated_files = glob.glob(f"{args.output}*")
-        report['generation_log']['files_generated'] = sorted(generated_files)
+        # Search in all subdirectories
+        all_files = []
+        for subdir in [core_dir, reports_dir, certificates_dir, narrative_dir, transparency_dir, logs_dir]:
+            if subdir.exists():
+                all_files.extend(glob.glob(str(subdir / f"{output_name}*")))
+        
+        report['generation_log']['files_generated'] = sorted(all_files)
         report['generation_log']['generation_sequence'] = generation_sequence
-        report['generation_log']['total_files'] = len(generated_files)
+        report['generation_log']['total_files'] = len(all_files)
+        report['generation_log']['output_structure'] = {
+            'core': str(core_dir),
+            'reports': str(reports_dir),
+            'certificates': str(certificates_dir),
+            'narrative': str(narrative_dir),
+            'transparency': str(transparency_dir),
+            'logs': str(logs_dir)
+        }
         
         # Re-save JSON with complete generation log
         with open(output_json, 'w') as f:
@@ -2645,11 +2673,14 @@ def main():
                 from ai_detection_engine import ProvenanceAnalyzer
                 prov_analyzer = ProvenanceAnalyzer()
                 
+                # v8.4.2: Create transparency directory
+                transparency_dir.mkdir(parents=True, exist_ok=True)
+                
                 # Get enhanced metadata
                 prov_metadata = prov_analyzer.extract_metadata(args.input_file)
                 
                 # Save provenance report
-                output_prov = f"{args.output}_provenance.json"
+                output_prov = str(transparency_dir / f"{output_name}_provenance.json")
                 with open(output_prov, 'w', encoding='utf-8') as f:
                     json.dump(prov_metadata, f, indent=2)
                 print(f"   ✓ Provenance: {output_prov}")
@@ -2697,10 +2728,11 @@ def main():
                     analysis_timestamp=report.get('metadata', {}).get('generated_at')
                 )
                 
-                # Save both JSON and markdown versions
+                # v8.4.2: Save both JSON and markdown versions to transparency directory
+                transparency_dir.mkdir(parents=True, exist_ok=True)
                 saved_files = prov_report_gen.save_report(
                     provenance_report,
-                    args.output,
+                    str(transparency_dir / output_name),
                     format="both"
                 )
                 
@@ -2747,7 +2779,8 @@ def main():
                             raise
                         
                         # Generate citation report
-                        output_citation = f"{args.output}_citation_report.txt"
+                        transparency_dir.mkdir(parents=True, exist_ok=True)
+                        output_citation = str(transparency_dir / f"{output_name}_citation_report.txt")
                         with open(output_citation, 'w', encoding='utf-8') as f:
                             f.write(scorer.format_citation_results(citation_results))
                         print(f"   ✓ Citation Report: {output_citation}")
@@ -2864,18 +2897,19 @@ def main():
                                  status="completed")
                     
                     # Generate appropriate format
+                    transparency_dir.mkdir(parents=True, exist_ok=True)
                     if args.lineage_chart == 'html':
-                        output_file = f"{args.output}_lineage_flowchart.html"
+                        output_file = str(transparency_dir / f"{output_name}_lineage_flowchart.html")
                         html_content = viz.generate_html_flowchart()
                         with open(output_file, 'w', encoding='utf-8') as f:
                             f.write(html_content)
                     elif args.lineage_chart == 'ascii':
-                        output_file = f"{args.output}_lineage_flowchart.txt"
+                        output_file = str(transparency_dir / f"{output_name}_lineage_flowchart.txt")
                         ascii_content = viz.generate_ascii_flowchart()
                         with open(output_file, 'w', encoding='utf-8') as f:
                             f.write(ascii_content)
                     elif args.lineage_chart == 'json':
-                        output_file = f"{args.output}_lineage_flowchart.json"
+                        output_file = str(transparency_dir / f"{output_name}_lineage_flowchart.json")
                         with open(output_file, 'w', encoding='utf-8') as f:
                             json.dump({"stages": viz.stages}, f, indent=2)
                     
@@ -2896,7 +2930,8 @@ def main():
                     compliance_results = checker.check_compliance(report)
                     
                     # Generate compliance report
-                    output_nist = f"{args.output}_nist_compliance.txt"
+                    transparency_dir.mkdir(parents=True, exist_ok=True)
+                    output_nist = str(transparency_dir / f"{output_name}_nist_compliance.txt")
                     with open(output_nist, 'w', encoding='utf-8') as f:
                         f.write(checker.generate_compliance_report(compliance_results))
                     print(f"   ✓ NIST Compliance: {output_nist}")
@@ -2933,12 +2968,13 @@ def main():
                         lineage_data = mapper.trace_sources(doc_text)
                         
                         # Generate reports
-                        output_lineage_txt = f"{args.output}_data_lineage.txt"
+                        transparency_dir.mkdir(parents=True, exist_ok=True)
+                        output_lineage_txt = str(transparency_dir / f"{output_name}_data_lineage.txt")
                         with open(output_lineage_txt, 'w', encoding='utf-8') as f:
                             f.write(mapper.generate_report(lineage_data, 'text'))
                         print(f"   ✓ Data Lineage (Text): {output_lineage_txt}")
                         
-                        output_lineage_json = f"{args.output}_data_lineage.json"
+                        output_lineage_json = str(transparency_dir / f"{output_name}_data_lineage.json")
                         with open(output_lineage_json, 'w', encoding='utf-8') as f:
                             json.dump(lineage_data, f, indent=2)
                         print(f"   ✓ Data Lineage (JSON): {output_lineage_json}")
@@ -2971,8 +3007,10 @@ def main():
                     # Initialize generator with analysis results
                     disclosure_gen = AIDisclosureGenerator(report)
                     
-                    # Generate all formats
-                    disclosure_files = disclosure_gen.generate_all_formats(args.output)
+                    # Generate all formats in transparency directory
+                    transparency_dir.mkdir(parents=True, exist_ok=True)
+                    output_path = str(transparency_dir / output_name)
+                    disclosure_files = disclosure_gen.generate_all_formats(output_path)
                     
                     print(f"   ✅ Generated {len(disclosure_files)} disclosure formats:")
                     for file in disclosure_files:
@@ -3003,12 +3041,39 @@ def main():
         except Exception as e:
             print(f"   ⚠️  Failed to cleanup temp file: {str(e)}")
     
-    # v8.4.2: Close pipeline logger before final message
+    # v8.4.2: Close pipeline logger and show organized output structure
     if pipeline_logger:
         pipeline_logger.close()
         print(f"\n📝 Pipeline log saved: {log_file_path}")
     
-    print(f"\n✅ Grading complete!\n")
+    # v8.4.2: Display organized output structure
+    print(f"\n✅ Grading complete!")
+    print(f"\n📁 Outputs organized in:")
+    if core_dir.exists():
+        core_files = list(core_dir.glob(f"{output_name}*"))
+        if core_files:
+            print(f"   📂 Core ({len(core_files)} files): {core_dir}")
+    if reports_dir.exists():
+        report_files = list(reports_dir.glob(f"{output_name}*"))
+        if report_files:
+            print(f"   📂 Reports ({len(report_files)} files): {reports_dir}")
+    if certificates_dir.exists():
+        cert_files = list(certificates_dir.glob(f"{output_name}*"))
+        if cert_files:
+            print(f"   📂 Certificates ({len(cert_files)} files): {certificates_dir}")
+    if narrative_dir.exists():
+        narr_files = list(narrative_dir.glob(f"{output_name}*"))
+        if narr_files:
+            print(f"   📂 Narrative ({len(narr_files)} files): {narrative_dir}")
+    if transparency_dir.exists():
+        trans_files = list(transparency_dir.glob(f"{output_name}*"))
+        if trans_files:
+            print(f"   📂 Transparency ({len(trans_files)} files): {transparency_dir}")
+    if logs_dir.exists():
+        log_files = list(logs_dir.glob(f"{output_name}*"))
+        if log_files:
+            print(f"   📂 Logs ({len(log_files)} files): {logs_dir}")
+    print()
 
 
 if __name__ == '__main__':
