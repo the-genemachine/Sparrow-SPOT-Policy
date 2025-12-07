@@ -4,3 +4,4 @@ bertopic
 matplotlib
 requests
 git+https://github.com/andehr/sfpd.git
+tiktoken>=0.5.0  # v8.6: Token counting for Q&A chunking
