@@ -28,6 +28,17 @@ from io import StringIO
 # Import version management
 from version import SPARROW_VERSION, get_version_string
 
+# v8.4.2: Import diagnostic logging system
+try:
+    from diagnostic_logger import DiagnosticLogger, get_logger
+    DIAGNOSTIC_LOGGING_AVAILABLE = True
+except ImportError:
+    DIAGNOSTIC_LOGGING_AVAILABLE = False
+    # Create no-op logger fallback
+    class DiagnosticLogger:
+        def __getattr__(self, name):
+            return lambda *args, **kwargs: None
+
 # v8: Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -2177,6 +2188,21 @@ def main():
         print(f"⚠️ Could not initialize pipeline logging: {e}")
         pipeline_logger = None
     
+    # v8.4.2: Initialize diagnostic logger (debug trace + errors + performance)
+    diagnostic_logger = None
+    if DIAGNOSTIC_LOGGING_AVAILABLE:
+        try:
+            diagnostic_logger = DiagnosticLogger(output_dir=logs_dir, session_name=output_name)
+            diagnostic_logger.info(f"Sparrow SPOT Scale™ {get_version_string()} session started")
+            diagnostic_logger.log_config("variant", args.variant)
+            diagnostic_logger.log_config("output_directory", str(output_dir))
+            diagnostic_logger.log_config("deep_analysis", args.deep_analysis)
+        except Exception as e:
+            print(f"⚠️ Could not initialize diagnostic logging: {e}")
+            diagnostic_logger = DiagnosticLogger()  # Use no-op fallback
+    else:
+        diagnostic_logger = DiagnosticLogger()  # Use no-op fallback
+    
     print(f"\n🎯 Sparrow SPOT Scale™ {get_version_string()} - Starting grading process (with Deep Analysis)...")
     print(f"   Variant: {args.variant}")
     
@@ -2327,12 +2353,17 @@ def main():
                 print(f"\n🔬 Running 6-level deep AI transparency analysis...")
                 print(f"   This will take approximately 1-2 minutes...")
                 try:
+                    diagnostic_logger.start_stage("deep_analysis")
+                    diagnostic_logger.debug("Initializing DeepAnalyzer")
+                    
                     deep_analyzer = DeepAnalyzer()
                     # Create temp file with text content for analysis
                     import tempfile
                     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as tmp:
                         tmp.write(text)
                         temp_text_path = tmp.name
+                    
+                    diagnostic_logger.debug("Running 6-level deep analysis", text_length=len(text))
                     
                     # Run deep analysis
                     deep_analysis_results = deep_analyzer.analyze_document(temp_text_path)
@@ -2342,6 +2373,11 @@ def main():
                         os.unlink(temp_text_path)
                     except:
                         pass
+                    
+                    diagnostic_logger.end_stage("deep_analysis", details={
+                        'ai_percentage': deep_analysis_results.get('consensus', {}).get('ai_percentage'),
+                        'primary_model': deep_analysis_results.get('consensus', {}).get('primary_model')
+                    })
                     
                     # Show quick summary
                     if 'consensus' in deep_analysis_results:
@@ -2612,6 +2648,9 @@ def main():
         
         # HTML Certificate
         try:
+            diagnostic_logger.start_stage("certificate_generation")
+            diagnostic_logger.debug("Importing certificate generator module")
+            
             from certificate_generator import CertificateGenerator
             cert_gen = CertificateGenerator()
             
@@ -2627,11 +2666,15 @@ def main():
                     doc_title = Path(args.input_file).stem
             output_html = str(certificates_dir / f"{output_name}_certificate.html")
             
+            diagnostic_logger.debug("Generating certificate", variant=args.variant, title=doc_title)
+            
             if args.variant == 'policy':
                 cert_gen.generate_policy_certificate(report, doc_title, output_html)
             else:
                 cert_gen.generate_journalism_certificate(report, doc_title, output_html)
             
+            diagnostic_logger.log_file_operation("write", output_html, success=True)
+            diagnostic_logger.end_stage("certificate_generation")
             print(f"   ✓ Certificate: {output_html}")
             
             # Plain-Language Summary (Ollama)
@@ -2651,9 +2694,12 @@ def main():
                 if summary:
                     print(f"   ✓ Summary: {output_summary}")
             except Exception as e:
+                diagnostic_logger.error("Summary generation failed", exception=e)
                 print(f"   ⚠️  Summary generation skipped: {str(e)}")
         
         except Exception as e:
+            diagnostic_logger.error("Certificate generation failed", exception=e, variant=args.variant)
+            diagnostic_logger.end_stage("certificate_generation")
             print(f"   ⚠️  Certificate generation skipped: {str(e)}")
     
     except Exception as e:
@@ -3096,6 +3142,10 @@ def main():
         if log_files:
             print(f"   📂 Logs ({len(log_files)} files): {logs_dir}")
     print()
+    
+    # v8.4.2: Finalize diagnostic logging
+    if diagnostic_logger:
+        diagnostic_logger.finalize()
 
 
 if __name__ == '__main__':
