@@ -1,7 +1,7 @@
-# Sparrow SPOT Scale™ v8.3: Technical Architecture Report
+# Sparrow SPOT Scale™ v8.4: Technical Architecture Report
 
-**Report Date:** December 3, 2025 (Updated)  
-**System Version:** v8.3.4 (Document Type Calibration + AI Usage Explainer)  
+**Report Date:** December 7, 2025 (Updated)  
+**System Version:** v8.4.2 (Deep Analysis Consensus, Document Q&A, Diagnostic Logging)  
 **Repository:** Sparrow-SPOT-Policy  
 **Classification:** Technical Documentation
 
@@ -9,7 +9,30 @@
 
 ## Executive Summary
 
-This report provides a comprehensive technical overview of the Sparrow SPOT Scale™ v8.3 system architecture, including all files, modules, classes, functions, and analytical models used in the framework. The system combines journalism evaluation (SPARROW Scale™) with government policy analysis (SPOT-Policy™) through a dual-variant architecture supported by an ethical AI framework, narrative generation engine, and enhanced transparency features.
+This report provides a comprehensive technical overview of the Sparrow SPOT Scale™ v8.4 system architecture, including all files, modules, classes, functions, and analytical models used in the framework. The system combines journalism evaluation (SPARROW Scale™) with government policy analysis (SPOT-Policy™) through a dual-variant architecture supported by an ethical AI framework, narrative generation engine, and enhanced transparency features.
+
+**Version 8.4.2 Enhancement (December 7, 2025):**
+- **Document Q&A Feature:** New `document_qa.py` module enabling direct document queries via Ollama
+- **Deep Analysis Consensus Precedence:** All outputs (certificates, narratives, reports) now consistently use deep analysis consensus (12.0%) over basic detection
+- **Social Media Narrative Fix:** LinkedIn and X/Twitter narratives updated to use deep consensus instead of basic AI detection
+- **Comprehensive Diagnostic Logging:** New `diagnostic_logger.py` module with debug_trace.log, errors.log, performance.json
+- **Output Consistency:** All 5 major output types (certificates, deep analysis reports, publish narratives, AI disclosures, LinkedIn narratives) now show identical AI percentages
+- **Enhanced Error Tracking:** Full error logging with tracebacks in errors.log for debugging
+- **Performance Monitoring:** Stage-by-stage timing data in JSON format for optimization analysis
+- **Subprocess Timeout:** Increased from 600s to 1200s (20 minutes) for large document analysis
+- **Working Directory Fix:** Subprocess now runs from project root to ensure correct file organization
+
+**Version 8.4.1 Enhancement (December 6, 2025):**
+- **Provenance Report Generation:** Full document origin + AI usage audit trail
+- **AI Contribution Tracking:** Comprehensive logging of all AI-assisted operations
+- **Narrative Publish Enhancement:** Narrative metadata now uses deep_analysis.consensus
+- **Low Memory Mode Timeout:** Increased to 1200 seconds for complex analyses
+
+**Version 8.4 Enhancement (December 5, 2025):**
+- **Subprocess Execution:** GUI now runs analysis in subprocess for memory efficiency
+- **Version Centralization:** All versions managed from single `version.py` module
+- **Directory Organization:** Core, Reports, Certificates, Narrative, Transparency, Logs subdirectories
+- **Document Title Parameter:** User-supplied titles passed through entire pipeline
 
 **Version 8.3.4 Enhancement (December 3, 2025):**
 - **Document Type Calibration System:** Comprehensive baselines for ALL document types to reduce AI detection false positives
@@ -45,11 +68,15 @@ This report provides a comprehensive technical overview of the Sparrow SPOT Scal
 - **Gradio Web GUI:** Interactive interface with organized flag management
 
 **System Scope:**
-- **Primary Script:** `sparrow_grader_v8.py` (2,670 lines)
-- **Supporting Modules:** 25+ specialized Python modules (v8.3.4: +3 new modules)
+- **Primary Script:** `sparrow_grader_v8.py` (3,155 lines)
+- **Supporting Modules:** 30+ specialized Python modules (v8.4.2: +3 new modules from v8.3.4)
 - **Analysis Models:** Multi-model consensus detection (8 models), NIST AI Risk Framework, bias auditing, data source validation, document type calibration
 - **Output Formats:** 20+ file types per analysis (JSON, TXT, narratives, certificates, insights, QA reports, transparency reports, AI disclosures, data lineage, AI usage explanations)
-- **User Interfaces:** CLI (15+ flags) + Web GUI (Gradio, 5-tab interface)
+- **User Interfaces:** CLI (16+ flags) + Web GUI (Gradio, 5-tab interface)
+
+**New Modules in v8.4.2:**
+- `document_qa.py` - Document Q&A using Ollama (~380 lines)
+- `diagnostic_logger.py` - Comprehensive diagnostic logging system (~250 lines)
 
 **New Modules in v8.3.3-8.3.4:**
 - `document_type_baselines.py` - Comprehensive document type calibration (~1000 lines)
@@ -282,7 +309,123 @@ if self.document_type_detector:
 
 ---
 
-### 2.1.1 Document Type Baselines (NEW in v8.3.4)
+## Part 2.2: New Modules in v8.4.2
+
+### 2.2.1 Document Q&A Module
+
+#### **document_qa.py**
+
+**Location:** `/home/gene/Sparrow-SPOT-Policy/document_qa.py`  
+**Size:** ~380 lines  
+**Purpose:** Enable users to ask questions about analyzed documents via Ollama  
+**Version:** 8.4.2  
+**Status:** Production Ready
+
+**Key Classes:**
+
+##### `DocumentQA`
+- **Purpose:** Handle document Q&A operations
+- **Methods:**
+  - `ask_question(document_text, question, document_name, model, context_from_analysis, timeout)`: Ask question about document
+  - `_build_qa_prompt()`: Construct prompt with document and question
+  - `save_qa_output()`: Save answer to qa/ directory with metadata
+- **Features:**
+  - AI contribution tracking integration
+  - Timeout handling (180s default)
+  - Error handling for connection issues
+  - Document length truncation (50,000 char limit)
+  - Metadata logging (duration, status, model, timestamp)
+
+**Integration Points:**
+- **GUI:** Analysis Options tab, Document Q&A checkbox + question field
+- **CLI:** `--document-qa "Your question"` argument
+- **Pipeline:** Runs after narrative generation, before provenance report
+- **Output Directory:** `qa/{output_name}_document_qa.txt`
+
+**Execution Flow:**
+```
+User Input → Question Field (GUI) or --document-qa CLI arg
+    ↓
+DocumentQA.ask_question() called
+    ↓
+Prompt built with document text + question
+    ↓
+Ollama API request (model configurable)
+    ↓
+Answer generated (with timeout protection)
+    ↓
+Metadata captured (duration, status, AI contribution logged)
+    ↓
+Output saved to qa/ directory
+```
+
+**Safety Features:**
+- Completely isolated from core analysis
+- Optional feature (only runs if enabled)
+- Non-blocking failures (analysis continues if Q&A fails)
+- Separate output directory
+- All errors logged with timestamps
+
+**Example Usage:**
+```bash
+# GUI: Check "Enable Document Q&A" + enter question + run analysis
+# CLI: python sparrow_grader_v8.py budget.pdf --document-qa "What are key infrastructure investments?"
+# Output: qa/budget_document_qa.txt with answer
+```
+
+### 2.2.2 Diagnostic Logging Module
+
+#### **diagnostic_logger.py**
+
+**Location:** `/home/gene/Sparrow-SPOT-Policy/diagnostic_logger.py`  
+**Size:** ~250 lines  
+**Purpose:** Comprehensive logging for debugging and performance monitoring  
+**Version:** 8.4.2  
+**Status:** Production Ready
+
+**Key Classes:**
+
+##### `DiagnosticLogger`
+- **Purpose:** Central logging system with multiple output streams
+- **Methods:**
+  - `debug()`, `info()`, `warning()`, `error()`: Log messages at different levels
+  - `log_file_operation()`: Log file I/O operations
+  - `log_subprocess()`: Log subprocess execution
+  - `log_model_call()`: Log AI model calls
+  - `start_stage()`, `end_stage()`: Mark analysis stages with timing
+  - `save_performance_report()`: Generate JSON performance data
+  - `finalize()`: Close all logs and save reports
+
+**Output Files (in logs/ directory):**
+1. **debug_trace.log:** All debug/info/warning/error messages with timestamps
+   - Format: `[TIMESTAMP] [LEVEL] [COMPONENT] Message`
+   - Useful for understanding execution flow and identifying timing issues
+
+2. **errors.log:** Error messages only with full tracebacks
+   - Format: `[TIMESTAMP] [ERROR] [COMPONENT] Error message\nTraceback:\n...`
+   - Useful for debugging failures
+
+3. **performance.json:** Stage timing data and execution metrics
+   - Structure:
+     ```json
+     {
+       "stages": {
+         "deep_analysis": {"duration_seconds": 2.34, "timestamp": "..."}
+       },
+       "total_duration_seconds": 45.67,
+       "errors_count": 0
+     }
+     ```
+
+**Fallback Design:**
+If import fails, system continues with no-op class (won't break analysis)
+
+**Integration Points:**
+- **sparrow_grader_v8.py:** Logs deep analysis, certificate generation, errors
+- **Output:** logs/ subdirectory (auto-created)
+- **Singleton Pattern:** Single logger instance per analysis session
+
+---
 
 #### **document_type_baselines.py**
 
@@ -2800,6 +2943,40 @@ The Sparrow SPOT Scale™ v8.3 system represents a comprehensive analytical fram
   - **Confidence Penalties:** Applied when methods disagree or specialized text detected
   - **Reference:** Driedger's "Manual of Instructions for Legislative and Legal Writing" (1982)
 
+**v8.4.2 Critical Fixes (December 7, 2025):**
+- **Deep Analysis Consensus Precedence:** All outputs now consistently use deep_analysis.consensus data
+  - **Issue:** LinkedIn/X narratives showed 0% AI while certificates showed 12% AI
+  - **Root Cause:** Social media narrative generation (format_renderer.py) still used basic ai_detection instead of deep consensus
+  - **Resolution:** Updated format_renderer.py to check for deep_analysis.consensus first in both LinkedIn and X/Twitter rendering
+  - **Files Modified:** format_renderer.py, narrative_integration.py
+  - **Impact:** All 5 output types now consistently show 12.0% AI from Cohere (deep consensus) when available
+  - **Verification:** Grep checks confirm LinkedIn now shows 12.0%, matching other outputs
+
+**v8.4.1 Enhancements (December 6, 2025):**
+- **Subprocess Timeout Increase:** Extended from 600s (10 min) to 1200s (20 min)
+  - **Issue:** Large document analyses timing out at 399.4 seconds
+  - **Resolution:** Changed timeout in gui/sparrow_gui.py line 710
+  - **Impact:** Complex deep analyses now complete successfully
+
+- **Working Directory Fix:** Subprocess now runs with correct cwd
+  - **Issue:** Files created in weird "gui/ /home/gene/..." paths
+  - **Resolution:** Added `cwd=str(SPOT_NEWS_DIR)` to subprocess.run() call
+  - **Impact:** All files now create in correct organized subdirectories
+
+- **Document Title Parameter:** User-supplied titles passed through entire pipeline
+  - **Issue:** Certificate showed PDF filename instead of user-friendly title
+  - **Resolution:** Added --document-title CLI argument and GUI field
+  - **Impact:** Professional document titles in all outputs
+
+**v8.4 Enhancements (December 5, 2025):**
+- **Version Centralization:** Single source of truth in version.py
+  - **Constants:** SPARROW_VERSION = "8.4.2", CERTIFICATE_VERSION = "8.4.2"
+  - **Impact:** No more hardcoded version strings in templates
+
+- **Directory Organization:** Organized output structure
+  - **Directories:** core/, reports/, certificates/, narrative/, transparency/, logs/
+  - **Impact:** Cleaner output, easier file management
+
 **v8.3.3 Enhancement (December 2, 2025):**
 - **AI Usage Explanation Generator:** New module synthesizing detection data into detailed reports
   - Generates comprehensive reports with 9 sections (executive summary, methodology, attribution, etc.)
@@ -2826,19 +3003,26 @@ The Sparrow SPOT Scale™ v8.3 system represents a comprehensive analytical fram
 - **AI Disclosure Generator (v8.3 - NEW):** Auto-generate government transparency statements (4 formats)
 - **Data Lineage Source Mapper (v8.3 - NEW):** Validate economic claims against 20-year historical data
 - **Gradio Web GUI (v8.3 - NEW):** User-friendly interface at http://localhost:7860 (5 organized tabs)
+- **Document Q&A Feature (v8.4.2 - NEW):** Ask questions about analyzed documents via Ollama
+- **Diagnostic Logging (v8.4.2 - NEW):** Comprehensive logging with debug_trace.log, errors.log, performance.json
 
-**Validated Effectiveness:**
+**Validated Effectiveness (v8.4.2):**
+- **Deep Analysis Consensus:** 12.0% AI (Cohere model, 30% confidence) from 6-level analysis
+- **Output Consistency:** All 5 major outputs show identical AI percentages (certificates, deep reports, publish narratives, AI disclosures, social media)
+- **Test Case - Bill C-15:** Certificate 12.0% ✓, Deep analysis 12.0% ✓, Publish narrative 12.0% ✓, LinkedIn narrative 12.0% ✓, X/Twitter narrative 12.0% ✓
+- **Diagnostic Logging:** Captures all operations with timing data, error tracking, performance metrics
+- **Document Q&A:** Functional with Ollama, saves answers to qa/ directory with metadata
+- **Subprocess Execution:** 1200s timeout handles complex analyses without timing out
+- **File Organization:** All outputs in correct subdirectories (core, reports, certificates, narrative, transparency, logs, qa)
 - 2025 Budget analysis: 53.2% AI detection (Cohere, 100% confidence)
-- Deep analysis: 1,421 pattern database, 5-model agreement, **27.9% consensus accuracy validated (v8.3.1)**
-- **Bill C-15 analysis: 4-12% AI detection after calibration (v8.3.4)**
 - Citation quality: Source diversity metrics, URL accessibility checks
 - NIST compliance: 97.5/100 (Excellent) - GOVERN/MAP/MEASURE/MANAGE pillars
 - Data lineage: 71.4% claim trace rate, correctly flagged 3.1% GDP as OPTIMISTIC (+35% deviation)
 - AI disclosure: 4 formats auto-generated (formal, plain-language, social, HTML)
-- **Document calibration: 12,970 patterns detected in legislation, score adjusted appropriately (v8.3.4)**
-- Production readiness: All quality checks passing, GUI operational, certificate accuracy verified
+- Document calibration: 12,970 patterns detected in legislation, score adjusted appropriately (v8.3.4)
+- Production readiness: All quality checks passing, GUI operational, output consistency verified (v8.4.2)
 
-This technical architecture enables the framework to serve as **accountability infrastructure** for AI-assisted governance, providing transparent, reproducible, and actionable policy analysis with unprecedented depth of AI transparency, data validation, and user accessibility through both CLI (15+ flags) and GUI (5-tab interface) access methods.
+This technical architecture enables the framework to serve as **accountability infrastructure** for AI-assisted governance, providing transparent, reproducible, and actionable policy analysis with unprecedented depth of AI transparency, output consistency, comprehensive diagnostic logging, and direct document interaction via Q&A.
 
 ---
 
@@ -2858,16 +3042,27 @@ This represents the evolution from pattern-matching (v8.3.4) to true machine lea
 ---
 
 **Report Prepared By:** Gene Machine Research Team  
-**Framework Version:** Sparrow SPOT Scale™ v8.3.4  
-**Report Date:** December 3, 2025 (Updated)  
-**Last Technical Enhancement:** Document Type Calibration (v8.3.4)  
+**Framework Version:** Sparrow SPOT Scale™ v8.4.2  
+**Report Date:** December 7, 2025 (Updated)  
+**Last Technical Enhancement:** Deep Analysis Consensus Precedence + Document Q&A (v8.4.2)  
 **Next Technical Review:** January 31, 2026
 
-This technical architecture enables the framework to serve as **accountability infrastructure** for AI-assisted governance, providing transparent, reproducible, and actionable policy analysis with unprecedented depth of AI transparency and compliance mapping.
----
+**Recent Quality Validations (v8.4.2):**
+- ✅ Deep analysis consensus (12.0% AI, Cohere model) now appears in all 5 major output types
+- ✅ Certificate displays correct AI percentage from deep consensus
+- ✅ Publish narrative shows 12.0% AI (fixed from previous 0.0%)
+- ✅ LinkedIn narrative shows 12.0% AI (fixed from previous 0.0%)
+- ✅ X/Twitter narrative shows 12.0% AI (fixed from previous 0.0%)
+- ✅ AI disclosure HTML shows 12.0% AI with Cohere model
+- ✅ Deep analysis report shows 12.0% AI consensus
+- ✅ Diagnostic logging captures all operations with timing data
+- ✅ Document Q&A feature functional with Ollama integration
+- ✅ GUI subprocess timeout increased to 1200s (20 minutes)
+- ✅ Working directory fixed (files in correct subdirectories)
+- ✅ All version strings centralized and consistent
+- ✅ qa/ directory auto-created for document Q&A outputs
 
-**Report Prepared By:** Gene Machine Research Team  
-**Framework Version:** Sparrow SPOT Scale™ v8.3  
+This technical architecture now provides comprehensive diagnostic and Q&A capabilities alongside transparent, reproducible, and actionable policy analysis with unprecedented output consistency across all platforms.
 **Report Date:** November 24, 2025  
 **Next Technical Review:** January 31, 2026
 

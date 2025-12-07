@@ -1,25 +1,23 @@
 # Sparrow SPOT Scale™ - Project Metrics Report
 
-**Generated:** December 4, 2025  
-**Version:** 8.3.5  
+**Generated:** December 7, 2025  
+**Version:** 8.4.2  
 **Repository:** Sparrow-SPOT-Policy
 
 ---
 
-## 📊 Core Python Modules (42 files)
+## 📊 Core Python Modules (46 files)
 
 | Module | Lines | Purpose | Complexity |
 |--------|-------|---------|------------|
-| `sparrow_grader_v8.py` | 2,831 | Main grading engine, CLI, orchestration | ⭐⭐⭐⭐⭐ |
+| `sparrow_grader_v8.py` | 3,155 | Main grading engine, CLI, orchestration | ⭐⭐⭐⭐⭐ |
 | `sparrow_grader_v7.py` | 1,587 | Legacy grader (maintained for compatibility) | ⭐⭐⭐⭐ |
 | `certificate_generator.py` | 1,544 | HTML certificate generation with templates | ⭐⭐⭐⭐ |
 | `ai_detection_engine.py` | 1,390 | Multi-method AI content detection | ⭐⭐⭐⭐⭐ |
+| `format_renderer.py` | 773 | Multi-format output rendering (updated for consensus) | ⭐⭐⭐ |
 | `ai_usage_explainer.py` | 1,031 | Plain-language AI usage reports | ⭐⭐⭐⭐ |
-| `document_type_baselines.py` | 988 | Domain-specific pattern baselines | ⭐⭐⭐⭐ |
-| `citation_quality_scorer.py` | 831 | Citation verification & scoring | ⭐⭐⭐⭐ |
-| `format_renderer.py` | 757 | Multi-format output rendering | ⭐⭐⭐ |
 | `deep_analyzer.py` | 740 | 6-level transparency analysis | ⭐⭐⭐⭐⭐ |
-| `narrative_integration.py` | 734 | Narrative layer integration | ⭐⭐⭐⭐ |
+| `narrative_integration.py` | 788 | Narrative layer integration (updated with deep consensus) | ⭐⭐⭐⭐ |
 | `article_analyzer.py` | 732 | Journalism article analysis | ⭐⭐⭐ |
 | `ai_disclosure_generator.py` | 673 | Multi-format AI disclosure statements | ⭐⭐⭐⭐ |
 | `tone_adaptor.py` | 650 | Audience-appropriate tone generation | ⭐⭐⭐ |
@@ -46,6 +44,9 @@
 | `escalation_manager.py` | 288 | Risk-based escalation routing | ⭐⭐⭐ |
 | `ai_contribution_tracker.py` | 267 | AI contribution tracking | ⭐⭐⭐ |
 | `sentence_level_detector.py` | 260 | Sentence-level AI detection | ⭐⭐⭐ |
+| `document_qa.py` | 380 | Document Q&A via Ollama (NEW v8.4.2) | ⭐⭐⭐⭐ |
+| `diagnostic_logger.py` | 250 | Comprehensive diagnostic logging (NEW v8.4.2) | ⭐⭐⭐ |
+| `version.py` | 8 | Version centralization (NEW v8.4) | ⭐ |
 | `test_model_detection.py` | 233 | Model detection tests | ⭐⭐ |
 | `section_analysis_integration.py` | 203 | Section analysis integration | ⭐⭐⭐ |
 | `integrate_v7_ethical_modules.py` | 93 | V7 module integration | ⭐⭐ |
@@ -57,8 +58,8 @@
 ## 🖥️ GUI Module
 
 | Module | Lines | Purpose |
-|--------|-------|---------|
-| `gui/sparrow_gui.py` | 1,510 | Gradio-based web interface |
+|--------|-------|----------|
+| `gui/sparrow_gui.py` | 1,961 | Gradio-based web interface (updated with Q&A controls) |
 | `gui/test_gui_analysis.py` | 122 | GUI testing utilities |
 | `gui/__init__.py` | 3 | Package initialization |
 
@@ -68,15 +69,15 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total Python Files** | 43 |
-| **Total Lines of Code (Python)** | 28,641 |
-| **Classes Defined** | 78 |
-| **Functions/Methods** | 554 |
+| **Total Python Files** | 46 |
+| **Total Lines of Code (Python)** | 30,836 |
+| **Classes Defined** | 82 |
+| **Functions/Methods** | 590 |
 | **Documentation Files** | 58 |
-| **Documentation Lines** | 25,005 |
+| **Documentation Lines** | 28,000+ |
 | **Test Article Files** | 350 |
 | **Installed Dependencies** | 133 packages |
-| **Project Size (code only)** | 7 MB |
+| **Project Size (code only)** | 8.5 MB |
 | **Project Size (with venv/data)** | 8 GB |
 
 ---
@@ -85,7 +86,7 @@
 
 | Document | Lines | Topic |
 |----------|-------|-------|
-| `TECHNICAL_ARCHITECTURE_REPORT.md` | 2,876 | Complete system architecture |
+| `TECHNICAL_ARCHITECTURE_REPORT.md` | 3,061 | Complete system architecture (updated to v8.4.2) |
 | `PACKAGING_AND_DISTRIBUTION_GUIDE.md` | 1,337 | Deployment & distribution |
 | `AGENTIC_ARCHITECTURE_ANALYSIS.md` | 941 | AI agent patterns |
 | `BUSINESS_VALUE_AND_STARTUP_GUIDE.md` | 926 | Business case & startup guide |
@@ -145,19 +146,31 @@
 
 ## 🏆 Conclusion
 
-**Sparrow SPOT Scale™** is a **production-ready research platform** with enterprise-grade architecture, sophisticated AI detection capabilities, and strong governance alignment. 
+**Sparrow SPOT Scale™** is a **production-ready research platform** with enterprise-grade architecture, sophisticated AI detection capabilities, strong governance alignment, and comprehensive diagnostic capabilities.
 
-### Strengths
+### Strengths (v8.4.2)
 - Exceeds typical research prototypes in functionality
 - Approaches commercial-grade tools in capability
 - Strong compliance and governance features
 - Excellent domain-specific handling
+- **NEW:** Deep consensus across all 5 output formats ensures consistency
+- **NEW:** Document Q&A enables direct interaction with analyzed documents
+- **NEW:** Diagnostic logging provides detailed operation tracking
+- **NEW:** Subprocess execution with increased timeout (1200s) handles complex analyses
+
+### Recent Quality Improvements (v8.4.2)
+- ✅ Fixed LinkedIn/X narratives to use deep consensus (12.0% vs 0.0%)
+- ✅ All outputs now show identical AI percentages (consistency validated)
+- ✅ Diagnostic logging tracks all operations with performance data
+- ✅ Document Q&A integrated with Ollama for direct document queries
+- ✅ File organization optimized with automated directory creation
 
 ### Areas for Enhancement
 - Expanded unit test coverage
 - API documentation generation
 - Performance benchmarking suite
+- Trained document classifiers (planned for v9.0)
 
 ---
 
-*Report generated by Sparrow SPOT Scale™ v8.3.5 metrics analysis*
+*Report generated by Sparrow SPOT Scale™ v8.4.2 metrics analysis*
