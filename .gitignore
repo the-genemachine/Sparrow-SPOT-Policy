@@ -3,6 +3,9 @@ test_articles/
 docs/*.pdf
 certificates/
 archive/
+core/
+logs/
+qa/
 
 # Data files
 data/posts.csv

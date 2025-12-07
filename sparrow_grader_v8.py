@@ -2157,6 +2157,21 @@ def create_arg_parser():
     transparency_group.add_argument('--document-qa', type=str, metavar='QUESTION',
                         help='v8.4.2: Ask a question about the document using Ollama. Answer saved to qa/ directory.')
     
+    # v8.6: Enhanced Q&A and token analysis
+    qa_group = parser.add_argument_group('enhanced document q&a', 'v8.6: Token analysis and intelligent chunking for large documents')
+    qa_group.add_argument('--analyze-tokens', action='store_true',
+                        help='v8.6: Analyze document size and show token count, recommended models, and chunking strategy.')
+    qa_group.add_argument('--enable-chunking', action='store_true',
+                        help='v8.6: Enable smart chunking for large documents during Q&A (automatically chunks if document exceeds context window).')
+    qa_group.add_argument('--qa-routing', type=str, choices=['keyword', 'semantic', 'comprehensive', 'quick'],
+                        default='keyword',
+                        help='v8.6: Query routing strategy for chunked Q&A (keyword: smart/fast, comprehensive: all chunks, quick: first chunk only).')
+    qa_group.add_argument('--chunk-strategy', type=str, choices=['section', 'sliding', 'semantic'],
+                        default='section',
+                        help='v8.6: Chunking strategy (section: legislative docs, sliding: general docs, semantic: topic-based).')
+    qa_group.add_argument('--max-chunk-tokens', type=int, default=100000,
+                        help='v8.6: Maximum tokens per chunk (default: 100000).')
+    
     # v8.5: Legislative threat detection
     legislative_group = parser.add_argument_group('legislative threat detection', 'v8.5: Analyze legislative documents for hidden powers and accountability gaps')
     legislative_group.add_argument('--legislative-threat', action='store_true',
@@ -2775,36 +2790,176 @@ def main():
             except Exception as e:
                 print(f"   ⚠️  Enhanced provenance skipped: {str(e)}")
         
-        # v8.4.2: Document Q&A (if requested)
+        # v8.6: Token Analysis (if requested)
+        if args.analyze_tokens:
+            print(f"\n📊 Analyzing Document Size...")
+            try:
+                from token_calculator import analyze_document_file
+                
+                # For text input, save to temp file for analysis
+                import tempfile
+                if args.url or (args.input_file and not args.input_file.endswith(('.txt', '.pdf'))):
+                    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+                    temp_file.write(text)
+                    temp_file.close()
+                    analysis_path = temp_file.name
+                else:
+                    analysis_path = args.input_file
+                
+                # Analyze document
+                analysis = analyze_document_file(analysis_path)
+                
+                # Display results
+                print(f"\n{'='*70}")
+                print("DOCUMENT SIZE ANALYSIS")
+                print(f"{'='*70}")
+                print(f"Characters: {analysis.get('character_count', 0):,}")
+                print(f"Estimated Tokens: {analysis.get('estimated_tokens', 0):,}")
+                print(f"Estimated Pages: {analysis.get('estimated_pages', 0)}")
+                print(f"Method: {analysis.get('estimation_method', 'unknown')}")
+                
+                rec = analysis.get('recommendations', {})
+                if rec:
+                    print(f"\nRecommendation: {rec.get('strategy', 'unknown').upper()} strategy")
+                    models = rec.get('recommended_models', [])
+                    if models:
+                        top_model = models[0]
+                        print(f"  Suggested Model: {top_model.get('model', 'unknown')}")
+                        print(f"  Context: {top_model.get('context_size', 0):,} tokens")
+                        print(f"  Chunks Needed: {top_model.get('chunks_needed', 1)}")
+                        print(f"  Coverage: {top_model.get('coverage', '0%')}")
+                        
+                        if top_model.get('chunks_needed', 1) > 1:
+                            print(f"\n💡 Use --enable-chunking for optimal Q&A on this document")
+                
+                print(f"{'='*70}\n")
+                
+                # Clean up temp file
+                if args.url or (args.input_file and not args.input_file.endswith(('.txt', '.pdf'))):
+                    import os
+                    os.unlink(analysis_path)
+                
+            except Exception as e:
+                print(f"   ⚠️  Token analysis failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
+        
+        # v8.4.2/v8.6: Document Q&A (if requested)
         if args.document_qa:
             print(f"\n❓ Generating document Q&A...")
             try:
-                from document_qa import generate_document_qa
-                
-                # Create qa directory
-                qa_dir = output_dir / "qa"
-                
-                # Get contribution tracker if available
-                tracker = None
-                if grader.narrative_pipeline and hasattr(grader.narrative_pipeline, 'contribution_tracker'):
-                    tracker = grader.narrative_pipeline.contribution_tracker
-                
-                qa_file = generate_document_qa(
-                    document_text=text,
-                    question=args.document_qa,
-                    output_dir=qa_dir,
-                    output_name=output_name,
-                    model=args.ollama_model,
-                    analysis_context=report,
-                    contribution_tracker=tracker
-                )
-                
-                if qa_file:
-                    print(f"   ✓ Document Q&A: {qa_file}")
-                    generation_sequence.append({'file': qa_file, 'type': 'document_qa', 'timestamp': datetime.now().isoformat()})
+                # v8.6: Use enhanced Q&A with chunking if enabled
+                if args.enable_chunking:
+                    print(f"   🔄 Smart chunking enabled (strategy: {args.chunk_strategy}, routing: {args.qa_routing})")
+                    
+                    from token_calculator import estimate_tokens
+                    from semantic_chunker import chunk_document, save_chunks
+                    from enhanced_document_qa import EnhancedDocumentQA
+                    
+                    # Estimate tokens
+                    tokens = estimate_tokens(text, method="tiktoken")
+                    print(f"   📊 Document size: {tokens['estimated_tokens']:,} tokens")
+                    
+                    # Create chunks
+                    print(f"   ✂️  Creating chunks...")
+                    chunks_result = chunk_document(
+                        text,
+                        max_tokens=args.max_chunk_tokens,
+                        strategy=args.chunk_strategy,
+                        overlap_tokens=200
+                    )
+                    
+                    # Save chunks
+                    qa_dir = output_dir / "qa"
+                    chunks_dir = qa_dir / "chunks"
+                    save_chunks(
+                        chunks_result,
+                        output_dir=str(chunks_dir),
+                        save_text=True,
+                        save_index=True
+                    )
+                    print(f"   ✂️  Created {len(chunks_result['chunks'])} chunks")
+                    
+                    # Query using enhanced Q&A
+                    print(f"   🔍 Querying with {args.qa_routing} routing...")
+                    qa_engine = EnhancedDocumentQA(
+                        chunks_dir=chunks_dir / "chunks",
+                        chunk_index_path=chunks_dir / "chunk_index.json"
+                    )
+                    
+                    answer = qa_engine.query(
+                        question=args.document_qa,
+                        model="mock",  # Use mock for now (integrate with Ollama in future)
+                        routing_strategy=args.qa_routing,
+                        synthesis_strategy="concatenate",
+                        relevance_threshold=0.3
+                    )
+                    
+                    # Save answer
+                    qa_file = qa_dir / f"{output_name}_qa_enhanced.json"
+                    qa_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    import json
+                    with open(qa_file, 'w', encoding='utf-8') as f:
+                        json.dump({
+                            "question": answer.question,
+                            "answer": answer.answer,
+                            "sources": [
+                                {
+                                    "chunk": s.chunk_number,
+                                    "pages": s.pages,
+                                    "sections": s.sections
+                                }
+                                for s in answer.sources
+                            ],
+                            "metadata": {
+                                "chunks_queried": answer.total_chunks_queried,
+                                "total_time": answer.total_time,
+                                "confidence": answer.confidence,
+                                "routing_strategy": answer.routing_strategy,
+                                "chunk_strategy": args.chunk_strategy,
+                                "max_chunk_tokens": args.max_chunk_tokens
+                            }
+                        }, f, indent=2, ensure_ascii=False)
+                    
+                    print(f"   ✓ Enhanced Q&A: {qa_file}")
+                    print(f"   ✓ Chunks queried: {answer.total_chunks_queried}, Confidence: {answer.confidence:.0%}")
+                    generation_sequence.append({
+                        'file': str(qa_file),
+                        'type': 'enhanced_document_qa',
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    
+                else:
+                    # Standard Q&A (no chunking)
+                    from document_qa import generate_document_qa
+                    
+                    # Create qa directory
+                    qa_dir = output_dir / "qa"
+                    
+                    # Get contribution tracker if available
+                    tracker = None
+                    if grader.narrative_pipeline and hasattr(grader.narrative_pipeline, 'contribution_tracker'):
+                        tracker = grader.narrative_pipeline.contribution_tracker
+                    
+                    qa_file = generate_document_qa(
+                        document_text=text,
+                        question=args.document_qa,
+                        output_dir=qa_dir,
+                        output_name=output_name,
+                        model=args.ollama_model,
+                        analysis_context=report,
+                        contribution_tracker=tracker
+                    )
+                    
+                    if qa_file:
+                        print(f"   ✓ Document Q&A: {qa_file}")
+                        generation_sequence.append({'file': qa_file, 'type': 'document_qa', 'timestamp': datetime.now().isoformat()})
                 
             except Exception as e:
                 print(f"   ⚠️  Document Q&A failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 if diagnostic_logger:
                     diagnostic_logger.error("document_qa_failed", error=str(e))
         
