@@ -15,6 +15,7 @@ import gradio as gr
 import sys
 import os
 from pathlib import Path
+from typing import Dict  # v8.6: Type hints
 import json
 import tempfile
 import shutil
@@ -60,6 +61,16 @@ try:
         PDFPLUMBER_AVAILABLE = False
         print("⚠️  pdfplumber not available - bilingual PDF column extraction disabled")
     
+    # v8.6: Token calculator and enhanced Q&A
+    try:
+        from token_calculator import analyze_document_file, estimate_tokens, recommend_model
+        from semantic_chunker import chunk_document, save_chunks
+        from enhanced_document_qa import EnhancedDocumentQA
+        ENHANCED_QA_AVAILABLE = True
+    except ImportError as e:
+        ENHANCED_QA_AVAILABLE = False
+        print(f"⚠️  Enhanced Q&A not available: {e}")
+    
     SPARROW_AVAILABLE = True
 except ImportError as e:
     SPARROW_AVAILABLE = False
@@ -74,6 +85,38 @@ except ImportError as e:
 _active_analyzers = []
 _active_ollama_generators = []
 _cleanup_registered = False
+
+
+def analyze_document_tokens(file_path: str) -> Dict:
+    """
+    Analyze document size and recommend chunking strategy.
+    
+    v8.6: Token analysis for large document handling.
+    
+    Args:
+        file_path: Path to document file
+    
+    Returns:
+        Dict with token analysis and recommendations
+    """
+    if not ENHANCED_QA_AVAILABLE:
+        return {"error": "Enhanced Q&A not available"}
+    
+    try:
+        from token_calculator import analyze_document_file
+        
+        # Analyze document
+        analysis = analyze_document_file(file_path)
+        
+        return {
+            "characters": analysis.get("characters", 0),
+            "tokens": analysis.get("estimated_tokens", 0),
+            "method": analysis.get("estimation_method", "unknown"),
+            "pages": analysis.get("estimated_pages", 0),
+            "recommendation": analysis.get("recommendation", {})
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def cleanup_after_analysis():
@@ -410,6 +453,8 @@ def analyze_document(
     citation_check,
     check_urls,
     enable_document_qa,  # v8.4.2: Document Q&A
+    enable_chunking,  # v8.6: Smart chunking for large documents
+    qa_routing_strategy,  # v8.6: Query routing strategy
     document_qa_question,  # v8.4.2: Question for Q&A
     
     # Transparency flags
@@ -452,7 +497,7 @@ def analyze_document(
         return run_via_subprocess(
             input_for_subprocess, variant, document_type, output_name, document_title, narrative_style, narrative_length,
             ollama_model, deep_analysis, citation_check, check_urls,
-            enable_document_qa, document_qa_question,
+            enable_document_qa, enable_chunking, qa_routing_strategy, document_qa_question,
             enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
             nist_compliance, lineage_chart_format, legislative_threat, progress
         )
@@ -502,7 +547,7 @@ def analyze_document(
             return run_via_subprocess(
                 url_input, variant, document_type, output_name, document_title, narrative_style, narrative_length,
                 ollama_model, deep_analysis, citation_check, check_urls,
-                enable_document_qa, document_qa_question,
+                enable_document_qa, enable_chunking, qa_routing_strategy, document_qa_question,
                 enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                 nist_compliance, lineage_chart_format, legislative_threat, progress
             )
@@ -691,36 +736,105 @@ def analyze_document(
                     if chart_path:
                         output_files.append(chart_path)
                 
-                # v8.4.2: Document Q&A (if requested)
+                # v8.4.2/v8.6: Document Q&A (if requested)
                 if enable_document_qa and document_qa_question and document_qa_question.strip():
                     progress(0.93, desc="Generating document Q&A...")
                     try:
-                        from document_qa import generate_document_qa
                         # Determine output directory (handle test_articles paths)
                         if output_name.startswith('test_articles/'):
                             qa_output_dir = Path('..') / Path(output_name).parent
                         else:
                             qa_output_dir = Path(output_name).parent if '/' in output_name else Path('.')
                         
-                        # Get contribution tracker if available
-                        tracker = None
-                        if narrative_pipeline and hasattr(narrative_pipeline, 'contribution_tracker'):
-                            tracker = narrative_pipeline.contribution_tracker
-                        
-                        qa_file = generate_document_qa(
-                            document_text=text,
-                            question=document_qa_question.strip(),
-                            output_dir=qa_output_dir,
-                            output_name=Path(output_name).name,
-                            model=ollama_model,
-                            analysis_context=results,
-                            contribution_tracker=tracker
-                        )
-                        if qa_file:
-                            output_files.append(qa_file)
-                            print(f"   ✓ Document Q&A: {qa_file}")
+                        # v8.6: Use enhanced Q&A with chunking if enabled
+                        if enable_chunking and ENHANCED_QA_AVAILABLE:
+                            from token_calculator import estimate_tokens
+                            from semantic_chunker import chunk_document, save_chunks
+                            from enhanced_document_qa import EnhancedDocumentQA
+                            
+                            print("   📊 Analyzing document size...")
+                            tokens = estimate_tokens(text, method="tiktoken")
+                            print(f"   📊 Estimated tokens: {tokens:,}")
+                            
+                            # Create chunks
+                            print("   ✂️  Creating intelligent chunks...")
+                            chunks_result = chunk_document(
+                                text,
+                                max_tokens=100000,  # Standard chunk size
+                                strategy="section",
+                                overlap_tokens=200
+                            )
+                            
+                            # Save chunks
+                            chunks_dir = qa_output_dir / "chunks"
+                            save_chunks(
+                                chunks_result,
+                                output_dir=str(chunks_dir),
+                                save_chunk_files=True
+                            )
+                            print(f"   ✂️  Created {len(chunks_result['chunks'])} chunks")
+                            
+                            # Query using enhanced Q&A
+                            print(f"   🔍 Routing strategy: {qa_routing_strategy}")
+                            qa_engine = EnhancedDocumentQA(
+                                chunks_dir=chunks_dir / "chunks",
+                                chunk_index_path=chunks_dir / "chunk_index.json"
+                            )
+                            
+                            answer = qa_engine.query(
+                                question=document_qa_question.strip(),
+                                model="mock",  # Use mock for now (GUI uses document_qa for Ollama)
+                                routing_strategy=qa_routing_strategy,
+                                synthesis_strategy="concatenate",
+                                relevance_threshold=0.3
+                            )
+                            
+                            # Save answer
+                            qa_file = qa_output_dir / f"{Path(output_name).stem}_qa.json"
+                            import json
+                            with open(qa_file, 'w', encoding='utf-8') as f:
+                                json.dump({
+                                    "question": answer.question,
+                                    "answer": answer.answer,
+                                    "sources": [
+                                        {"chunk": s.chunk_number, "pages": s.pages, "sections": s.sections}
+                                        for s in answer.sources
+                                    ],
+                                    "metadata": {
+                                        "chunks_queried": answer.total_chunks_queried,
+                                        "confidence": answer.confidence,
+                                        "routing_strategy": answer.routing_strategy
+                                    }
+                                }, f, indent=2)
+                            
+                            output_files.append(str(qa_file))
+                            print(f"   ✓ Enhanced Q&A: {qa_file}")
+                            print(f"   ✓ Confidence: {answer.confidence:.0%}, Chunks: {answer.total_chunks_queried}")
+                        else:
+                            # Standard Q&A (no chunking)
+                            from document_qa import generate_document_qa
+                            
+                            # Get contribution tracker if available
+                            tracker = None
+                            if narrative_pipeline and hasattr(narrative_pipeline, 'contribution_tracker'):
+                                tracker = narrative_pipeline.contribution_tracker
+                            
+                            qa_file = generate_document_qa(
+                                document_text=text,
+                                question=document_qa_question.strip(),
+                                output_dir=qa_output_dir,
+                                output_name=Path(output_name).name,
+                                model=ollama_model,
+                                analysis_context=results,
+                                contribution_tracker=tracker
+                            )
+                            if qa_file:
+                                output_files.append(qa_file)
+                                print(f"   ✓ Document Q&A: {qa_file}")
                     except Exception as e:
+                        import traceback
                         print(f"   ⚠️ Document Q&A failed: {e}")
+                        traceback.print_exc()
                         # Don't fail entire analysis
                 
                 # v8.5: Legislative Threat Detection
@@ -853,7 +967,7 @@ def analyze_document(
 
 def run_via_subprocess(url_or_file, variant, document_type, output_name, document_title, narrative_style, narrative_length,
                        ollama_model, deep_analysis, citation_check, check_urls,
-                       enable_document_qa, document_qa_question,
+                       enable_document_qa, enable_chunking, qa_routing_strategy, document_qa_question,
                        enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
                        nist_compliance, lineage_chart_format, legislative_threat, progress):
     """
@@ -861,6 +975,7 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
     
     v8.4.1: Updated to handle both URLs and file paths for low memory mode.
     v8.5: Added legislative_threat parameter and PDF column extraction.
+    v8.6: Added enable_chunking and qa_routing_strategy for enhanced Q&A.
     """
     import subprocess
     import os
@@ -1541,7 +1656,7 @@ def generate_lineage_chart(results, output_name, format):
 
 def update_settings_summary(pdf_file, url_input, variant, document_type, output_name, document_title,
                            narrative_style, narrative_length, ollama_model, ollama_custom_query,
-                           deep_analysis, citation_check, check_urls, enable_document_qa, document_qa_question,
+                           deep_analysis, citation_check, check_urls, enable_document_qa, enable_chunking, qa_routing_strategy, document_qa_question,
                            enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources, 
                            nist_compliance, lineage_chart_format, legislative_threat, low_memory_mode):
     """Generate a summary of current settings."""
@@ -1928,12 +2043,39 @@ def create_interface():
                     info="Check if cited URLs are accessible. Only works with --citation-check. Checks first 10 URLs."
                 )
                 
+                gr.Markdown("### Document Size Analysis (v8.6)")
+                
+                with gr.Row():
+                    analyze_tokens_btn = gr.Button(
+                        "📊 Analyze Document Size",
+                        size="sm"
+                    )
+                
+                token_analysis_output = gr.Markdown(
+                    "Upload a document and click 'Analyze Document Size' to see token count and recommendations.",
+                    label="Token Analysis"
+                )
+                
                 gr.Markdown("### Document Q&A")
                 
                 enable_document_qa = gr.Checkbox(
                     label="Enable Document Q&A",
                     value=False,
                     info="Ask a specific question about the document using Ollama."
+                )
+                
+                enable_chunking = gr.Checkbox(
+                    label="🔄 Use Smart Chunking (for large documents)",
+                    value=False,
+                    info="Automatically chunk large documents and use intelligent routing. Recommended for 100+ page documents."
+                )
+                
+                qa_routing_strategy = gr.Radio(
+                    choices=["keyword", "comprehensive", "quick"],
+                    value="keyword",
+                    label="Query Routing Strategy",
+                    info="keyword: Smart routing (fast), comprehensive: Query all chunks (thorough), quick: First chunk only",
+                    visible=False
                 )
                 
                 document_qa_question = gr.Textbox(
@@ -2062,11 +2204,87 @@ def create_interface():
         [GitHub Repository](#) | [Documentation](#) | [Case Studies](#)
         """)
         
+        # v8.6: Token analysis button handler
+        def handle_token_analysis(pdf_file_path):
+            """Handle token analysis button click."""
+            if not pdf_file_path:
+                return "❌ Please upload a document first."
+            
+            if not ENHANCED_QA_AVAILABLE:
+                return "❌ Enhanced Q&A modules not available. Please install token_calculator.py and enhanced_document_qa.py."
+            
+            try:
+                from token_calculator import analyze_document_file
+                
+                # Analyze document
+                analysis = analyze_document_file(pdf_file_path)
+                
+                # Format output
+                tokens = analysis.get("estimated_tokens", 0)
+                chars = analysis.get("characters", 0)
+                pages = analysis.get("estimated_pages", 0)
+                method = analysis.get("estimation_method", "unknown")
+                
+                output = f"""### 📊 Document Size Analysis
+                
+**File:** `{Path(pdf_file_path).name}`
+
+**Size Metrics:**
+- Characters: {chars:,}
+- Estimated Tokens: {tokens:,} ({method} method)
+- Estimated Pages: {pages}
+
+"""
+                
+                # Add recommendation if available
+                rec = analysis.get("recommendation", {})
+                if rec and rec.get("strategy") != "SINGLE":
+                    strategy = rec.get("strategy", "unknown")
+                    models = rec.get("recommended_models", [])
+                    
+                    output += f"""**Recommendation:** {strategy} strategy\n\n"""
+                    
+                    if models:
+                        top_model = models[0]
+                        output += f"""**Suggested Model:** `{top_model.get('model', 'unknown')}`
+- Context: {top_model.get('context', 0):,} tokens
+- Chunks Needed: {top_model.get('chunks_needed', 1)}
+- Coverage: {top_model.get('coverage', '0%')}
+
+"""
+                        
+                        if top_model.get('chunks_needed', 1) > 1:
+                            output += f"""
+⚠️ **This document requires chunking!**
+Enable "Use Smart Chunking" in Document Q&A section for optimal results.
+"""
+                else:
+                    output += "✅ **Document fits in single context window** - No chunking needed.\n"
+                
+                return output
+                
+            except Exception as e:
+                import traceback
+                return f"❌ Error analyzing document: {str(e)}\n\n{traceback.format_exc()}"
+        
+        analyze_tokens_btn.click(
+            fn=handle_token_analysis,
+            inputs=[pdf_file],
+            outputs=[token_analysis_output]
+        )
+        
+        # v8.6: Show/hide routing strategy based on chunking checkbox
+        enable_chunking.change(
+            fn=lambda enabled: gr.update(visible=enabled),
+            inputs=[enable_chunking],
+            outputs=[qa_routing_strategy]
+        )
+        
         # Wire up settings summary to update when any input changes
         all_inputs = [
             pdf_file, url_input, variant, document_type, output_name, document_title,
             narrative_style, narrative_length, ollama_model, ollama_custom_query,
-            deep_analysis, citation_check, check_urls, enable_document_qa, document_qa_question,
+            deep_analysis, citation_check, check_urls, enable_document_qa, enable_chunking, qa_routing_strategy, document_qa_question,
             enhanced_provenance, provenance_report, generate_ai_disclosure,
             trace_data_sources, nist_compliance, lineage_chart_format, legislative_threat, low_memory_mode
         ]
@@ -2103,6 +2321,8 @@ def create_interface():
                 citation_check,
                 check_urls,
                 enable_document_qa,  # v8.4.2: Document Q&A
+                enable_chunking,  # v8.6: Smart chunking
+                qa_routing_strategy,  # v8.6: Routing strategy
                 document_qa_question,  # v8.4.2: Q&A question
                 
                 # Transparency flags
