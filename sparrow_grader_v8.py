@@ -103,6 +103,13 @@ try:
 except ImportError:
     ETHICAL_BIAS_AUDITOR_AVAILABLE = False
 
+# v8.5: Import legislative threat detection modules
+try:
+    from discretionary_power_analyzer import DiscretionaryPowerAnalyzer
+    LEGISLATIVE_THREAT_AVAILABLE = True
+except ImportError:
+    LEGISLATIVE_THREAT_AVAILABLE = False
+
 # v8.4.2: Pipeline logging class
 class PipelineLogger:
     """Simple logger that writes to both stdout and a log file."""
@@ -2150,6 +2157,11 @@ def create_arg_parser():
     transparency_group.add_argument('--document-qa', type=str, metavar='QUESTION',
                         help='v8.4.2: Ask a question about the document using Ollama. Answer saved to qa/ directory.')
     
+    # v8.5: Legislative threat detection
+    legislative_group = parser.add_argument_group('legislative threat detection', 'v8.5: Analyze legislative documents for hidden powers and accountability gaps')
+    legislative_group.add_argument('--legislative-threat', action='store_true',
+                        help='v8.5: Run Discretionary Power Analysis (detects ministerial discretion, broad scope, exclusion powers).')
+    
     return parser
 
 
@@ -2795,6 +2807,46 @@ def main():
                 print(f"   ⚠️  Document Q&A failed: {str(e)}")
                 if diagnostic_logger:
                     diagnostic_logger.error("document_qa_failed", error=str(e))
+        
+        # v8.5: Legislative Threat Detection (Discretionary Power Analysis)
+        if args.legislative_threat:
+            print(f"\n⚖️  Running Legislative Threat Detection...")
+            try:
+                if not LEGISLATIVE_THREAT_AVAILABLE:
+                    print(f"   ⚠️  Legislative threat detection not available (discretionary_power_analyzer.py not found)")
+                else:
+                    # Create threats directory at same level as certificates, core, logs, etc.
+                    threats_dir = output_dir / "threats"
+                    threats_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    # Initialize analyzer
+                    dpa = DiscretionaryPowerAnalyzer(output_dir=str(threats_dir))
+                    
+                    # Run analysis
+                    dpa_results = dpa.analyze(text, document_name=output_name)
+                    
+                    # Save both JSON and Markdown reports
+                    json_path = dpa.save_results(dpa_results, format='json')
+                    md_path = dpa.save_results(dpa_results, format='markdown')
+                    
+                    print(f"   ✓ Discretionary Power Analysis: {dpa_results['risk_level']} RISK")
+                    print(f"   ✓ Score: {dpa_results['discretionary_power_score']:.1f}/100")
+                    print(f"   ✓ Findings: {dpa_results['total_findings']}")
+                    print(f"   ✓ JSON Report: {json_path}")
+                    print(f"   ✓ Markdown Report: {md_path}")
+                    
+                    generation_sequence.append({'file': str(json_path), 'type': 'legislative_threat_json', 'timestamp': datetime.now().isoformat()})
+                    generation_sequence.append({'file': str(md_path), 'type': 'legislative_threat_report', 'timestamp': datetime.now().isoformat()})
+                    
+                    # Add to main report
+                    if 'legislative_threat_analysis' not in report:
+                        report['legislative_threat_analysis'] = {}
+                    report['legislative_threat_analysis']['discretionary_power'] = dpa_results
+                    
+            except Exception as e:
+                print(f"   ⚠️  Legislative threat detection failed: {str(e)}")
+                if diagnostic_logger:
+                    diagnostic_logger.error("legislative_threat_failed", error=str(e))
         
         # v8.4.1: Full Provenance Report (document origin + AI usage audit trail)
         if args.provenance_report:

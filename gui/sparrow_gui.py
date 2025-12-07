@@ -304,6 +304,7 @@ def analyze_document(
     trace_data_sources,
     nist_compliance,
     lineage_chart_format,
+    legislative_threat,  # v8.5: Legislative threat detection
     
     # Memory management
     low_memory_mode,  # v8.4.1: Run in subprocess to free RAM
@@ -338,7 +339,7 @@ def analyze_document(
             ollama_model, deep_analysis, citation_check, check_urls,
             enable_document_qa, document_qa_question,
             enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
-            nist_compliance, lineage_chart_format, progress
+            nist_compliance, lineage_chart_format, legislative_threat, progress
         )
     
     # Track temporary files
@@ -376,7 +377,7 @@ def analyze_document(
                 ollama_model, deep_analysis, citation_check, check_urls,
                 enable_document_qa, document_qa_question,
                 enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
-                nist_compliance, lineage_chart_format, progress
+                nist_compliance, lineage_chart_format, legislative_threat, progress
             )
         
         progress(0.3, desc=f"Analyzing with {variant} variant...")
@@ -595,6 +596,38 @@ def analyze_document(
                         print(f"   ⚠️ Document Q&A failed: {e}")
                         # Don't fail entire analysis
                 
+                # v8.5: Legislative Threat Detection
+                if legislative_threat:
+                    progress(0.94, desc="Running Legislative Threat Detection...")
+                    try:
+                        from discretionary_power_analyzer import DiscretionaryPowerAnalyzer
+                        
+                        # Create threats directory at same level as certificates, core, logs, etc.
+                        threats_dir = output_dir / "threats"
+                        threats_dir.mkdir(parents=True, exist_ok=True)
+                        
+                        # Initialize analyzer
+                        dpa = DiscretionaryPowerAnalyzer(output_dir=str(threats_dir))
+                        
+                        # Run analysis
+                        dpa_results = dpa.analyze(text, document_name=output_name)
+                        
+                        # Save both JSON and Markdown reports
+                        json_path = dpa.save_results(dpa_results, format='json')
+                        md_path = dpa.save_results(dpa_results, format='markdown')
+                        
+                        output_files.extend([str(json_path), str(md_path)])
+                        
+                        print(f"   ✓ Discretionary Power Analysis: {dpa_results['risk_level']} RISK")
+                        print(f"   ✓ Score: {dpa_results['discretionary_power_score']:.1f}/100")
+                        print(f"   ✓ Findings: {dpa_results['total_findings']}")
+                        print(f"   ✓ JSON: {json_path.name}")
+                        print(f"   ✓ Report: {md_path.name}")
+                        
+                    except Exception as e:
+                        print(f"   ⚠️ Legislative threat detection failed: {e}")
+                        # Don't fail entire analysis
+                
                 # v8.4.1: Generate provenance report LAST (after all AI operations)
                 if provenance_report:
                     progress(0.95, desc="Generating provenance report...")
@@ -695,11 +728,12 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
                        ollama_model, deep_analysis, citation_check, check_urls,
                        enable_document_qa, document_qa_question,
                        enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources,
-                       nist_compliance, lineage_chart_format, progress):
+                       nist_compliance, lineage_chart_format, legislative_threat, progress):
     """
     Run analysis via subprocess for URL inputs or low memory mode.
     
     v8.4.1: Updated to handle both URLs and file paths for low memory mode.
+    v8.5: Added legislative_threat parameter.
     """
     import subprocess
     import os
@@ -747,6 +781,8 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
         cmd.append("--nist-compliance")
     if lineage_chart_format != "None":
         cmd.extend(["--lineage-chart", lineage_chart_format])
+    if legislative_threat:
+        cmd.append("--legislative-threat")
     
     progress(0.3, desc="Running Sparrow via subprocess...")
     
@@ -1344,7 +1380,7 @@ def update_settings_summary(pdf_file, url_input, variant, document_type, output_
                            narrative_style, narrative_length, ollama_model, ollama_custom_query,
                            deep_analysis, citation_check, check_urls, enable_document_qa, document_qa_question,
                            enhanced_provenance, provenance_report, generate_ai_disclosure, trace_data_sources, 
-                           nist_compliance, lineage_chart_format, low_memory_mode):
+                           nist_compliance, lineage_chart_format, legislative_threat, low_memory_mode):
     """Generate a summary of current settings."""
     
     # Input source
@@ -1408,6 +1444,7 @@ def update_settings_summary(pdf_file, url_input, variant, document_type, output_
 - Data Source Tracing: {'✅ Enabled' if trace_data_sources else '❌ Disabled'}
 - NIST Compliance Check: {'✅ Enabled' if nist_compliance else '❌ Disabled'}
 - Lineage Flowchart: {lineage_chart_format if lineage_chart_format != 'None' else 'Disabled'}
+- ⚖️ Legislative Threat Analysis: {'✅ Enabled' if legislative_threat else '❌ Disabled'}
 - 🧠 Low Memory Mode: {'✅ Enabled (subprocess)' if low_memory_mode else '❌ Standard'}
 
 ---
@@ -1785,6 +1822,14 @@ def create_interface():
                     info="Visualize analysis pipeline stages"
                 )
                 
+                gr.Markdown("### Legislative Threat Detection (v8.5)")
+                
+                legislative_threat = gr.Checkbox(
+                    label="⚖️ Run Discretionary Power Analysis",
+                    value=False,
+                    info="Detect ministerial discretion, broad scope language, exclusion powers, and accountability gaps in legislation."
+                )
+                
                 gr.Markdown("### Memory Management")
                 
                 low_memory_mode = gr.Checkbox(
@@ -1860,7 +1905,7 @@ def create_interface():
             narrative_style, narrative_length, ollama_model, ollama_custom_query,
             deep_analysis, citation_check, check_urls, enable_document_qa, document_qa_question,
             enhanced_provenance, provenance_report, generate_ai_disclosure,
-            trace_data_sources, nist_compliance, lineage_chart_format, low_memory_mode
+            trace_data_sources, nist_compliance, lineage_chart_format, legislative_threat, low_memory_mode
         ]
         
         for input_component in all_inputs:
@@ -1904,6 +1949,7 @@ def create_interface():
                 trace_data_sources,
                 nist_compliance,
                 lineage_chart_format,
+                legislative_threat,  # v8.5: Legislative threat detection
                 
                 # Memory management
                 low_memory_mode,  # v8.4.1: Run in subprocess
