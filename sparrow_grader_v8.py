@@ -1500,7 +1500,7 @@ class SPOTPolicy:
         
         return min(100, score)
     
-    def grade(self, text, document_type='policy', document_structure=None, pdf_path=None):
+    def grade(self, text, document_type='policy', document_structure=None, pdf_path=None, document_type_selected='auto'):
         """
         Grade a policy document using SPOT-Policy™ criteria + v7 ethical framework.
         
@@ -1513,6 +1513,7 @@ class SPOTPolicy:
             document_type: Type of document ('policy', etc.)
             document_structure: Optional document structure info
             pdf_path: Optional path to PDF for image extraction
+            document_type_selected: User-selected document type from CLI/GUI ('auto', 'legislation', 'budget', etc.)
         
         Returns dict with criteria scores, composite, AND ethical framework results.
         """
@@ -1523,6 +1524,7 @@ class SPOTPolicy:
             'variant': 'SPOT-Policy™',
             'version': SPARROW_VERSION,
             'document_type': document_type,
+            'document_type_selected': document_type_selected,  # v8.6.1: Store user-selected type for certificate badge
             'timestamp': master_timestamp,
             'criteria': {},
             'vision_findings': None,
@@ -2118,6 +2120,8 @@ def create_arg_parser():
     
     parser.add_argument('-o', '--output', help='Output filename (without extension)', default='report')
     parser.add_argument('--document-title', help='Human-readable document title for reports and certificates (if not provided, uses filename stem)', default=None)
+    parser.add_argument('--document-type', choices=['auto', 'legislation', 'budget', 'policy_brief', 'research_report', 'analysis', 'legal_judgment', 'report'], default='auto',
+                        help='v8.6.1: Document type for certificate badge and citation scoring. Default: auto (auto-detect from content)')
     parser.add_argument('--variant', choices=['journalism', 'policy'], default='journalism',
                         help='Evaluation variant: journalism (SPARROW SPOT) or policy (SPOT-Policy™). Default: journalism')
     parser.add_argument('--narrative-style', choices=['journalistic', 'academic', 'civic', 'critical', 'explanatory'],
@@ -2322,7 +2326,8 @@ def main():
             grader = SPOTPolicy()
             # v6: Pass PDF path for multimodal analysis if available
             pdf_path = args.input_file if is_pdf else None
-            report = grader.grade(text, pdf_path=pdf_path)
+            # v8.6.1: Pass user-selected document type for certificate badge
+            report = grader.grade(text, pdf_path=pdf_path, document_type_selected=args.document_type)
             
             # Add document title to report (use CLI arg if provided, otherwise derive from filename)
             if args.document_title:

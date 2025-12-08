@@ -4,18 +4,19 @@ Centralized version control for all components
 """
 
 # Main version
-SPARROW_VERSION = "8.6.0"
+SPARROW_VERSION = "8.6.1"
 SPARROW_VERSION_NAME = "Enhanced Document Q&A System"
 RELEASE_DATE = "2025-12-07"
 
 # Component versions (when they differ from main)
 DEEP_ANALYZER_VERSION = "8.4.2"
 PROVENANCE_VERSION = "1.1"
-CERTIFICATE_VERSION = "8.4.2"
+CERTIFICATE_VERSION = "8.6.1"  # Updated with document-type fix
 NARRATIVE_ENGINE_VERSION = "8.0"
 
 # Version history for reference
 VERSION_HISTORY = {
+    "8.6.1": "Document type parameter fix - GUI now properly passes document type selection to grader for correct certificate badges",
     "8.6.0": "Enhanced Document Q&A System - Multi-chunk analysis with token calculator, semantic chunker, and intelligent query routing",
     "8.5.1": "Improved DPA reporting with zero data loss, bilingual PDF column extraction",
     "8.5.0": "Legislative Threat Detection Suite with Discretionary Power Analyzer",

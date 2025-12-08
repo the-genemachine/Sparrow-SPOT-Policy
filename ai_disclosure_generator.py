@@ -455,7 +455,7 @@ AI USAGE SUMMARY
 This {self.metadata['document_type']} was prepared with artificial intelligence assistance.
 Expert review of AI-generated content is recommended before use.
 
-For complete disclosure and methodology, see full transparency certificate."""
+For complete analysis methodology, see the Sparrow SPOT Scale™ certificate."""
     
     def _get_baseline_adjustment_section(self) -> str:
         """v8.3.4: Generate transparency section about domain adjustments."""

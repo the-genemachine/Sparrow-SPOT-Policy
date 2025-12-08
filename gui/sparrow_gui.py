@@ -910,6 +910,8 @@ def analyze_document(
         else:
             cmd_parts.extend(["--url", url_input])
         cmd_parts.extend(["--variant", variant, "--output", output_name])
+        if document_type and document_type != "auto":
+            cmd_parts.extend(["--document-type", document_type])
         
         if narrative_style != "None":
             cmd_parts.extend(["--narrative-style", narrative_style])
@@ -1005,6 +1007,10 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
     else:
         # It's a file path - use potentially extracted text file
         cmd = [sys.executable, grader_script, input_path, "--variant", variant, "--output", output_name]
+    
+    # Add document type if specified (v8.6.1)
+    if document_type and document_type != "auto":
+        cmd.extend(["--document-type", document_type])
     
     # Add document title if provided (user-friendly name for certificate/reports)
     if document_title:
