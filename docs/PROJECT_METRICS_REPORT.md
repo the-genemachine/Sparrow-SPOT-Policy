@@ -1,7 +1,7 @@
 # Sparrow SPOT Scale™ - Project Metrics Report
 
 **Generated:** December 7, 2025  
-**Version:** 8.6.0  
+**Version:** 8.6.1  
 **Repository:** Sparrow-SPOT-Policy
 
 ---
@@ -10,8 +10,8 @@
 
 | Module | Lines | Purpose | Complexity |
 |--------|-------|---------|------------|
-| `sparrow_grader_v8.py` | 3,394 | Main grading engine, CLI, orchestration (v8.6 with enhanced Q&A) | ⭐⭐⭐⭐⭐ |
-| `gui/sparrow_gui.py` | 2,394 | Gradio web interface (v8.6 with token analysis) | ⭐⭐⭐⭐⭐ |
+| `sparrow_grader_v8.py` | 3,397 | Main grading engine, CLI, orchestration (v8.6.1 with document-type parameter calibration) | ⭐⭐⭐⭐⭐ |
+| `gui/sparrow_gui.py` | 2,394 | Gradio web interface (v8.6.1 with document-type dropdown GUI integration) | ⭐⭐⭐⭐⭐ |
 | `sparrow_grader_v7.py` | 1,587 | Legacy grader (maintained for compatibility) | ⭐⭐⭐⭐ |
 | `certificate_generator.py` | 1,544 | HTML certificate generation with templates | ⭐⭐⭐⭐ |
 | `ai_detection_engine.py` | 1,390 | Multi-method AI content detection | ⭐⭐⭐⭐⭐ |
@@ -44,14 +44,14 @@
 | `validation_middleware.py` | 442 | Cross-output consistency checks | ⭐⭐⭐⭐ |
 | `trust_score_calculator.py` | 389 | Trust score computation | ⭐⭐⭐⭐ |
 | `realtime_fairness_audit.py` | 380 | Runtime bias detection | ⭐⭐⭐⭐ |
-| `document_qa.py` | 380 | Document Q&A via Ollama (v8.4.2) | ⭐⭐⭐⭐ |
+| `document_qa.py` | 324 | Document Q&A via Ollama (v8.6.1 with fixed directory structure) | ⭐⭐⭐⭐ |
 | `ai_section_analyzer.py` | 376 | Section-level AI analysis | ⭐⭐⭐ |
 | `data_lineage_visualizer.py` | 363 | Pipeline flowchart generation | ⭐⭐⭐ |
 | `escalation_manager.py` | 288 | Risk-based escalation routing | ⭐⭐⭐ |
 | `ai_contribution_tracker.py` | 267 | AI contribution tracking | ⭐⭐⭐ |
 | `sentence_level_detector.py` | 260 | Sentence-level AI detection | ⭐⭐⭐ |
 | `diagnostic_logger.py` | 250 | Comprehensive diagnostic logging (v8.4.2) | ⭐⭐⭐ |
-| `version.py` | 8 | Version centralization (v8.4) | ⭐ |
+| `version.py` | 49 | Version centralization with history (v8.6.1, 20+ versions documented) | ⭐⭐⭐ |
 | `test_model_detection.py` | 233 | Model detection tests | ⭐⭐ |
 | `section_analysis_integration.py` | 203 | Section analysis integration | ⭐⭐⭐ |
 | `integrate_v7_ethical_modules.py` | 93 | V7 module integration | ⭐⭐ |
@@ -91,7 +91,7 @@
 
 | Document | Lines | Topic |
 |----------|-------|-------|
-| `TECHNICAL_ARCHITECTURE_REPORT.md` | 3,286 | Complete system architecture (updated to v8.5 with Legislative Threat Detection) |
+| `TECHNICAL_ARCHITECTURE_REPORT.md` | 3,858 | Complete system architecture (updated to v8.6.1 with document-type calibration) |
 | `PACKAGING_AND_DISTRIBUTION_GUIDE.md` | 1,337 | Deployment & distribution |
 | `AGENTIC_ARCHITECTURE_ANALYSIS.md` | 941 | AI agent patterns |
 | `BUSINESS_VALUE_AND_STARTUP_GUIDE.md` | 926 | Business case & startup guide |
@@ -154,33 +154,40 @@
 
 **Sparrow SPOT Scale™** is a **production-ready research platform** with enterprise-grade architecture, sophisticated AI detection capabilities, strong governance alignment, and comprehensive diagnostic capabilities.
 
-### Strengths (v8.6.0)
+### Strengths (v8.6.1)
 - Exceeds typical research prototypes in functionality
 - Approaches commercial-grade tools in capability
 - Strong compliance and governance features
 - Excellent domain-specific handling
-- **NEW v8.6:** Enhanced Document Q&A with multi-chunk support (token calculator, semantic chunker, intelligent routing)
-- **NEW v8.6:** Token-aware chunking enables analysis of documents exceeding LLM context windows (tested on 286K token documents)
-- **NEW v8.6:** Smart query routing (keyword/semantic/comprehensive/quick strategies)
-- **NEW v8.6:** Model recommendation engine (30+ Ollama models with context windows mapped)
+- **NEW v8.6.1:** Document Type Parameter Calibration - GUI dropdown properly passes document type selection to grader for accurate certificate badges (POLICY, LEGISLATIVE, BUDGET, etc.)
+- **NEW v8.6.1:** Fixed directory structure - Q&A outputs now save to `qa/` instead of `qa/qa/` double nesting
+- **v8.6:** Enhanced Document Q&A with multi-chunk support (token calculator, semantic chunker, intelligent routing)
+- **v8.6:** Token-aware chunking enables analysis of documents exceeding LLM context windows (tested on 286K token documents)
+- **v8.6:** Smart query routing (keyword/semantic/comprehensive/quick strategies)
+- **v8.6:** Model recommendation engine (30+ Ollama models with context windows mapped)
 - **v8.5:** Legislative Threat Detection Suite with 5 pattern types (40+ regex patterns)
 - **v8.5:** Automatic bilingual PDF column extraction (FR/EN detection threshold: FR > 10 AND EN > 5)
 - **v8.4.2:** Deep consensus across all 5 output formats ensures consistency
 - **v8.4.2:** Document Q&A enables direct interaction with analyzed documents
 - **v8.4.2:** Diagnostic logging provides detailed operation tracking
 
-### Recent Quality Improvements (v8.6.0)
-- ✅ Enhanced Document Q&A System (Phase 1-6 complete, 3 new modules: 1,830 lines)
-- ✅ Token Calculator with 3 estimation methods (quick/tiktoken/precise)
-- ✅ Semantic Chunker with section-based, sliding window, and semantic strategies
-- ✅ Multi-chunk Q&A engine with query routing and answer synthesis
-- ✅ GUI integration: Document Size Analysis panel, Smart Chunking controls
-- ✅ CLI integration: --analyze-tokens, --enable-chunking, --qa-routing flags
-- ✅ Comprehensive testing on Bill C-15 (1.15M characters, 286K tokens, 4 chunks)
-- ✅ QA_SYSTEM_ARCHITECTURE.md created (comprehensive 400+ line technical reference)
-- ✅ Legislative Threat Detection Suite (v8.5)
-- ✅ Discretionary Power Analyzer with improved reporting format
-- ✅ Bilingual PDF column extraction with intelligent detection
+### Recent Quality Improvements (v8.6.1)
+- ✅ **Document Type Parameter Fix**: GUI document type dropdown now properly flows to grader CLI → analysis.json storage
+- ✅ **Directory Structure Fix**: Resolved double qa/ directory nesting issue in document_qa.py
+- ✅ **Certificate Version Sync**: CERTIFICATE_VERSION bumped from 8.4.2 to 8.6.1 matching SPARROW_VERSION
+- ✅ **Transparency Certificate Reference**: Updated ai_disclosure_generator.py reference to actual Sparrow SPOT Scale™ certificate
+- ✅ **Git Branch Reconciliation**: Safely merged divergent local/remote branches, all changes synced to GitHub
+- ✅ **Enhanced Document Q&A System** (v8.6, Phase 1-6 complete, 3 new modules: 1,830 lines)
+- ✅ **Token Calculator** with 3 estimation methods (quick/tiktoken/precise)
+- ✅ **Semantic Chunker** with section-based, sliding window, and semantic strategies
+- ✅ **Multi-chunk Q&A Engine** with query routing and answer synthesis
+- ✅ **GUI Integration**: Document Size Analysis panel, Smart Chunking controls, Document Type dropdown
+- ✅ **CLI Integration**: --analyze-tokens, --enable-chunking, --qa-routing, --document-type flags
+- ✅ **Comprehensive Testing** on Bill C-15 (1.15M characters, 286K tokens, 4 chunks)
+- ✅ **QA_SYSTEM_ARCHITECTURE.md** created (comprehensive 400+ line technical reference)
+- ✅ **Legislative Threat Detection Suite** (v8.5)
+- ✅ **Discretionary Power Analyzer** with improved reporting format
+- ✅ **Bilingual PDF Column Extraction** with intelligent detection
 
 ### Areas for Enhancement
 - Ollama integration for enhanced Q&A (currently using mock mode)
@@ -191,4 +198,4 @@
 
 ---
 
-*Report generated by Sparrow SPOT Scale™ v8.5.1 metrics analysis*
+*Report generated by Sparrow SPOT Scale™ v8.6.1 metrics analysis*
