@@ -1,7 +1,7 @@
-# Sparrow SPOT Scale™ v8.6: Technical Architecture Report
+# Sparrow SPOT Scale™ v8.6.1: Technical Architecture Report
 
 **Report Date:** December 7, 2025 (Updated)  
-**System Version:** v8.6.0 (Enhanced Document Q&A System)  
+**System Version:** v8.6.1 (Enhanced Document Q&A System with Document Type Calibration)  
 **Repository:** Sparrow-SPOT-Policy  
 **Classification:** Technical Documentation
 
@@ -9,9 +9,20 @@
 
 ## Executive Summary
 
-This report provides a comprehensive technical overview of the Sparrow SPOT Scale™ v8.6 system architecture, including all files, modules, classes, functions, and analytical models used in the framework. The system combines journalism evaluation (SPARROW Scale™) with government policy analysis (SPOT-Policy™) through a dual-variant architecture supported by an ethical AI framework, narrative generation engine, enhanced transparency features, legislative threat detection capabilities, and a comprehensive multi-chunk document Q&A system.
+This report provides a comprehensive technical overview of the Sparrow SPOT Scale™ v8.6.1 system architecture, including all files, modules, classes, functions, and analytical models used in the framework. The system combines journalism evaluation (SPARROW Scale™) with government policy analysis (SPOT-Policy™) through a dual-variant architecture supported by an ethical AI framework, narrative generation engine, enhanced transparency features, legislative threat detection capabilities, and a comprehensive multi-chunk document Q&A system with proper document type handling.
 
-**Latest: Version 8.6.0 Enhancement (December 7, 2025):**
+**Latest: Version 8.6.1 Enhancement (December 7, 2025):**
+- **Document Type Parameter Fix:** GUI now properly passes user-selected document type to grader script
+- **CLI Argument Added:** `--document-type` with 8 options (auto, legislation, budget, policy_brief, research_report, analysis, legal_judgment, report)
+- **Certificate Badge Accuracy:** Certificates now display correct document type (e.g., "LEGISLATIVE DOCUMENT" when user selects Legislation)
+- **Version Synchronization:** SPARROW_VERSION and CERTIFICATE_VERSION both updated to 8.6.1
+- **Field Addition:** `document_type_selected` now stored in analysis.json for proper badge rendering
+- **Double Directory Fix:** Fixed qa/qa/ nesting - Q&A outputs now save correctly to qa/ (not qa/qa/)
+- **Transparency Reference Fixed:** Updated non-existent "transparency certificate" reference to point to actual Sparrow SPOT Scale™ certificate
+- **GUI Command Builders:** Both direct analysis and subprocess commands now include --document-type parameter
+- **Test Verification:** Bill C-15 analysis with Legislation type now correctly shows "LEGISLATIVE DOCUMENT" badge
+
+**Version 8.6.0 Enhancement (December 7, 2025):**
 - **Enhanced Document Q&A System:** Multi-chunk analysis for documents exceeding LLM context windows
 - **Token Calculator:** 3 estimation methods (quick/tiktoken/precise) with 28 Ollama models mapped
 - **Semantic Chunker:** Intelligent document splitting (section-based, sliding window, semantic strategies)
@@ -19,8 +30,9 @@ This report provides a comprehensive technical overview of the Sparrow SPOT Scal
 - **GUI Integration:** Document Size Analysis panel, Smart Chunking controls, Enhanced Q&A interface
 - **CLI Integration:** 5 new flags (--analyze-tokens, --enable-chunking, --qa-routing, --chunk-strategy, --max-chunk-tokens)
 - **Validation:** Tested on Bill C-15 (1.15M chars, 286K tokens, 4 chunks, comprehensive routing successful)
+- **File Format Support:** Extended to accept .pdf, .txt, .md, .text, .markdown files via GUI
 
-**Previous: Version 8.5.1 Enhancement (December 7, 2025):**
+**Version 8.5.1 Enhancement (December 7, 2025):**
 - **Improved DPA Reporting:** Report format enhanced from 270 to 1,565 lines with zero data loss
 - **100% CRITICAL findings shown** (107/107) - Full detail for accountability
 - **100% HIGH findings shown** (34/34) - Complete ministerial discretion documentation
@@ -32,20 +44,6 @@ This report provides a comprehensive technical overview of the Sparrow SPOT Scal
 - **Zero Data Loss:** All 925 Bill C-15 findings captured (100% vs 1.3% before)
 
 **Version 8.5.0 Enhancement (December 6, 2025):**
-- **Legislative Threat Detection Suite (P0):** New comprehensive threat analysis system
-- **Discretionary Power Analyzer (DPA):** 665 lines, 5 pattern types, 40+ regex patterns
-- **Pattern Detection:** permissive_language, self_judgment, undefined_timelines, broad_scope, exclusion_powers
-- **Scoring Algorithms:** Discretionary Power Score (0-100), Power Concentration Index (0-100)
-- **Risk Levels:** LOW/MEDIUM/HIGH/CRITICAL based on pattern counts and combinations
-- **Output Formats:** JSON (machine-readable) + Markdown (human-readable reports)
-- **CLI Integration:** `--legislative-threat` flag in main pipeline
-- **GUI Integration:** "⚖️ Run Discretionary Power Analysis" checkbox in Transparency & Compliance tab
-- **Test Results:** Bill C-15 (634 pages) - CRITICAL RISK (100/100 score), 925 findings detected
-- **Output Directory:** All files saved to `[output]/threats/` (sibling to certificates/, core/, logs/)
-
-**Version 8.4.2 Enhancement (December 7, 2025):**
-- **Document Q&A Feature:** New `document_qa.py` module enabling direct document queries via Ollama
-- **Deep Analysis Consensus Precedence:** All outputs (certificates, narratives, reports) now consistently use deep analysis consensus (12.0%) over basic detection
 - **Social Media Narrative Fix:** LinkedIn and X/Twitter narratives updated to use deep consensus instead of basic AI detection
 - **Comprehensive Diagnostic Logging:** New `diagnostic_logger.py` module with debug_trace.log, errors.log, performance.json
 - **Output Consistency:** All 5 major output types (certificates, deep analysis reports, publish narratives, AI disclosures, LinkedIn narratives) now show identical AI percentages
