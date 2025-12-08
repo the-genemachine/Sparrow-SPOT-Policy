@@ -6,6 +6,7 @@ archive/
 core/
 logs/
 qa/
+Investigations/
 
 # Data files
 data/posts.csv

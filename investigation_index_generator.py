@@ -486,7 +486,7 @@ def generate_investigation_index(output_dir, document_name=None):
             currentFile = file;
             
             document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
-            document.querySelector(`[data-path="${{file.path}}}"]`).classList.add('active');
+            document.querySelector(`[data-path="${{file.path}}"]`).classList.add('active');
 
             const contentArea = document.getElementById('contentArea');
             contentArea.innerHTML = '<div class="loading">Loading file</div>';
