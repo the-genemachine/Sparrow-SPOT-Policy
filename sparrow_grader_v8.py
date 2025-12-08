@@ -39,6 +39,13 @@ except ImportError:
         def __getattr__(self, name):
             return lambda *args, **kwargs: None
 
+# v8.6.1: Import investigation index generator
+try:
+    from investigation_index_generator import generate_investigation_index
+    INDEX_GENERATOR_AVAILABLE = True
+except ImportError:
+    INDEX_GENERATOR_AVAILABLE = False
+
 # v8: Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -3389,6 +3396,16 @@ def main():
         if log_files:
             print(f"   📂 Logs ({len(log_files)} files): {logs_dir}")
     print()
+    
+    # v8.6.1: Generate interactive index.html for this investigation run
+    if INDEX_GENERATOR_AVAILABLE:
+        try:
+            index_path = generate_investigation_index(output_dir, document_name=output_name)
+            print(f"✅ Investigation index generated: {index_path}")
+            print(f"   💡 Tip: Run 'cd {output_dir.parent} && python3 -m http.server 8765' to view")
+            print(f"   Then open: http://localhost:8765/{output_dir.name}/index.html")
+        except Exception as e:
+            print(f"⚠️  Could not generate index: {e}")
     
     # v8.4.2: Finalize diagnostic logging
     if diagnostic_logger:
