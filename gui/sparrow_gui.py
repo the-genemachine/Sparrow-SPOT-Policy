@@ -526,7 +526,7 @@ def analyze_document(
             is_pdf = input_path.lower().endswith('.pdf')
             if is_pdf:
                 # v8.5: Check for bilingual PDF and extract English column only
-                output_dir = Path("./temp_extractions")
+                output_dir = SPOT_NEWS_DIR / "temp_extractions"  # Use absolute path
                 extracted_path = extract_pdf_columns(input_path, output_dir)
                 temp_files.append(str(output_dir))  # Track for cleanup
                 
@@ -990,13 +990,13 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
     temp_files = []
     input_path = url_or_file
     if not is_url and input_path.lower().endswith('.pdf'):
-        output_dir = Path("./temp_extractions")
+        output_dir = SPOT_NEWS_DIR / "temp_extractions"  # Use absolute path
         extracted_path = extract_pdf_columns(input_path, output_dir)
         temp_files.append(str(output_dir))
         
         # Use extracted text file instead of PDF
         if extracted_path != input_path:
-            input_path = extracted_path
+            input_path = str(Path(extracted_path).resolve())  # Convert to absolute path
             print(f"   Using extracted text: {input_path}")
     
     # Use sys.executable to get the current Python interpreter
@@ -1899,8 +1899,8 @@ def create_interface():
                 with gr.Row():
                     with gr.Column():
                         pdf_file = gr.File(
-                            label="Upload PDF Document",
-                            file_types=[".pdf"],
+                            label="Upload Document (PDF, TXT, MD, or URL)",
+                            file_types=[".pdf", ".txt", ".md", ".text", ".markdown"],
                             type="filepath"
                         )
                     

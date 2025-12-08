@@ -310,9 +310,8 @@ def generate_document_qa(
         context_from_analysis=analysis_context
     )
     
-    # Save output
-    qa_dir = output_dir / "qa"
-    output_path = qa_dir / f"{output_name}_document_qa.txt"
+    # Save output (output_dir is already the qa directory)
+    output_path = output_dir / f"{output_name}_document_qa.txt"
     
     saved_path = qa.save_qa_output(
         answer=answer,

@@ -2899,7 +2899,7 @@ def main():
                     qa_file = qa_dir / f"{output_name}_qa_enhanced.json"
                     qa_dir.mkdir(parents=True, exist_ok=True)
                     
-                    import json
+                    # json already imported at module level
                     with open(qa_file, 'w', encoding='utf-8') as f:
                         json.dump({
                             "question": answer.question,
