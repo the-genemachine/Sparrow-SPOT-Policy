@@ -546,6 +546,11 @@ class SPARROWGrader:
     def _extract_with_pdfplumber(self, pdf_path):
         """Extract text using pdfplumber with table detection."""
         import pdfplumber
+        
+        # v8.6: Check if file is actually a PDF before attempting extraction
+        if not pdf_path.lower().endswith('.pdf'):
+            raise ValueError(f"File does not appear to be a PDF: {pdf_path}")
+        
         text = ""
         with pdfplumber.open(pdf_path) as pdf:
             total_pages = len(pdf.pages)
@@ -568,6 +573,11 @@ class SPARROWGrader:
     def _extract_with_pypdf(self, pdf_path):
         """Fallback to pypdf for text extraction."""
         from pypdf import PdfReader
+        
+        # v8.6: Check if file is actually a PDF before attempting extraction
+        if not pdf_path.lower().endswith('.pdf'):
+            raise ValueError(f"File does not appear to be a PDF: {pdf_path}")
+        
         pdf_reader = PdfReader(pdf_path)
         text = ""
         for page_num, page in enumerate(pdf_reader.pages, 1):
@@ -2899,12 +2909,50 @@ def main():
                         chunk_index_path=chunks_dir / "chunk_index.json"
                     )
                     
+                    # Create Ollama client for chunked Q&A (v8.6)
+                    import requests as req_module
+                    import time
+                    
+                    class OllamaChunkClient:
+                        """Simple Ollama client for enhanced Q&A."""
+                        def __init__(self, base_url="http://localhost:11434"):
+                            self.base_url = base_url
+                            self.queries_made = 0
+                        
+                        def generate(self, model: str, prompt: str, options: dict = None):
+                            """Query Ollama API."""
+                            opts = options or {}
+                            self.queries_made += 1
+                            try:
+                                query_start = time.time()
+                                response = req_module.post(
+                                    f"{self.base_url}/api/generate",
+                                    json={
+                                        "model": model,
+                                        "prompt": prompt,
+                                        "stream": False,
+                                        "temperature": opts.get('temperature', 0.3),
+                                        "num_predict": opts.get('num_predict', 500),
+                                    },
+                                    timeout=180
+                                )
+                                response.raise_for_status()
+                                query_time = time.time() - query_start
+                                print(f"      🔗 Ollama query #{self.queries_made}: {query_time:.1f}s")
+                                return response.json()
+                            except Exception as e:
+                                print(f"      ⚠️  Ollama query failed: {str(e)}")
+                                return {"response": f"Error: {str(e)}"}
+                    
+                    ollama_client = OllamaChunkClient()
+                    
                     answer = qa_engine.query(
                         question=args.document_qa,
-                        model="mock",  # Use mock for now (integrate with Ollama in future)
+                        model=args.ollama_model,
                         routing_strategy=args.qa_routing,
                         synthesis_strategy="concatenate",
-                        relevance_threshold=0.3
+                        relevance_threshold=0.3,
+                        ollama_client=ollama_client
                     )
                     
                     # Save answer

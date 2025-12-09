@@ -1129,6 +1129,10 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
         cmd.append("--check-urls")
     if enable_document_qa and document_qa_question and document_qa_question.strip():
         cmd.extend(["--document-qa", document_qa_question.strip()])
+        if enable_chunking:
+            cmd.append("--enable-chunking")
+            if qa_routing_strategy and qa_routing_strategy != "keyword":
+                cmd.extend(["--qa-routing", qa_routing_strategy])
     if enhanced_provenance:
         cmd.append("--enhanced-provenance")
     if provenance_report:
