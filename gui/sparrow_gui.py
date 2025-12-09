@@ -751,10 +751,17 @@ def analyze_document(
                             from token_calculator import estimate_tokens
                             from semantic_chunker import chunk_document, save_chunks
                             from enhanced_document_qa import EnhancedDocumentQA
+                            import time
+                            import json
                             
+                            # Track timing
+                            chunk_start_time = time.time()
+                            
+                            # Analyze document size
                             print("   📊 Analyzing document size...")
                             tokens = estimate_tokens(text, method="tiktoken")
-                            print(f"   📊 Estimated tokens: {tokens:,}")
+                            doc_chars = len(text)
+                            print(f"   📊 Document stats: {doc_chars:,} chars, {tokens:,} tokens")
                             
                             # Create chunks
                             print("   ✂️  Creating intelligent chunks...")
@@ -765,6 +772,9 @@ def analyze_document(
                                 overlap_tokens=200
                             )
                             
+                            num_chunks = len(chunks_result['chunks'])
+                            print(f"   ✂️  Created {num_chunks} chunks")
+                            
                             # Save chunks
                             chunks_dir = qa_output_dir / "chunks"
                             save_chunks(
@@ -772,7 +782,33 @@ def analyze_document(
                                 output_dir=str(chunks_dir),
                                 save_chunk_files=True
                             )
-                            print(f"   ✂️  Created {len(chunks_result['chunks'])} chunks")
+                            
+                            # Log chunk details
+                            chunk_metrics = {
+                                "document_size": {
+                                    "characters": doc_chars,
+                                    "tokens": tokens
+                                },
+                                "chunking": {
+                                    "strategy": "section",
+                                    "max_tokens_per_chunk": 100000,
+                                    "overlap_tokens": 200,
+                                    "total_chunks": num_chunks
+                                },
+                                "chunks": []
+                            }
+                            
+                            # Collect chunk details
+                            for chunk in chunks_result.get('chunks', []):
+                                chunk_metrics["chunks"].append({
+                                    "chunk_id": chunk.get('chunk_id', 0),
+                                    "chunk_number": chunk.get('chunk_id', 0) + 1,
+                                    "pages": chunk.get('pages', 'unknown'),
+                                    "sections": chunk.get('sections', []),
+                                    "tokens": chunk.get('token_count', 0),
+                                    "characters": len(chunk.get('text', '')),
+                                    "keywords": chunk.get('keywords', [])[:5]  # Top 5
+                                })
                             
                             # Query using enhanced Q&A
                             print(f"   🔍 Routing strategy: {qa_routing_strategy}")
@@ -788,11 +824,14 @@ def analyze_document(
                                 """Simple Ollama client for enhanced Q&A."""
                                 def __init__(self, base_url="http://localhost:11434"):
                                     self.base_url = base_url
+                                    self.queries_made = 0
                                 
                                 def generate(self, model: str, prompt: str, options: dict = None):
                                     """Query Ollama API."""
                                     opts = options or {}
+                                    self.queries_made += 1
                                     try:
+                                        query_start = time.time()
                                         response = req_module.post(
                                             f"{self.base_url}/api/generate",
                                             json={
@@ -805,6 +844,8 @@ def analyze_document(
                                             timeout=180
                                         )
                                         response.raise_for_status()
+                                        query_time = time.time() - query_start
+                                        print(f"      🔗 Ollama query #{self.queries_made}: {query_time:.1f}s")
                                         return response.json()
                                     except Exception as e:
                                         print(f"⚠️  Ollama query failed: {e}")
@@ -812,6 +853,7 @@ def analyze_document(
                             
                             ollama_chunk_client = OllamaChunkClient()
                             
+                            qa_start = time.time()
                             answer = qa_engine.query(
                                 question=document_qa_question.strip(),
                                 model=ollama_model,  # Use selected Ollama model
@@ -820,10 +862,10 @@ def analyze_document(
                                 relevance_threshold=0.3,
                                 ollama_client=ollama_chunk_client  # Pass real Ollama client
                             )
+                            qa_time = time.time() - qa_start
                             
-                            # Save answer
+                            # Save answer with comprehensive metrics
                             qa_file = qa_output_dir / f"{Path(output_name).stem}_qa.json"
-                            import json
                             with open(qa_file, 'w', encoding='utf-8') as f:
                                 json.dump({
                                     "question": answer.question,
@@ -834,14 +876,39 @@ def analyze_document(
                                     ],
                                     "metadata": {
                                         "chunks_queried": answer.total_chunks_queried,
+                                        "total_chunks_available": num_chunks,
                                         "confidence": answer.confidence,
-                                        "routing_strategy": answer.routing_strategy
+                                        "routing_strategy": answer.routing_strategy,
+                                        "model": ollama_model,
+                                        "ollama_queries_made": ollama_chunk_client.queries_made,
+                                        "qa_processing_time_seconds": qa_time
                                     }
                                 }, f, indent=2)
                             
+                            # Save detailed metrics to separate file
+                            metrics_file = qa_output_dir / f"{Path(output_name).stem}_chunking_metrics.json"
+                            chunk_metrics["query"] = {
+                                "question": document_qa_question.strip(),
+                                "routing_strategy": qa_routing_strategy,
+                                "model": ollama_model,
+                                "ollama_queries_executed": ollama_chunk_client.queries_made,
+                                "total_time_seconds": time.time() - chunk_start_time
+                            }
+                            chunk_metrics["chunks_used_in_answer"] = [
+                                {"chunk_number": s.chunk_number, "pages": s.pages, "sections": s.sections}
+                                for s in answer.sources
+                            ]
+                            
+                            with open(metrics_file, 'w', encoding='utf-8') as f:
+                                json.dump(chunk_metrics, f, indent=2)
+                            
                             output_files.append(str(qa_file))
+                            output_files.append(str(metrics_file))
                             print(f"   ✓ Enhanced Q&A: {qa_file}")
-                            print(f"   ✓ Confidence: {answer.confidence:.0%}, Chunks: {answer.total_chunks_queried}")
+                            print(f"   ✓ Chunking metrics: {metrics_file}")
+                            print(f"   ✓ Confidence: {answer.confidence:.0%}, Chunks queried: {answer.total_chunks_queried}/{num_chunks}")
+                            print(f"   ✓ Ollama API calls: {ollama_chunk_client.queries_made}")
+                            print(f"   ✓ Total processing time: {time.time() - chunk_start_time:.1f}s")
                         else:
                             # Standard Q&A (no chunking)
                             from document_qa import generate_document_qa
