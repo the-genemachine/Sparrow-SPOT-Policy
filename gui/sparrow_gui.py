@@ -781,12 +781,44 @@ def analyze_document(
                                 chunk_index_path=chunks_dir / "chunk_index.json"
                             )
                             
+                            # Create Ollama client for chunked Q&A
+                            import requests as req_module
+                            
+                            class OllamaChunkClient:
+                                """Simple Ollama client for enhanced Q&A."""
+                                def __init__(self, base_url="http://localhost:11434"):
+                                    self.base_url = base_url
+                                
+                                def generate(self, model: str, prompt: str, options: dict = None):
+                                    """Query Ollama API."""
+                                    opts = options or {}
+                                    try:
+                                        response = req_module.post(
+                                            f"{self.base_url}/api/generate",
+                                            json={
+                                                "model": model,
+                                                "prompt": prompt,
+                                                "stream": False,
+                                                "temperature": opts.get('temperature', 0.3),
+                                                "num_predict": opts.get('num_predict', 500),
+                                            },
+                                            timeout=180
+                                        )
+                                        response.raise_for_status()
+                                        return response.json()
+                                    except Exception as e:
+                                        print(f"⚠️  Ollama query failed: {e}")
+                                        return {"response": f"Error: {str(e)}"}
+                            
+                            ollama_chunk_client = OllamaChunkClient()
+                            
                             answer = qa_engine.query(
                                 question=document_qa_question.strip(),
-                                model="mock",  # Use mock for now (GUI uses document_qa for Ollama)
+                                model=ollama_model,  # Use selected Ollama model
                                 routing_strategy=qa_routing_strategy,
                                 synthesis_strategy="concatenate",
-                                relevance_threshold=0.3
+                                relevance_threshold=0.3,
+                                ollama_client=ollama_chunk_client  # Pass real Ollama client
                             )
                             
                             # Save answer
