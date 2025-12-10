@@ -141,9 +141,11 @@ class NarrativeGenerationPipeline:
         # Step 2.1: Fix #5 - Expand narrative with Ollama for longer formats
         if length in ['detailed', 'comprehensive'] and ollama_model:
             print(f"🔄 Step 2.1: Expanding narrative with {ollama_model}...")
+            print(f"   📊 Current narrative: {len(narrative_text.split())} words")
             narrative_text = self._expand_narrative_with_ollama(
                 narrative_text, analysis, length, ollama_model
             )
+            print(f"   📊 After expansion: {len(narrative_text.split())} words")
         
         # Step 2.5: Add Flags and Contradictions section if contradictions detected (Recommendation #5)
         contradiction_analysis = analysis.get('contradiction_analysis', {})
@@ -498,6 +500,9 @@ class NarrativeGenerationPipeline:
         """
         Fix #5: Expand narrative to target word count using Ollama.
         
+        Strategy: Use multi-section generation to reach target word count
+        since Ollama may not respect num_predict parameter for long sequences.
+        
         Args:
             narrative_text: Base narrative from tone adaptor
             analysis: Full analysis results for context
@@ -576,9 +581,21 @@ FOCUS ON:
 - Economic rigor and evidence base
 - Implementation feasibility"""
         
-        prompt = f"""You are a professional analyst writing a comprehensive analysis narrative.
+        # STRATEGY: Since Ollama may not honor num_predict for very long outputs,
+        # we'll break the expansion into sections and concatenate them
+        sections_needed = max(1, int(target_words / 1000))  # ~1000 words per section
+        
+        print(f"   🔍 DEBUG: Planning {sections_needed}-section expansion strategy (target: {target_words} words)")
+        
+        sections = []
+        section_targets = [target_words // sections_needed] * sections_needed
+        # Add remainder to last section
+        section_targets[-1] += target_words % sections_needed
+        
+        for i, section_target in enumerate(section_targets, 1):
+            section_prompt = f"""You are a professional analyst. Expand the following narrative section with detailed analysis.
 
-EXISTING NARRATIVE (current length: {current_words} words):
+CONTEXT - Original Narrative ({current_words} words):
 {narrative_text}
 
 ANALYSIS DATA:
@@ -586,63 +603,102 @@ ANALYSIS DATA:
 {criteria_summary}
 {doc_type_context}
 {custom_query_section}
-TASK: Expand this narrative to approximately {target_words} words while:
-1. Maintaining the same tone and style
-2. Adding deeper analysis appropriate to the DOCUMENT TYPE
-3. Including context relevant to the document's purpose
-4. Discussing impacts on affected parties
-5. Adding comparative context where appropriate
-6. Expanding on the key findings with supporting details
-{f'7. Address the user context/focus: {custom_query}' if custom_query else ''}
 
-Write the expanded narrative now. Do not include any meta-commentary - just the narrative text:"""
-
-        # v8.4.1: Track AI contribution
-        start_time = datetime.now()
-        
-        try:
-            response = requests.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.7,
-                    "num_predict": target_words * 2,  # Allow generous token count
-                },
-                timeout=120  # 2 minute timeout for longer generation
-            )
-            response.raise_for_status()
+SECTION {i} OF {sections_needed}:
+Write a detailed {section_target}-word section that:
+"""
             
-            expanded = response.json().get("response", "")
-            
-            # v8.4.1: Log successful AI contribution
-            end_time = datetime.now()
-            self.contribution_tracker.record_contribution(
-                component="narrative_expansion",
-                model_used=ollama_model,
-                model_version="local",
-                prompt_details=f"Expanded narrative from {current_words} to target {target_words} words",
-                contribution_type="generation",
-                confidence_level=0.85,
-                requires_review=True
-            )
-            
-            if expanded and len(expanded.split()) > current_words:
-                # v8.3.2 Fix: Remove meta-commentary before returning
-                expanded = self._strip_meta_commentary(expanded)
-                print(f"   ✓ Expanded narrative from {current_words} to {len(expanded.split())} words")
-                return expanded
+            if i == 1:
+                section_prompt += """1. Introduces the document and provides comprehensive context
+2. Details the scoring and evaluation criteria
+3. Explains the implications and significance
+4. Discusses primary stakeholder impacts"""
+            elif i == len(section_targets):
+                section_prompt += """1. Provides deeper analysis of findings
+2. Discusses recommended next steps or considerations
+3. Addresses limitations and alternative perspectives
+4. Concludes with synthesis and key takeaways"""
             else:
-                print(f"   ⚠️ Expansion failed, using original narrative")
-                return narrative_text
+                section_prompt += f"""1. Provides detailed analysis of specific aspects
+2. Includes concrete examples and supporting details
+3. Discusses relevant contextual factors
+4. Connects to broader policy implications"""
+            
+            section_prompt += "\n\nWrite only the section content - no meta-commentary or section markers:"
+            
+            # v8.4.1: Track AI contribution
+            start_time = datetime.now()
+            
+            try:
+                print(f"   🔍 DEBUG: Generating section {i}/{sections_needed} (target {section_target} words)...")
+                response = requests.post(
+                    "http://localhost:11434/api/generate",
+                    json={
+                        "model": ollama_model,
+                        "prompt": section_prompt,
+                        "stream": False,
+                        "temperature": 0.7,
+                        "num_predict": int(section_target * 3),  # Generous multiplier
+                    },
+                    timeout=180  # 3 minute timeout per section
+                )
+                response.raise_for_status()
                 
-        except requests.exceptions.RequestException as e:
-            print(f"   ⚠️ Ollama expansion error: {e}")
+                section_text = response.json().get("response", "")
+                section_words = len(section_text.split()) if section_text else 0
+                
+                if section_text:
+                    # Clean up section text
+                    section_text = self._strip_meta_commentary(section_text).strip()
+                    sections.append(section_text)
+                    print(f"   ✓ Section {i} generated: {len(section_text.split())} words")
+                else:
+                    print(f"   ⚠️ Section {i} was empty")
+                    
+            except requests.exceptions.Timeout as e:
+                print(f"   ⚠️ Section {i} TIMEOUT: {e}")
+                continue
+            except requests.exceptions.ConnectionError as e:
+                print(f"   ⚠️ Section {i} CONNECTION ERROR: {e}")
+                print(f"   🔍 DEBUG: Is Ollama running on localhost:11434?")
+                # Fall back to using just the original narrative
+                return narrative_text
+            except Exception as e:
+                print(f"   ⚠️ Section {i} error: {e}")
+                continue
+        
+        if not sections:
+            print(f"   ⚠️ Failed to generate any sections, using original narrative")
             return narrative_text
-        except Exception as e:
-            print(f"   ⚠️ Unexpected error in expansion: {e}")
-            return narrative_text
+        
+        # Combine sections
+        expanded = "\n\n".join(sections)
+        expanded_words = len(expanded.split())
+        
+        print(f"   🔍 DEBUG: Combined {len(sections)} sections = {expanded_words} words")
+        
+        # Log AI contribution
+        self.contribution_tracker.record_contribution(
+            component="narrative_expansion",
+            model_used=ollama_model,
+            model_version="local",
+            prompt_details=f"Expanded narrative from {current_words} to target {target_words} words ({sections_needed} sections)",
+            contribution_type="generation",
+            confidence_level=0.85,
+            requires_review=True
+        )
+        
+        # Check if expansion meets minimum threshold
+        min_target = target_words * 0.6  # At least 60% of target
+        if expanded_words >= min_target:
+            print(f"   ✓ Expanded narrative from {current_words} to {expanded_words} words (target: {target_words})")
+            return expanded
+        else:
+            # Expansion was too short - log warning but return it anyway since it's still an improvement
+            percentage = int((expanded_words / target_words) * 100)
+            print(f"   ⚠️ Expansion fell short - got {expanded_words} words ({percentage}% of {target_words} target)")
+            print(f"   💡 Consider using a larger model or increasing timeout for fuller expansion")
+            return expanded if expanded_words > current_words else narrative_text
     
     def _generate_contradiction_section(self, contradictions: List[Dict], length: str) -> str:
         """
