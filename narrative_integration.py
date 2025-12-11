@@ -1,7 +1,8 @@
 """
-Narrative Integration Module for v8.4.1
-Orchestrates all 6 narrative modules into a unified pipeline
+Narrative Integration Module for v8.6.1+
+Orchestrates all narrative modules and appendices auto-generation
 
+v8.6.1: Added automatic appendices generation for transparency
 v8.4.1: Added AI contribution tracking for provenance reports
 
 This module:
@@ -13,6 +14,7 @@ This module:
 - Renders multi-format output (format_renderer)
 - Validates quality (narrative_qa)
 - Tracks AI contributions for transparency (NEW v8.4.1)
+- Generates appendices automatically (NEW v8.6.1)
 """
 
 import json
@@ -30,6 +32,7 @@ from ai_disclosure_generator import AIDisclosureGenerator, create_ai_disclosure_
 from escalation_manager import EscalationManager, create_escalation_manager
 from ai_contribution_tracker import AIContributionTracker, create_ai_contribution_tracker
 from realtime_fairness_audit import RealTimeFairnessAudit, create_real_time_fairness_audit
+from appendices_generator import AppendicesGenerator
 
 
 class NarrativeGenerationPipeline:
@@ -40,11 +43,12 @@ class NarrativeGenerationPipeline:
     Includes external critique ingestion for enhanced stakeholder balance.
     """
     
-    def __init__(self, ingest_critiques: bool = True):
+    def __init__(self, ingest_critiques: bool = True, generate_appendices: bool = True):
         """Initialize all narrative modules
         
         Args:
             ingest_critiques: Whether to automatically ingest Budget 2025 critiques
+            generate_appendices: Whether to auto-generate appendices (v8.6.1+)
         """
         self.engine = create_narrative_engine()
         self.tone_adaptor = create_tone_adaptor()
@@ -58,6 +62,9 @@ class NarrativeGenerationPipeline:
         self.escalation_manager = create_escalation_manager()
         self.contribution_tracker = create_ai_contribution_tracker()
         self.fairness_audit = create_real_time_fairness_audit()
+        
+        # NEW v8.6.1: Appendices auto-generation for transparency
+        self.appendices_generator = AppendicesGenerator() if generate_appendices else None
         
         # Auto-load default critiques if requested
         if ingest_critiques:
@@ -306,13 +313,30 @@ class NarrativeGenerationPipeline:
         
         print("   ✓ Governance outputs generated")
         
+        # NEW v8.6.1: Generate appendices for transparency (Step 7)
+        appendices_output = None
+        if self.appendices_generator:
+            print("🔄 Step 7: Generating appendices for transparency...")
+            doc_title = (
+                analysis.get('document_title')
+                or analysis.get('title')
+                or analysis.get('variant')
+                or 'Policy Analysis'
+            )
+            appendices_output = self.appendices_generator.generate_all_appendices(
+                analysis,
+                document_title=doc_title,
+                include_index=True
+            )
+            print(f"   ✓ Generated 5 appendices + navigation index (~30K words)")
+        
         # Fix #6: Add timestamp for audit trail
         from datetime import datetime
         
         # Compile complete output
         result = {
             'metadata': {
-                'version': 'v8.0',
+                'version': 'v8.6.1',
                 'pipeline': 'NarrativeGenerationPipeline',
                 'tone': tone,
                 'length': length,
@@ -321,6 +345,7 @@ class NarrativeGenerationPipeline:
                 'source_analysis_score': analysis.get('composite_score', 0),
                 'source_analysis_grade': analysis.get('grade', 'N/A'),
                 'critiques_ingested': len(self.critique_module.ingested_critiques) if ingest_critiques else 0,
+                'appendices_generated': appendices_output is not None,
                 'generated_at': datetime.utcnow().isoformat() + 'Z'
             },
             'narrative_components': narrative_components,
@@ -334,7 +359,8 @@ class NarrativeGenerationPipeline:
                 'escalation': escalation_data,
                 'fairness_audit': fairness_dashboards,
                 'escalation_status': 'BLOCKED' if escalation_data and escalation_data.get('publication_blocked') else 'FLAGGED' if escalation_data else 'CLEAR'
-            }
+            },
+            'appendices': appendices_output
         }
         
         print("✅ Narrative generation complete!")

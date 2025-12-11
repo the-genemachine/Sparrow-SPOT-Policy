@@ -58,6 +58,13 @@ try:
 except ImportError:
     NARRATIVE_ENGINE_AVAILABLE = False
 
+# v8.6.1: Import appendices auto-saver for transparency documentation
+try:
+    from appendices_auto_saver import save_appendices_from_result
+    APPENDICES_AUTO_SAVER_AVAILABLE = True
+except ImportError:
+    APPENDICES_AUTO_SAVER_AVAILABLE = False
+
 # v7: Import ethical framework modules
 try:
     from ai_detection_engine import AIDetectionEngine, ProvenanceAnalyzer
@@ -2214,8 +2221,31 @@ def main():
     
     # v8.4.2: Create organized output directory structure
     output_base = Path(args.output)
-    output_dir = output_base.parent if output_base.parent != Path('.') else Path('.')
+    
+    # FIX v8.6.1+: Handle multiple path formats:
+    # 1. Directory path: /path/to/Bill-C15-05 → Use as output_dir, stem as output_name
+    # 2. Duplicate path: /path/to/Bill-C15-05/Bill-C15-05 → Use parent as output_dir
+    # 3. Prefix path: /path/to/Bill-C15-05/analysis → Use parent as output_dir, stem as output_name (file prefix)
+    
     output_name = output_base.stem
+    parent_name = output_base.parent.stem if output_base.parent != Path('.') else None
+    
+    # Detect if last component is a file prefix (not a directory)
+    # Heuristic: file prefixes are typically lowercase or simple names, while directories are uppercase/kebab-case
+    is_likely_prefix = output_name and output_name.islower() and not output_name.isupper()
+    is_duplicate_directory = parent_name and output_name == parent_name and output_base.parent.parent != Path('.')
+    
+    if is_duplicate_directory:
+        # Case: /path/to/Bill-C15-05/Bill-C15-05 → Duplicate directory
+        output_dir = output_base.parent
+        output_name = output_dir.stem
+    elif is_likely_prefix and output_base.parent != Path('.'):
+        # Case: /path/to/Bill-C15-05/analysis → Prefix path
+        output_dir = output_base.parent
+        output_name = output_base.stem  # Keep "analysis" as the prefix
+    else:
+        # Case: /path/to/Bill-C15-05 → Directory path
+        output_dir = output_base
     
     # Create subdirectories for organized outputs
     core_dir = output_dir / 'core'
@@ -2392,6 +2422,21 @@ def main():
                 if narrative_outputs and 'critique_integration' in narrative_outputs and narrative_outputs['critique_integration']:
                     report['critique_integration'] = narrative_outputs['critique_integration']
                     print(f"   ✓ Critique integration added to report")
+                
+                # NEW v8.6.1: Auto-save appendices to disk for transparency documentation
+                if APPENDICES_AUTO_SAVER_AVAILABLE and narrative_outputs and narrative_outputs.get('appendices'):
+                    try:
+                        print(f"🔄 Saving appendices to disk...")
+                        doc_title = report.get('title') or report.get('variant') or 'Policy Analysis'
+                        # Use output_dir (the analysis folder where all outputs go)
+                        save_appendices_from_result(
+                            result=narrative_outputs,
+                            output_dir=str(output_dir),
+                            document_title=doc_title
+                        )
+                        print(f"   ✓ Appendices saved to /appendices/ directory")
+                    except Exception as e:
+                        print(f"   ⚠️  Appendices save failed: {str(e)}")
             except Exception as e:
                 print(f"   ⚠️  Narrative generation skipped: {str(e)}")
         

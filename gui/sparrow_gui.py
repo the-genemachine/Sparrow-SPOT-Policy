@@ -71,6 +71,15 @@ try:
         ENHANCED_QA_AVAILABLE = False
         print(f"⚠️  Enhanced Q&A not available: {e}")
     
+    # v8.6.1: Appendices auto-generation
+    try:
+        from appendices_generator import AppendicesGenerator
+        from appendices_panel import AppendicesPanelManager
+        APPENDICES_AVAILABLE = True
+    except ImportError as e:
+        APPENDICES_AVAILABLE = False
+        print(f"⚠️  Appendices generator not available: {e}")
+    
     SPARROW_AVAILABLE = True
 except ImportError as e:
     SPARROW_AVAILABLE = False
@@ -2252,47 +2261,144 @@ def create_interface():
                     info="Runs analysis in subprocess - frees all RAM when complete. Best for 100+ page PDFs."
                 )
             
-            # ========== TAB 5: OUTPUT & EXECUTION ==========
-            with gr.Tab("▶️ Run Analysis"):
-                gr.Markdown("### Ready to Analyze")
-                
-                # Settings summary
-                with gr.Accordion("📋 Current Settings Summary", open=False):
-                    settings_summary = gr.Markdown(
-                        "**Tip:** Review your settings in the tabs above before clicking Analyze Document.",
-                        elem_id="settings-summary"
+        # ========== TAB 5: OUTPUT & EXECUTION ==========
+        with gr.Tab("▶️ Run Analysis"):
+            gr.Markdown("### Ready to Analyze")
+            
+            # Settings summary
+            with gr.Accordion("📋 Current Settings Summary", open=False):
+                settings_summary = gr.Markdown(
+                    "**Tip:** Review your settings in the tabs above before clicking Analyze Document.",
+                    elem_id="settings-summary"
+                )
+            
+            with gr.Row():
+                analyze_btn = gr.Button(
+                    "🎯 Analyze Document",
+                    variant="primary",
+                    size="lg"
+                )
+                cleanup_btn = gr.Button(
+                    "🧹 Free Memory",
+                    variant="secondary",
+                    size="lg"
+                )
+            
+            gr.Markdown("---")
+            
+            with gr.Row():
+                with gr.Column():
+                    output_status = gr.Textbox(
+                        label="Analysis Status",
+                        lines=15,
+                        max_lines=25,
+                        interactive=False
                     )
                 
+                with gr.Column():
+                    command_output = gr.Textbox(
+                        label="Command Executed",
+                        lines=5,
+                        max_lines=10,
+                        interactive=False
+                    )
+        
+        # ========== TAB 6: APPENDICES (NEW v8.6.1) ==========
+        if APPENDICES_AVAILABLE:
+            with gr.Tab("📚 Appendices"):
+                gr.Markdown("""
+                ## 📚 Auto-Generated Appendices (v8.6.1+)
+                
+                Complete transparency documentation automatically generated from your analysis:
+                
+                - **Appendix A:** Evidence Citations - tie every score to specific document sections
+                - **Appendix B:** Methodology - complete scoring framework and replication instructions
+                - **Appendix C:** Component Disclosure - AI/human involvement and reproducibility
+                - **Appendix D:** Bill-Specific Findings - policy-specific analysis (not generic template)
+                - **Appendix E:** Verification Guide - how to independently verify the analysis
+                - **Index:** Navigation and reading paths by user role
+                
+                **Total:** ~30,000 words of comprehensive transparency documentation
+                """)
+                
+                appendices_panel_manager = AppendicesPanelManager()
+                
+                with gr.Tabs():
+                    # Appendix A
+                    with gr.Tab("A: Evidence"):
+                        appendix_a_text = gr.Markdown(
+                            "Run an analysis to generate evidence citations",
+                            label="Appendix A"
+                        )
+                        with gr.Row():
+                            gr.Button("📋 Copy to Clipboard", size="sm")
+                            gr.Button("💾 Save as MD", size="sm")
+                    
+                    # Appendix B
+                    with gr.Tab("B: Methodology"):
+                        appendix_b_text = gr.Markdown(
+                            "Run an analysis to generate methodology documentation",
+                            label="Appendix B"
+                        )
+                        with gr.Row():
+                            gr.Button("📋 Copy to Clipboard", size="sm")
+                            gr.Button("💾 Save as MD", size="sm")
+                    
+                    # Appendix C
+                    with gr.Tab("C: Disclosure"):
+                        appendix_c_text = gr.Markdown(
+                            "Run an analysis to generate component disclosure",
+                            label="Appendix C"
+                        )
+                        with gr.Row():
+                            gr.Button("📋 Copy to Clipboard", size="sm")
+                            gr.Button("💾 Save as MD", size="sm")
+                    
+                    # Appendix D
+                    with gr.Tab("D: Findings"):
+                        appendix_d_text = gr.Markdown(
+                            "Run an analysis to generate bill-specific findings",
+                            label="Appendix D"
+                        )
+                        with gr.Row():
+                            gr.Button("📋 Copy to Clipboard", size="sm")
+                            gr.Button("💾 Save as MD", size="sm")
+                    
+                    # Appendix E
+                    with gr.Tab("E: Verification"):
+                        appendix_e_text = gr.Markdown(
+                            "Run an analysis to generate verification guide",
+                            label="Appendix E"
+                        )
+                        with gr.Row():
+                            gr.Button("📋 Copy to Clipboard", size="sm")
+                            gr.Button("💾 Save as MD", size="sm")
+                    
+                    # Index
+                    with gr.Tab("Index"):
+                        index_text = gr.Markdown(
+                            "Run an analysis to generate navigation index",
+                            label="Navigation Index"
+                        )
+                        with gr.Row():
+                            gr.Button("📋 Copy to Clipboard", size="sm")
+                            gr.Button("💾 Save as MD", size="sm")
+                
                 with gr.Row():
-                    analyze_btn = gr.Button(
-                        "🎯 Analyze Document",
+                    export_zip_btn = gr.Button(
+                        "⬇️ Download All Appendices as ZIP",
                         variant="primary",
                         size="lg"
                     )
-                    cleanup_btn = gr.Button(
-                        "🧹 Free Memory",
-                        variant="secondary",
+                    view_metadata_btn = gr.Button(
+                        "📊 View Appendices Metadata",
                         size="lg"
                     )
                 
-                gr.Markdown("---")
-                
-                with gr.Row():
-                    with gr.Column():
-                        output_status = gr.Textbox(
-                            label="Analysis Status",
-                            lines=15,
-                            max_lines=25,
-                            interactive=False
-                        )
-                    
-                    with gr.Column():
-                        command_output = gr.Textbox(
-                            label="Command Executed",
-                            lines=5,
-                            max_lines=10,
-                            interactive=False
-                        )
+                metadata_display = gr.Markdown(
+                    "Metadata will appear here after analysis completes",
+                    label="Metadata"
+                )
         
         # ========== BOTTOM INFO ==========
         gr.Markdown("""
@@ -2307,13 +2413,12 @@ def create_interface():
         - 📚 Citation quality scoring and source tracing
         - 🏛️ NIST AI RMF compliance mapping
         - 📋 Multi-format outputs (14 types: JSON, HTML, narrative, social media, etc.)
+        - 📚 Auto-generated appendices for complete transparency (v8.6.1+)
         
         **Market Value:** $340M-1B TAM | **Cost:** $0 (vs. $430-1,225/month commercial tools)
         
         [GitHub Repository](#) | [Documentation](#) | [Case Studies](#)
-        """)
-        
-        # v8.6: Token analysis button handler
+        """)        # v8.6: Token analysis button handler
         def handle_token_analysis(pdf_file_path):
             """Handle token analysis button click."""
             if not pdf_file_path:
