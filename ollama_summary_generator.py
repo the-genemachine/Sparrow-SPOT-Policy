@@ -136,7 +136,7 @@ class OllamaSummaryGenerator:
                     "temperature": 0.7,
                     "num_predict": 800,
                 },
-                timeout=60
+                timeout=(10, 300)  # (connect timeout, read timeout) - 5 min for large models
             )
             response.raise_for_status()
             result = response.json()["response"]

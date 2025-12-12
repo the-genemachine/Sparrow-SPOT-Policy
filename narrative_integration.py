@@ -682,15 +682,15 @@ Write a detailed {section_target}-word section that:
             try:
                 print(f"   🔍 DEBUG: Generating section {i}/{sections_needed} (target {section_target} words)...")
                 response = requests.post(
-                    "http://localhost:11434/api/generate",
+                    f"{ollama_url}/api/generate",
                     json={
-                        "model": ollama_model,
+                        "model": model,
                         "prompt": section_prompt,
                         "stream": False,
                         "temperature": 0.7,
                         "num_predict": int(section_target * 3),  # Generous multiplier
                     },
-                    timeout=180  # 3 minute timeout per section
+                    timeout=(10, 600)  # (connect, read) - 10 min read for large models
                 )
                 response.raise_for_status()
                 
