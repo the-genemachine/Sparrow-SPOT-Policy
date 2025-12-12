@@ -83,21 +83,22 @@ class QueryRouter:
         """Parse chunk index into ChunkReference objects."""
         chunks = []
         for chunk_data in index.get("chunks", []):
+            chunk_id = chunk_data.get("id", chunk_data.get("chunk_id", 0))  # Try "id" first, fallback to "chunk_id"
             chunks.append(ChunkReference(
-                chunk_id=chunk_data.get("chunk_id", 0),
-                chunk_number=chunk_data.get("chunk_id", 0) + 1,  # 1-based
-                pages=chunk_data.get("pages", "unknown"),
+                chunk_id=chunk_id,
+                chunk_number=chunk_id,  # Already 1-based in the JSON
+                pages=chunk_data.get("page_range", chunk_data.get("pages", "unknown")),
                 sections=chunk_data.get("sections", []),
                 summary=chunk_data.get("summary", ""),
                 keywords=chunk_data.get("keywords", []),
-                token_count=chunk_data.get("token_count", 0)
+                token_count=chunk_data.get("tokens", chunk_data.get("token_count", 0))
             ))
         return chunks
     
     def route_query(
         self,
         question: str,
-        strategy: str = "keyword",
+        strategy: str = "comprehensive",
         relevance_threshold: float = 0.3
     ) -> List[ChunkReference]:
         """
@@ -265,15 +266,17 @@ class AnswerSynthesizer:
         self,
         question: str,
         results: List[QueryResult],
-        strategy: str = "concatenate"
+        strategy: str = "concatenate",
+        routing_strategy: str = "keyword"
     ) -> SynthesizedAnswer:
         """
-        Synthesize final answer from multiple chunk results.
+        Synthesize multiple chunk query results into a final answer.
         
         Args:
-            question: Original question
+            question: User's question
             results: List of QueryResult objects
             strategy: Synthesis strategy (concatenate/summarize/mapreduce)
+            routing_strategy: Routing strategy used (for metadata)
         
         Returns:
             SynthesizedAnswer with attributed sources
@@ -290,16 +293,17 @@ class AnswerSynthesizer:
             )
         
         if strategy == "summarize":
-            return self._synthesize_summarize(question, results)
+            return self._synthesize_summarize(question, results, routing_strategy)
         elif strategy == "mapreduce":
-            return self._synthesize_mapreduce(question, results)
+            return self._synthesize_mapreduce(question, results, routing_strategy)
         else:  # default: concatenate
-            return self._synthesize_concatenate(question, results)
+            return self._synthesize_concatenate(question, results, routing_strategy)
     
     def _synthesize_concatenate(
         self,
         question: str,
-        results: List[QueryResult]
+        results: List[QueryResult],
+        routing_strategy: str = "keyword"
     ) -> SynthesizedAnswer:
         """
         Simple concatenation with source attribution.
@@ -346,7 +350,7 @@ class AnswerSynthesizer:
             total_chunks_queried=len(results),
             total_time=total_time,
             confidence=confidence,
-            routing_strategy="keyword"
+            routing_strategy=routing_strategy
         )
     
     def _synthesize_summarize(
@@ -420,7 +424,7 @@ class EnhancedDocumentQA:
         self,
         question: str,
         model: str = "mock",
-        routing_strategy: str = "keyword",
+        routing_strategy: str = "comprehensive",
         synthesis_strategy: str = "concatenate",
         relevance_threshold: float = 0.3,
         ollama_client: Optional[Any] = None,
@@ -483,7 +487,8 @@ class EnhancedDocumentQA:
         synthesized = self.synthesizer.synthesize(
             question,
             results,
-            strategy=synthesis_strategy
+            strategy=synthesis_strategy,
+            routing_strategy=routing_strategy
         )
         
         return synthesized

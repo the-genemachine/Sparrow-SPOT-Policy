@@ -2152,8 +2152,8 @@ def create_arg_parser():
                         help='v8: Generate publish-ready narrative in specified style (Globe and Mail, Policy Options, etc.). Requires --variant policy.')
     parser.add_argument('--narrative-length', choices=['concise', 'standard', 'detailed', 'comprehensive'], default='standard',
                         help='v8: Control narrative detail level. concise=~500 words, standard=~1000, detailed=~2000, comprehensive=~3500+. Works with --narrative-style.')
-    parser.add_argument('--ollama-model', default='llama3.2',
-                        help='v8: Ollama model for summary generation. Options: llama3.2 (default), mistral, qwen2.5, gemma2, etc. Must be pulled locally.')
+    parser.add_argument('--ollama-model', default='llama3.2:3b',
+                        help='v8: Ollama model for summary generation. Options: llama3.2:3b (default), qwen2.5:7b, qwen2.5:14b, mistral:7b, gemma3:4b, etc. Must be pulled locally.')
     parser.add_argument('--doc-type', choices=['journalistic', 'policy', 'mixed'], default='journalistic',
                         help='v2: Document type for context-aware weighting (journalism variant only)')
     parser.add_argument('--cite-analysis', action='store_true',
