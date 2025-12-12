@@ -918,6 +918,19 @@ def analyze_document(
                             print(f"   ✓ Confidence: {answer.confidence:.0%}, Chunks queried: {answer.total_chunks_queried}/{num_chunks}")
                             print(f"   ✓ Ollama API calls: {ollama_chunk_client.queries_made}")
                             print(f"   ✓ Total processing time: {time.time() - chunk_start_time:.1f}s")
+                            
+                            # Generate publishable Q&A narrative
+                            try:
+                                from enhanced_document_qa import generate_qa_narrative
+                                
+                                doc_title = results.get('document_title') or results.get('title') or Path(output_name).stem
+                                narrative_file = qa_output_dir / f"{Path(output_name).stem}_qa_analysis.md"
+                                
+                                generate_qa_narrative(answer, narrative_file, document_title=doc_title)
+                                output_files.append(str(narrative_file))
+                                print(f"   ✓ Q&A Narrative: {narrative_file}")
+                            except Exception as e:
+                                print(f"   ⚠️ Could not generate Q&A narrative: {e}")
                         else:
                             # Standard Q&A (no chunking)
                             from document_qa import generate_document_qa

@@ -773,5 +773,101 @@ def main():
     return 0
 
 
+def generate_qa_narrative(answer: SynthesizedAnswer, output_path: Path, document_title: str = None) -> Path:
+    """
+    Generate a publishable markdown narrative from Q&A results.
+    
+    Args:
+        answer: SynthesizedAnswer object with question, answer, sources
+        output_path: Path to save the markdown file
+        document_title: Optional document title for header
+        
+    Returns:
+        Path to generated markdown file
+    """
+    from datetime import datetime
+    
+    # Extract document title from sources if not provided
+    if not document_title and answer.sources:
+        sections = answer.sources[0].sections
+        if sections:
+            document_title = sections[0] if sections[0] != "Document Start" else "Legislative Document"
+    
+    if not document_title:
+        document_title = "Policy Document"
+    
+    # Build markdown content
+    content = f"""# Document Q&A Analysis: {document_title}
+
+**Generated:** {datetime.now().strftime("%B %d, %Y")}  
+**Document:** {document_title}  
+**Analysis Type:** Legislative Interpretation
+
+---
+
+## Question
+
+**{answer.question}**
+
+---
+
+## Answer
+
+Based on comprehensive analysis of the legislative text:
+
+{answer.answer}
+
+---
+
+## Sources & Evidence
+
+"""
+    
+    # Add source information
+    if answer.sources:
+        content += "**Primary Sources:**\n\n"
+        for i, source in enumerate(answer.sources, 1):
+            content += f"{i}. **Chunk {source.chunk_number}**\n"
+            content += f"   - Pages: {source.pages}\n"
+            if source.sections:
+                sections_display = source.sections[:5]  # First 5 sections
+                if len(source.sections) > 5:
+                    sections_display.append(f"(+{len(source.sections) - 5} more)")
+                content += f"   - Sections: {', '.join(sections_display)}\n"
+            content += "\n"
+    
+    content += f"""---
+
+## Metadata
+
+- **Analysis Confidence:** {'High' if answer.confidence >= 0.8 else 'Medium' if answer.confidence >= 0.5 else 'Low'} ({answer.confidence:.1%})
+- **Chunks Analyzed:** {answer.total_chunks_queried}
+- **Routing Strategy:** {answer.routing_strategy.title()}
+- **Query Processing Time:** {answer.total_time:.1f} seconds
+- **Source Validation:** Direct citation from legislative text
+
+---
+
+## Analysis Framework
+
+This Q&A response was generated using the Sparrow SPOT Scale™ Document Q&A system with:
+- Smart chunking for large legislative documents
+- {answer.routing_strategy.title()} routing across document text
+- Direct citation of specific sections and articles
+- Legislative interpretation analysis methodology
+
+---
+
+**Disclaimer:** This analysis is for informational purposes and should not be construed as legal advice. Consult with legal professionals for authoritative interpretation of legislative documents.
+"""
+    
+    # Save to file
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    
+    return output_path
+
+
 if __name__ == '__main__':
     exit(main())
