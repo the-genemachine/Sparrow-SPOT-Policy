@@ -1696,6 +1696,29 @@ def generate_narrative_with_tracking(results, text, output_name, style, length, 
     # Add custom query to analysis for the pipeline to use
     if custom_query and custom_query.strip():
         results['custom_narrative_query'] = custom_query.strip()
+        
+        # Re-save analysis.json with custom_query included
+        # This ensures the query is persisted in the analysis file
+        import json
+        from pathlib import Path
+        
+        # Determine the analysis.json path from output_name
+        if output_name.startswith('test_articles/'):
+            json_path = f"../{output_name}.json"
+        else:
+            json_path = f"{output_name}.json"
+        
+        # Only update if the file exists (don't create new one)
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    existing_data = json.load(f)
+                existing_data['custom_narrative_query'] = custom_query.strip()
+                with open(json_path, 'w') as f:
+                    json.dump(existing_data, f, indent=2)
+                print(f"   ✓ Custom query saved to analysis.json")
+            except Exception as e:
+                print(f"   ⚠️ Could not update analysis.json with custom query: {e}")
     
     # Generate complete narrative
     narrative_result = pipeline.generate_complete_narrative(
