@@ -930,7 +930,9 @@ def analyze_document(
                                 output_files.append(str(narrative_file))
                                 print(f"   ✓ Q&A Narrative: {narrative_file}")
                             except Exception as e:
+                                import traceback
                                 print(f"   ⚠️ Could not generate Q&A narrative: {e}")
+                                print(f"   Debug: {traceback.format_exc()}")
                         else:
                             # Standard Q&A (no chunking)
                             from document_qa import generate_document_qa

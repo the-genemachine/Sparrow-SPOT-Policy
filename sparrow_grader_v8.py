@@ -2231,18 +2231,23 @@ def main():
     parent_name = output_base.parent.stem if output_base.parent != Path('.') else None
     
     # Detect if last component is a file prefix (not a directory)
-    # Heuristic: file prefixes are typically lowercase or simple names, while directories are uppercase/kebab-case
-    is_likely_prefix = output_name and output_name.islower() and not output_name.isupper()
+    # Improved heuristic: file prefixes are typically:
+    # - Short simple names (analysis, report, output, UNDRIP, etc.)
+    # - NOT containing date/version patterns like Bill-C15-09
+    # - Different from parent directory name (not duplicate)
+    has_hyphenated_number = bool(re.search(r'-\d+$', output_name))  # Ends with -09, -05, etc.
+    is_likely_directory = has_hyphenated_number or (len(output_name) > 15 and '-' in output_name)
     is_duplicate_directory = parent_name and output_name == parent_name and output_base.parent.parent != Path('.')
     
     if is_duplicate_directory:
         # Case: /path/to/Bill-C15-05/Bill-C15-05 → Duplicate directory
         output_dir = output_base.parent
         output_name = output_dir.stem
-    elif is_likely_prefix and output_base.parent != Path('.'):
-        # Case: /path/to/Bill-C15-05/analysis → Prefix path
+    elif not is_likely_directory and output_base.parent != Path('.') and parent_name:
+        # Case: /path/to/Bill-C15-05/analysis or /path/Bill-C15-09/UNDRIP → Prefix path
+        # Use parent as output_dir, keep last component as file prefix
         output_dir = output_base.parent
-        output_name = output_base.stem  # Keep "analysis" as the prefix
+        output_name = output_base.stem  # Keep "analysis" or "UNDRIP" as the prefix
     else:
         # Case: /path/to/Bill-C15-05 → Directory path
         output_dir = output_base
