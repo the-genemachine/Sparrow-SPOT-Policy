@@ -79,12 +79,13 @@ class NarrativeEngine:
             'policy_consequentiality': 'What are the real-world consequences?'
         }
     
-    def generate(self, analysis: Dict) -> Dict:
+    def generate(self, analysis: Dict, custom_query: str = '') -> Dict:
         """
         Generate complete narrative components from v7 analysis.
         
         Args:
             analysis: v7 JSON analysis report with scores and reasoning
+            custom_query: Optional custom question/context to address in narrative
             
         Returns:
             Dictionary with narrative components (lede, criteria, tensions, etc.)
@@ -114,9 +115,15 @@ class NarrativeEngine:
         implications = self._extract_implications(analysis, document_type)
         escalations = self._identify_escalations(analysis)
         
+        # Generate custom query response if provided
+        custom_response = ''
+        if custom_query and custom_query.strip():
+            custom_response = self._generate_custom_response(analysis, custom_query, document_type)
+        
         return {
             'lede': lede,
             'criteria': criteria_narratives,
+            'custom_response': custom_response,
             'key_tension': tensions.get('primary', ''),
             'secondary_tensions': tensions.get('secondary', []),
             'implications': implications,
@@ -133,6 +140,94 @@ class NarrativeEngine:
                 'document_type': document_type
             }
         }
+    
+    def _generate_custom_response(self, analysis: Dict, custom_query: str, document_type: str) -> str:
+        """
+        Generate a focused response to the user's custom query.
+        
+        Args:
+            analysis: Analysis results
+            custom_query: User's question/request
+            document_type: Type of document being analyzed
+            
+        Returns:
+            Narrative response addressing the custom query
+        """
+        criteria = analysis.get('criteria', {})
+        composite_score = analysis.get('composite_score', 0)
+        trust_score = analysis.get('trust_score', {}).get('score', 0)
+        
+        response = f"## Addressing Your Question\n\n"
+        response += f"**Your Query:** \"{custom_query}\"\n\n"
+        response += f"Based on the comprehensive analysis of this {document_type}, here's what the evidence shows:\n\n"
+        
+        # Map query terms to relevant criteria scores
+        query_lower = custom_query.lower()
+        response_points = []
+        
+        # Budget/Financial questions
+        if any(term in query_lower for term in ['budget', 'cost', 'financial', 'fiscal', 'money', 'spending', 'expense']):
+            if 'fiscal_transparency' in criteria:
+                score = criteria['fiscal_transparency'].get('score', 0)
+                response_points.append(f"**Fiscal Transparency ({score}/100):** The document shows {'strong' if score >= 70 else 'moderate' if score >= 50 else 'weak'} clarity regarding financial allocation and budget details.")
+        
+        # Stakeholder/Participation questions
+        if any(term in query_lower for term in ['stakeholder', 'consultation', 'engagement', 'participation', 'involve', 'voice', 'community']):
+            if 'stakeholder_balance' in criteria:
+                score = criteria['stakeholder_balance'].get('score', 0)
+                response_points.append(f"**Stakeholder Engagement ({score}/100):** The document demonstrates {'comprehensive' if score >= 70 else 'moderate' if score >= 50 else 'limited'} stakeholder involvement in policy development.")
+        
+        # Evidence/Analysis questions
+        if any(term in query_lower for term in ['evidence', 'analysis', 'rigor', 'economic', 'data', 'study', 'research']):
+            if 'economic_rigor' in criteria:
+                score = criteria['economic_rigor'].get('score', 0)
+                response_points.append(f"**Economic Rigor ({score}/100):** The economic analysis is {'robust' if score >= 70 else 'adequate' if score >= 50 else 'limited'}, with {'strong' if score >= 70 else 'moderate' if score >= 50 else 'weak'} evidence-based reasoning.")
+        
+        # Clarity/Accessibility questions
+        if any(term in query_lower for term in ['clear', 'understand', 'accessible', 'plain', 'readable', 'complicated', 'jargon']):
+            if 'public_accessibility' in criteria:
+                score = criteria['public_accessibility'].get('score', 0)
+                response_points.append(f"**Public Accessibility ({score}/100):** The document is {'highly' if score >= 70 else 'moderately' if score >= 50 else 'poorly'} accessible to general audiences, with {'clear' if score >= 70 else 'adequate' if score >= 50 else 'complicated'} language and explanations.")
+        
+        # Impact/Consequence questions
+        if any(term in query_lower for term in ['impact', 'effect', 'consequence', 'outcome', 'result', 'achieve', 'goal']):
+            if 'policy_consequentiality' in criteria:
+                score = criteria['policy_consequentiality'].get('score', 0)
+                response_points.append(f"**Policy Impact ({score}/100):** The policy shows {'strong' if score >= 70 else 'moderate' if score >= 50 else 'weak'} alignment between stated goals and practical implementation capabilities.")
+        
+        # Alternative/Options questions
+        if any(term in query_lower for term in ['alternative', 'option', 'choice', 'instead', 'other approach', 'compared']):
+            if 'considered_alternatives' in criteria:
+                score = criteria['considered_alternatives'].get('score', 0)
+                response_points.append(f"**Alternative Approaches ({score}/100):** The document shows {'thorough' if score >= 70 else 'moderate' if score >= 50 else 'limited'} exploration of alternative policy options.")
+        
+        # If we have specific points, add them
+        if response_points:
+            for point in response_points:
+                response += f"- {point}\n"
+        else:
+            # Fallback to general assessment
+            response += f"**Overall Assessment:**\n"
+            response += f"- Composite Quality Score: {composite_score}/100\n"
+            response += f"- Trust Score: {trust_score}/100\n"
+            response += f"- Document shows {'strong' if composite_score >= 70 else 'moderate' if composite_score >= 50 else 'weak'} performance across key evaluation criteria.\n"
+        
+        # Add implications
+        response += f"\n### Key Takeaway\n\n"
+        
+        if composite_score >= 70:
+            response += f"The document addresses your query well, with solid evidence and clear articulation of its position on the matters you're concerned about."
+        elif composite_score >= 50:
+            response += f"The document addresses your query with moderate clarity, though there are areas where additional evidence or explanation would strengthen the response."
+        else:
+            response += f"The document has significant gaps in addressing your query. Key areas require clarification, additional evidence, or more detailed explanation."
+        
+        if trust_score < 50:
+            response += f" However, credibility concerns should be considered when evaluating these claims."
+        
+        response += "\n\n"
+        
+        return response
     
     def _generate_lede(self, analysis: Dict) -> str:
         """

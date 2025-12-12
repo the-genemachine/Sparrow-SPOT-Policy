@@ -64,7 +64,7 @@ class ToneAdaptor:
         Adapt narrative components to specified tone and length.
         
         Args:
-            narrative_components: Dict with lede, criteria, tensions, implications
+            narrative_components: Dict with lede, criteria, tensions, implications, custom_response
             tone: One of 'journalistic', 'academic', 'civic', 'critical', 'explanatory'
             length: One of 'concise' (~500 words), 'standard' (~1000), 'detailed' (~2000), 'comprehensive' (~3500+)
             
@@ -88,23 +88,24 @@ class ToneAdaptor:
         tensions = narrative_components.get('key_tension', '')
         implications = narrative_components.get('implications', [])
         escalations = narrative_components.get('escalations', [])
+        custom_response = narrative_components.get('custom_response', '')  # NEW: Get custom response
         
         # Build narrative according to tone
         # Route to tone-specific formatter with length parameter
         if tone == 'journalistic':
-            return self._adapt_journalistic(lede, criteria, tensions, implications, escalations, target_words)
+            return self._adapt_journalistic(lede, criteria, tensions, implications, escalations, target_words, custom_response)
         elif tone == 'academic':
-            return self._adapt_academic(lede, criteria, tensions, implications, escalations, target_words)
+            return self._adapt_academic(lede, criteria, tensions, implications, escalations, target_words, custom_response)
         elif tone == 'civic':
-            return self._adapt_civic(lede, criteria, tensions, implications, escalations, target_words)
+            return self._adapt_civic(lede, criteria, tensions, implications, escalations, target_words, custom_response)
         elif tone == 'critical':
-            return self._adapt_critical(lede, criteria, tensions, implications, escalations, target_words)
+            return self._adapt_critical(lede, criteria, tensions, implications, escalations, target_words, custom_response)
         elif tone == 'explanatory':
-            return self._adapt_explanatory(lede, criteria, tensions, implications, escalations, target_words)
+            return self._adapt_explanatory(lede, criteria, tensions, implications, escalations, target_words, custom_response)
         
         return lede  # Fallback
     
-    def _adapt_journalistic(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000) -> str:
+    def _adapt_journalistic(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000, custom_response: str = '') -> str:
         """
         Journalistic tone: News-style, objective, inverted pyramid.
         Lead with most important info, add context, then details.
@@ -115,6 +116,11 @@ class ToneAdaptor:
         # Lead: The headline/opening
         narrative.append(f"ANALYSIS: {lede}")
         narrative.append("")
+        
+        # Custom query response if provided (insert right after lede)
+        if custom_response:
+            narrative.append(custom_response)
+            narrative.append("---\n")
         
         # Nut graph: Why this matters
         if implications:
@@ -177,7 +183,7 @@ class ToneAdaptor:
         
         return "\n".join(narrative)
     
-    def _adapt_academic(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000) -> str:
+    def _adapt_academic(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000, custom_response: str = '') -> str:
         """
         Academic tone: Formal, passive voice, evidence-heavy, structured.
         """
@@ -187,6 +193,13 @@ class ToneAdaptor:
         narrative.append("Abstract")
         narrative.append("-" * 60)
         narrative.append(f"This analysis demonstrates that {lede.lower()}")
+        
+        # Custom query response if provided
+        if custom_response:
+            narrative.append("")
+            narrative.append("Research Question & Findings")
+            narrative.append("-" * 60)
+            narrative.append(custom_response)
         narrative.append("")
         
         # Methodology
@@ -271,7 +284,7 @@ class ToneAdaptor:
         
         return "\n".join(narrative)
     
-    def _adapt_civic(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000) -> str:
+    def _adapt_civic(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000, custom_response: str = '') -> str:
         """
         Civic tone: Citizen-friendly, actionable, personal relevance.
         Focus on "what does this mean for you?"
@@ -280,8 +293,14 @@ class ToneAdaptor:
         
         # Hook with relevance
         narrative.append("Here's what you need to know:")
-        narrative.append("")
         narrative.append(lede)
+        narrative.append("")
+        
+        # Custom query response if provided
+        if custom_response:
+            narrative.append("Your Questions Answered:")
+            narrative.append(custom_response)
+            narrative.append("")
         narrative.append("")
         
         # What it means for citizens
@@ -371,7 +390,7 @@ class ToneAdaptor:
         
         return "\n".join(narrative)
     
-    def _adapt_critical(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000) -> str:
+    def _adapt_critical(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000, custom_response: str = '') -> str:
         """
         Critical tone: Analytical, questioning, identifying gaps and concerns.
         """
@@ -382,6 +401,13 @@ class ToneAdaptor:
         narrative.append("=" * 60)
         narrative.append(f"{lede}")
         narrative.append("")
+        
+        # Custom query response if provided
+        if custom_response:
+            narrative.append("Critical Assessment of Your Query")
+            narrative.append("-" * 60)
+            narrative.append(custom_response)
+            narrative.append("")
         
         # The problems
         narrative.append("Issues Identified")
@@ -484,7 +510,7 @@ class ToneAdaptor:
         
         return "\n".join(narrative)
     
-    def _adapt_explanatory(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000) -> str:
+    def _adapt_explanatory(self, lede: str, criteria: Dict, tensions: str, implications: List, escalations: List, target_words: int = 1000, custom_response: str = '') -> str:
         """
         Explanatory tone: Educational, detailed, step-by-step understanding.
         """
@@ -492,6 +518,16 @@ class ToneAdaptor:
         
         # Introduction with context
         narrative.append("Understanding This Analysis")
+        narrative.append("=" * 60)
+        narrative.append(lede)
+        narrative.append("")
+        
+        # Custom query response if provided
+        if custom_response:
+            narrative.append("Explaining Your Question")
+            narrative.append("-" * 60)
+            narrative.append(custom_response)
+            narrative.append("")
         narrative.append("=" * 60)
         narrative.append("")
         narrative.append(lede)

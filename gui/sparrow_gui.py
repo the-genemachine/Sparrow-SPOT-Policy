@@ -37,6 +37,7 @@ WAVE_DIR = SPOT_NEWS_DIR.parent  # Wave-2-2025-Methodology/
 # CRITICAL: Insert SPOT_News FIRST before any other imports
 # This ensures we get the correct versions of modules that exist in both places
 sys.path.insert(0, str(SPOT_NEWS_DIR))
+sys.path.insert(0, str(GUI_DIR))  # Also add gui/ directory for appendices_panel import
 
 # Import support modules FIRST (before sparrow_grader_v8 which will add parent to sys.path)
 # Import only modules that are in SPOT_News/ directory
@@ -761,7 +762,6 @@ def analyze_document(
                             from semantic_chunker import chunk_document, save_chunks
                             from enhanced_document_qa import EnhancedDocumentQA
                             import time
-                            import json
                             
                             # Track timing
                             chunk_start_time = time.time()

@@ -139,7 +139,8 @@ class NarrativeGenerationPipeline:
         
         # Step 1: Generate narrative components
         print("🔄 Step 1: Generating narrative components...")
-        narrative_components = self.engine.generate(analysis)
+        custom_query = analysis.get('custom_narrative_query', '')
+        narrative_components = self.engine.generate(analysis, custom_query=custom_query)
         
         # Step 2: Adapt tone with length control
         print(f"🔄 Step 2: Adapting tone to '{tone}' (length: {length})...")
@@ -329,6 +330,21 @@ class NarrativeGenerationPipeline:
                 include_index=True
             )
             print(f"   ✓ Generated 5 appendices + navigation index (~30K words)")
+            
+            # Append appendices to narrative_text for comprehensive output
+            if appendices_output:
+                narrative_text += "\n\n" + "="*80 + "\n"
+                narrative_text += "APPENDICES - COMPREHENSIVE TRANSPARENCY DOCUMENTATION\n"
+                narrative_text += "="*80 + "\n\n"
+                
+                # Add all appendices in order
+                for appendix_key in ['appendix_a', 'appendix_b', 'appendix_c', 'appendix_d', 'appendix_e']:
+                    if appendix_key in appendices_output:
+                        narrative_text += appendices_output[appendix_key] + "\n\n"
+                
+                # Add navigation index if available
+                if 'navigation_index' in appendices_output:
+                    narrative_text += appendices_output['navigation_index'] + "\n\n"
         
         # Fix #6: Add timestamp for audit trail
         from datetime import datetime
@@ -619,7 +635,15 @@ FOCUS ON:
         section_targets[-1] += target_words % sections_needed
         
         for i, section_target in enumerate(section_targets, 1):
-            section_prompt = f"""You are a professional analyst. Expand the following narrative section with detailed analysis.
+            section_prompt = f"""You are a professional policy analyst. Expand the following narrative section with detailed analysis.
+
+IMPORTANT INSTRUCTIONS:
+- Do NOT use generic templates or placeholder language like "[insert specific issue]" or "[relevant sector/region]"
+- DO analyze the specific scores and findings provided below
+- DO explain why scores are what they are based on the data
+- DO be concrete and specific - avoid vague generalizations
+- If you don't have document details, focus on what the scores tell us about quality gaps
+- Acknowledge specific criterion scores and what they indicate
 
 CONTEXT - Original Narrative ({current_words} words):
 {narrative_text}
@@ -635,22 +659,22 @@ Write a detailed {section_target}-word section that:
 """
             
             if i == 1:
-                section_prompt += """1. Introduces the document and provides comprehensive context
-2. Details the scoring and evaluation criteria
-3. Explains the implications and significance
-4. Discusses primary stakeholder impacts"""
+                section_prompt += """1. Analyzes the document based on the specific criteria scores shown above
+2. Explains what the scores tell us (gaps, strengths, weaknesses)
+3. Discusses why certain scores are low or high
+4. Explores stakeholder implications of the score profile"""
             elif i == len(section_targets):
-                section_prompt += """1. Provides deeper analysis of findings
-2. Discusses recommended next steps or considerations
-3. Addresses limitations and alternative perspectives
-4. Concludes with synthesis and key takeaways"""
+                section_prompt += """1. Synthesizes findings from the score analysis
+2. Discusses what needs to improve and why
+3. Addresses systemic issues revealed by score gaps
+4. Concludes with actionable insights based on the data"""
             else:
-                section_prompt += f"""1. Provides detailed analysis of specific aspects
-2. Includes concrete examples and supporting details
-3. Discusses relevant contextual factors
-4. Connects to broader policy implications"""
+                section_prompt += f"""1. Analyzes specific criteria in depth based on scores
+2. Explains the implications of score gaps
+3. Discusses the relationship between different criteria
+4. Connects scores to real-world policy impact"""
             
-            section_prompt += "\n\nWrite only the section content - no meta-commentary or section markers:"
+            section_prompt += "\n\nWrite only the section content - be specific to the scores and analysis provided - no meta-commentary or section markers:"
             
             # v8.4.1: Track AI contribution
             start_time = datetime.now()
