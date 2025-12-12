@@ -2192,8 +2192,8 @@ def create_arg_parser():
     qa_group.add_argument('--enable-chunking', action='store_true',
                         help='v8.6: Enable smart chunking for large documents during Q&A (automatically chunks if document exceeds context window).')
     qa_group.add_argument('--qa-routing', type=str, choices=['keyword', 'semantic', 'comprehensive', 'quick'],
-                        default='keyword',
-                        help='v8.6: Query routing strategy for chunked Q&A (keyword: smart/fast, comprehensive: all chunks, quick: first chunk only).')
+                        default='comprehensive',
+                        help='v8.6: Query routing strategy for chunked Q&A (keyword: smart/fast, comprehensive: all chunks for accuracy, quick: first chunk only).')
     qa_group.add_argument('--chunk-strategy', type=str, choices=['section', 'sliding', 'semantic'],
                         default='section',
                         help='v8.6: Chunking strategy (section: legislative docs, sliding: general docs, semantic: topic-based).')

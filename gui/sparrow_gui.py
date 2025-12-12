@@ -1157,7 +1157,8 @@ def run_via_subprocess(url_or_file, variant, document_type, output_name, documen
         cmd.extend(["--document-qa", document_qa_question.strip()])
         if enable_chunking:
             cmd.append("--enable-chunking")
-            if qa_routing_strategy and qa_routing_strategy != "keyword":
+            # Always pass routing strategy if not default (comprehensive)
+            if qa_routing_strategy and qa_routing_strategy != "comprehensive":
                 cmd.extend(["--qa-routing", qa_routing_strategy])
     if enhanced_provenance:
         cmd.append("--enhanced-provenance")
@@ -2230,7 +2231,7 @@ def create_interface():
                 
                 qa_routing_strategy = gr.Radio(
                     choices=["keyword", "comprehensive", "quick"],
-                    value="keyword",
+                    value="comprehensive",
                     label="Query Routing Strategy",
                     info="keyword: Smart routing (fast), comprehensive: Query all chunks (thorough), quick: First chunk only",
                     visible=False
