@@ -920,19 +920,21 @@ def analyze_document(
                             print(f"   ✓ Total processing time: {time.time() - chunk_start_time:.1f}s")
                             
                             # Generate publishable Q&A narrative
+                            print("   🔍 DEBUG: Starting Q&A narrative generation...")
                             try:
                                 from enhanced_document_qa import generate_qa_narrative
                                 
                                 doc_title = results.get('document_title') or results.get('title') or Path(output_name).stem
                                 narrative_file = qa_output_dir / f"{Path(output_name).stem}_qa_analysis.md"
                                 
+                                print(f"   🔍 DEBUG: Calling generate_qa_narrative with title='{doc_title}', file='{narrative_file}'")
                                 generate_qa_narrative(answer, narrative_file, document_title=doc_title)
                                 output_files.append(str(narrative_file))
                                 print(f"   ✓ Q&A Narrative: {narrative_file}")
                             except Exception as e:
                                 import traceback
                                 print(f"   ⚠️ Could not generate Q&A narrative: {e}")
-                                print(f"   Debug: {traceback.format_exc()}")
+                                print(f"   🔍 DEBUG: {traceback.format_exc()}")
                         else:
                             # Standard Q&A (no chunking)
                             from document_qa import generate_document_qa

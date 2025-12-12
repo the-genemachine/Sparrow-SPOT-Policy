@@ -2197,8 +2197,8 @@ def create_arg_parser():
     qa_group.add_argument('--chunk-strategy', type=str, choices=['section', 'sliding', 'semantic'],
                         default='section',
                         help='v8.6: Chunking strategy (section: legislative docs, sliding: general docs, semantic: topic-based).')
-    qa_group.add_argument('--max-chunk-tokens', type=int, default=100000,
-                        help='v8.6: Maximum tokens per chunk (default: 100000).')
+    qa_group.add_argument('--max-chunk-tokens', type=int, default=4000,
+                        help='v8.6: Maximum tokens per chunk (default: 4000 for focused context with section boundaries).')
     
     # v8.5: Legislative threat detection
     legislative_group = parser.add_argument_group('legislative threat detection', 'v8.5: Analyze legislative documents for hidden powers and accountability gaps')
@@ -3039,6 +3039,27 @@ def main():
                         'type': 'enhanced_document_qa',
                         'timestamp': datetime.now().isoformat()
                     })
+                    
+                    # Generate publishable Q&A narrative
+                    print("   🔍 DEBUG: Starting Q&A narrative generation...")
+                    try:
+                        from enhanced_document_qa import generate_qa_narrative
+                        
+                        doc_title = args.document_title or output_name
+                        narrative_file = qa_dir / f"{output_name}_qa_analysis.md"
+                        
+                        print(f"   🔍 DEBUG: Calling generate_qa_narrative with title='{doc_title}', file='{narrative_file}'")
+                        generate_qa_narrative(answer, narrative_file, document_title=doc_title)
+                        generation_sequence.append({
+                            'file': str(narrative_file),
+                            'type': 'qa_narrative',
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        print(f"   ✓ Q&A Narrative: {narrative_file}")
+                    except Exception as e:
+                        import traceback
+                        print(f"   ⚠️ Could not generate Q&A narrative: {e}")
+                        print(f"   🔍 DEBUG: {traceback.format_exc()}")
                     
                 else:
                     # Standard Q&A (no chunking)

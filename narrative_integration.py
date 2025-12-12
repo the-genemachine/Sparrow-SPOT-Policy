@@ -556,6 +556,9 @@ class NarrativeGenerationPipeline:
         """
         import requests
         
+        # Define Ollama endpoint
+        ollama_url = "http://localhost:11434"
+        
         length_targets = {
             'detailed': 2000,
             'comprehensive': 3500
@@ -684,7 +687,7 @@ Write a detailed {section_target}-word section that:
                 response = requests.post(
                     f"{ollama_url}/api/generate",
                     json={
-                        "model": model,
+                        "model": ollama_model,
                         "prompt": section_prompt,
                         "stream": False,
                         "temperature": 0.7,
