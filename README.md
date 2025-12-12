@@ -29,17 +29,28 @@ This project is licensed under the MIT License. See the LICENSE file for more in
 
 ### Quick Start
 
+**Three Ways to Run Sparrow SPOT:**
+
 ```bash
-# Grade a policy document
-python sparrow_grader_v4.py budget.pdf --variant policy -o analysis
+# 1. TUI (Text User Interface) - Recommended for interactive use
+./run_tui.py
+# OR: python -m tui.sparrow_tui
 
-# Grade a news article
-python sparrow_grader_v4.py article.txt --variant journalism -o report
+# 2. GUI (Web Interface) - Full-featured graphical interface
+cd gui && python sparrow_gui.py
 
-# View results
-cat analysis.json  # Structured data
-cat analysis.txt   # Human-readable summary
+# 3. CLI (Command Line) - Fast and scriptable
+python sparrow_grader_v8.py document.txt --enable-chunking --document-qa "Your question"
 ```
+
+**TUI Features:**
+- 📋 Organized tabs for all options (Document, Analysis, Q&A, Ollama, Advanced)
+- 👀 Real-time command preview
+- 💾 Save/load configuration profiles
+- ⌨️ Keyboard shortcuts (Ctrl+R to run, Ctrl+S to save)
+- 📊 No need to remember CLI flags
+
+See [tui/README.md](tui/README.md) for TUI documentation.
 
 ### Key Features
 
